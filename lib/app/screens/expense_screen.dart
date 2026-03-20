@@ -17,6 +17,9 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
   final _conceptController = TextEditingController();
   final _categoryController = TextEditingController(text: 'Insumos');
   final _amountController = TextEditingController();
+  final _conceptFocusNode = FocusNode();
+  final _amountFocusNode = FocusNode();
+  final _categoryFocusNode = FocusNode();
   DateTime _dateTime = DateTime.now();
   bool _saving = false;
 
@@ -25,6 +28,9 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
     _conceptController.dispose();
     _categoryController.dispose();
     _amountController.dispose();
+    _conceptFocusNode.dispose();
+    _amountFocusNode.dispose();
+    _categoryFocusNode.dispose();
     super.dispose();
   }
 
@@ -52,15 +58,17 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                     Text(
                       'Dejalo claro y corto para que la caja quede al dia.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.outline,
-                          ),
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
                     ),
                     const SizedBox(height: 18),
                     TextFormField(
                       controller: _conceptController,
-                      decoration: const InputDecoration(
-                        labelText: 'Concepto',
-                      ),
+                      focusNode: _conceptFocusNode,
+                      autofocus: true,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(labelText: 'Concepto'),
+                      onFieldSubmitted: (_) => _amountFocusNode.requestFocus(),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return 'Escribi un concepto';
@@ -83,10 +91,14 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                               width: fieldWidth,
                               child: TextFormField(
                                 controller: _amountController,
+                                focusNode: _amountFocusNode,
                                 keyboardType: TextInputType.number,
+                                textInputAction: TextInputAction.next,
                                 decoration: const InputDecoration(
                                   labelText: 'Monto',
                                 ),
+                                onFieldSubmitted: (_) =>
+                                    _categoryFocusNode.requestFocus(),
                                 validator: (value) {
                                   final parsed = _parseInt(value);
                                   if (parsed <= 0) {
@@ -100,9 +112,12 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                               width: fieldWidth,
                               child: TextFormField(
                                 controller: _categoryController,
+                                focusNode: _categoryFocusNode,
+                                textInputAction: TextInputAction.done,
                                 decoration: const InputDecoration(
                                   labelText: 'Categoria',
                                 ),
+                                onFieldSubmitted: (_) => _save(store),
                               ),
                             ),
                           ],
@@ -130,27 +145,58 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        const Spacer(),
-                        TextButton(
-                          onPressed:
-                              _saving ? null : () => Navigator.of(context).pop(),
-                          child: const Text('Cancelar'),
-                        ),
-                        const SizedBox(width: 12),
-                        FilledButton.icon(
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final compact = constraints.maxWidth < 520;
+                        final saveButton = FilledButton.icon(
                           onPressed: _saving ? null : () => _save(store),
+                          style: compact
+                              ? FilledButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(52),
+                                )
+                              : null,
                           icon: _saving
                               ? const SizedBox(
                                   width: 18,
                                   height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : const Icon(Icons.save_rounded),
                           label: Text(_saving ? 'Guardando' : 'Guardar gasto'),
-                        ),
-                      ],
+                        );
+
+                        if (compact) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              saveButton,
+                              const SizedBox(height: 10),
+                              TextButton(
+                                onPressed: _saving
+                                    ? null
+                                    : () => Navigator.of(context).pop(),
+                                child: const Text('Cancelar'),
+                              ),
+                            ],
+                          );
+                        }
+
+                        return Row(
+                          children: [
+                            const Spacer(),
+                            TextButton(
+                              onPressed: _saving
+                                  ? null
+                                  : () => Navigator.of(context).pop(),
+                              child: const Text('Cancelar'),
+                            ),
+                            const SizedBox(width: 12),
+                            saveButton,
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -196,6 +242,8 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
     }
 
     setState(() => _saving = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
     try {
       await store.recordExpense(
         concept: _conceptController.text,
@@ -208,18 +256,18 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
       if (!mounted) {
         return;
       }
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gasto guardado')),
+      messenger.hideCurrentSnackBar();
+      navigator.pop();
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Gasto guardado. Caja actualizada.')),
       );
     } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
-      );
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(SnackBar(content: Text(_friendlyError(error))));
     }
   }
 
@@ -229,5 +277,14 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
       return 0;
     }
     return int.tryParse(normalized) ?? 0;
+  }
+
+  String _friendlyError(Object error) {
+    final message = error.toString();
+    const prefix = 'Bad state: ';
+    if (message.startsWith(prefix)) {
+      return message.substring(prefix.length);
+    }
+    return message;
   }
 }

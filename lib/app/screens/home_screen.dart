@@ -57,7 +57,7 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 16),
               const SectionHeader(
                 title: 'Ultimos movimientos',
-                subtitle: 'Ventas en verde. Gastos en rojo sobrio.',
+                subtitle: 'Lo ultimo en caja, sin ruido.',
               ),
               const SizedBox(height: 10),
               if (recent.isEmpty)
@@ -78,8 +78,9 @@ class HomeScreen extends StatelessWidget {
                       for (final movement in recent)
                         MovementsListTile(
                           movement: movement,
-                          productName:
-                              store.productById(movement.productId ?? '')?.name,
+                          productName: store
+                              .productById(movement.productId ?? '')
+                              ?.name,
                         ),
                     ],
                   ),
@@ -127,7 +128,9 @@ class _HeaderStrip extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.12),
+                    ),
                   ),
                   child: const CajaClaraSymbol(size: 28),
                 ),
@@ -241,7 +244,7 @@ class _PrimaryActions extends StatelessWidget {
       children: [
         ActionCard(
           title: 'Nueva venta',
-          subtitle: 'Impacta stock y caja',
+          subtitle: 'Vende y actualiza caja',
           icon: Icons.shopping_bag_rounded,
           onTap: onNewSale,
           fillColor: scheme.primary,
@@ -251,7 +254,7 @@ class _PrimaryActions extends StatelessWidget {
         const SizedBox(height: 12),
         ActionCard(
           title: 'Registrar gasto',
-          subtitle: 'Impacta caja',
+          subtitle: 'Resta de caja',
           icon: Icons.receipt_long_rounded,
           onTap: onNewExpense,
           fillColor: Colors.white.withValues(alpha: 0.78),
@@ -259,7 +262,7 @@ class _PrimaryActions extends StatelessWidget {
         const SizedBox(height: 12),
         ActionCard(
           title: 'Escanear producto',
-          subtitle: 'Camara, scanner o codigo manual',
+          subtitle: 'Camara, scanner o codigo',
           icon: Icons.qr_code_scanner_rounded,
           onTap: onScanProduct,
         ),
@@ -288,8 +291,9 @@ class _SecondaryActions extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 760;
-        final width =
-            wide ? (constraints.maxWidth - 12) / 2 : constraints.maxWidth;
+        final width = wide
+            ? (constraints.maxWidth - 12) / 2
+            : constraints.maxWidth;
         return Wrap(
           spacing: 12,
           runSpacing: 12,

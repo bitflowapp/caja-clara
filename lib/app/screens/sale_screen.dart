@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/product.dart';
+import '../services/commerce_store.dart';
 import '../utils/formatters.dart';
 import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
@@ -17,6 +18,8 @@ class SaleScreen extends StatefulWidget {
 class _SaleScreenState extends State<SaleScreen> {
   final _formKey = GlobalKey<FormState>();
   final _quantityController = TextEditingController(text: '1');
+  final _productFocusNode = FocusNode();
+  final _quantityFocusNode = FocusNode();
   Product? _selectedProduct;
   String _paymentMethod = 'Efectivo';
   bool _saving = false;
@@ -30,6 +33,8 @@ class _SaleScreenState extends State<SaleScreen> {
   @override
   void dispose() {
     _quantityController.dispose();
+    _productFocusNode.dispose();
+    _quantityFocusNode.dispose();
     super.dispose();
   }
 
@@ -46,7 +51,9 @@ class _SaleScreenState extends State<SaleScreen> {
               : store.productById(_selectedProduct!.id) ?? _selectedProduct;
           final quantity = _parseInt(_quantityController.text);
           final total = product == null ? 0 : product.pricePesos * quantity;
-          final remaining = product == null ? null : product.stockUnits - quantity;
+          final remaining = product == null
+              ? null
+              : product.stockUnits - quantity;
           return Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
@@ -65,19 +72,47 @@ class _SaleScreenState extends State<SaleScreen> {
                         const SizedBox(height: 6),
                         Text(
                           'Selecciona un producto, cantidad y medio de pago.',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
                                 color: Theme.of(context).colorScheme.outline,
                               ),
                         ),
+                        if (widget.initialProduct != null) ...[
+                          const SizedBox(height: 14),
+                          BpcPanel(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerLow,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.qr_code_scanner_rounded),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Producto resuelto. Ajusta cantidad y confirma.',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 18),
                         Autocomplete<Product>(
+                          initialValue: TextEditingValue(
+                            text: widget.initialProduct?.name ?? '',
+                          ),
                           optionsBuilder: (value) {
                             final query = value.text.toLowerCase().trim();
                             if (query.isEmpty) {
                               return store.products;
                             }
                             return store.products.where((product) {
-                              return product.name.toLowerCase().contains(query) ||
+                              return product.name.toLowerCase().contains(
+                                    query,
+                                  ) ||
                                   (product.barcode ?? '')
                                       .toLowerCase()
                                       .contains(query) ||
@@ -91,25 +126,36 @@ class _SaleScreenState extends State<SaleScreen> {
                             setState(() {
                               _selectedProduct = product;
                             });
+                            _quantityFocusNode.requestFocus();
                           },
-                          fieldViewBuilder: (
-                            context,
-                            controller,
-                            focusNode,
-                            onFieldSubmitted,
-                          ) {
-                            return TextFormField(
-                              controller: controller,
-                              focusNode: focusNode,
-                              decoration: const InputDecoration(
-                                labelText: 'Buscar producto',
-                                prefixIcon: Icon(Icons.search_rounded),
-                              ),
-                              validator: (_) => _selectedProduct == null
-                                  ? 'Elegi un producto'
-                                  : null,
-                            );
-                          },
+                          fieldViewBuilder:
+                              (
+                                context,
+                                controller,
+                                focusNode,
+                                onFieldSubmitted,
+                              ) {
+                                return TextFormField(
+                                  controller: controller,
+                                  focusNode: _productFocusNode,
+                                  autofocus: widget.initialProduct == null,
+                                  textInputAction: TextInputAction.search,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Buscar producto',
+                                    prefixIcon: Icon(Icons.search_rounded),
+                                  ),
+                                  onFieldSubmitted: (_) {
+                                    if (_selectedProduct != null) {
+                                      _quantityFocusNode.requestFocus();
+                                    } else {
+                                      onFieldSubmitted();
+                                    }
+                                  },
+                                  validator: (_) => _selectedProduct == null
+                                      ? 'Elegi un producto'
+                                      : null,
+                                );
+                              },
                           optionsViewBuilder: (context, onSelected, options) {
                             final optionList = options.toList();
                             return Align(
@@ -118,7 +164,9 @@ class _SaleScreenState extends State<SaleScreen> {
                                 elevation: 6,
                                 borderRadius: BorderRadius.circular(18),
                                 child: ConstrainedBox(
-                                  constraints: const BoxConstraints(maxHeight: 280),
+                                  constraints: const BoxConstraints(
+                                    maxHeight: 280,
+                                  ),
                                   child: ListView.separated(
                                     padding: const EdgeInsets.all(8),
                                     shrinkWrap: true,
@@ -129,10 +177,15 @@ class _SaleScreenState extends State<SaleScreen> {
                                         subtitle: Text(
                                           '${option.category ?? 'Sin categoria'} / ${formatMoney(option.pricePesos)}${option.barcode == null ? '' : ' / ${option.barcode}'}',
                                         ),
-                                        trailing: Text('${option.stockUnits} u.'),
+                                        trailing: Text(
+                                          '${option.stockUnits} u.',
+                                        ),
                                         onTap: () {
                                           onSelected(option);
-                                          setState(() => _selectedProduct = option);
+                                          setState(
+                                            () => _selectedProduct = option,
+                                          );
+                                          _quantityFocusNode.requestFocus();
                                         },
                                       );
                                     },
@@ -160,11 +213,15 @@ class _SaleScreenState extends State<SaleScreen> {
                                   width: fieldWidth,
                                   child: TextFormField(
                                     controller: _quantityController,
+                                    focusNode: _quantityFocusNode,
+                                    autofocus: widget.initialProduct != null,
                                     keyboardType: TextInputType.number,
+                                    textInputAction: TextInputAction.done,
                                     decoration: const InputDecoration(
                                       labelText: 'Cantidad',
                                     ),
                                     onChanged: (_) => setState(() {}),
+                                    onFieldSubmitted: (_) => _submitSale(store),
                                     validator: (value) {
                                       final parsed = _parseInt(value);
                                       if (parsed <= 0) {
@@ -213,7 +270,9 @@ class _SaleScreenState extends State<SaleScreen> {
                         ),
                         const SizedBox(height: 16),
                         BpcPanel(
-                          color: Theme.of(context).colorScheme.surfaceContainerLow,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerLow,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -236,66 +295,26 @@ class _SaleScreenState extends State<SaleScreen> {
                               ),
                               _SummaryRow(
                                 label: 'Stock restante',
-                                value: remaining == null ? '-' : remaining.toString(),
+                                value: remaining == null
+                                    ? '-'
+                                    : remaining.toString(),
                               ),
                             ],
                           ),
                         ),
                         const SizedBox(height: 18),
-                        Row(
-                          children: [
-                            const Spacer(),
-                            TextButton(
-                              onPressed:
-                                  _saving ? null : () => Navigator.of(context).pop(),
-                              child: const Text('Cancelar'),
-                            ),
-                            const SizedBox(width: 12),
-                            FilledButton.icon(
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final compact = constraints.maxWidth < 520;
+                            final saveButton = FilledButton.icon(
                               onPressed: _saving
                                   ? null
-                                  : () async {
-                                      if (!_formKey.currentState!.validate()) {
-                                        return;
-                                      }
-                                      if (_selectedProduct == null) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Elegi un producto'),
-                                          ),
-                                        );
-                                        return;
-                                      }
-                                      setState(() => _saving = true);
-                                      try {
-                                        await store.recordSale(
-                                          productId: _selectedProduct!.id,
-                                          quantityUnits: _parseInt(
-                                            _quantityController.text,
-                                          ),
-                                          paymentMethod: _paymentMethod,
-                                        );
-                                        if (!context.mounted) {
-                                          return;
-                                        }
-                                        Navigator.of(context).pop();
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Venta guardada'),
-                                          ),
-                                        );
-                                      } catch (error) {
-                                        if (!context.mounted) {
-                                          return;
-                                        }
-                                        setState(() => _saving = false);
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text(error.toString()),
-                                          ),
-                                        );
-                                      }
-                                    },
+                                  : () => _submitSale(store),
+                              style: compact
+                                  ? FilledButton.styleFrom(
+                                      minimumSize: const Size.fromHeight(52),
+                                    )
+                                  : null,
                               icon: _saving
                                   ? const SizedBox(
                                       width: 18,
@@ -305,9 +324,41 @@ class _SaleScreenState extends State<SaleScreen> {
                                       ),
                                     )
                                   : const Icon(Icons.save_rounded),
-                              label: Text(_saving ? 'Guardando' : 'Guardar venta'),
-                            ),
-                          ],
+                              label: Text(
+                                _saving ? 'Guardando' : 'Guardar venta',
+                              ),
+                            );
+
+                            if (compact) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  saveButton,
+                                  const SizedBox(height: 10),
+                                  TextButton(
+                                    onPressed: _saving
+                                        ? null
+                                        : () => Navigator.of(context).pop(),
+                                    child: const Text('Cancelar'),
+                                  ),
+                                ],
+                              );
+                            }
+
+                            return Row(
+                              children: [
+                                const Spacer(),
+                                TextButton(
+                                  onPressed: _saving
+                                      ? null
+                                      : () => Navigator.of(context).pop(),
+                                  child: const Text('Cancelar'),
+                                ),
+                                const SizedBox(width: 12),
+                                saveButton,
+                              ],
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -328,13 +379,61 @@ class _SaleScreenState extends State<SaleScreen> {
     }
     return int.tryParse(normalized) ?? 0;
   }
+
+  Future<void> _submitSale(CommerceStore store) async {
+    if (_saving) {
+      return;
+    }
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    if (_selectedProduct == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Elegi un producto')));
+      return;
+    }
+
+    setState(() => _saving = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
+    try {
+      await store.recordSale(
+        productId: _selectedProduct!.id,
+        quantityUnits: _parseInt(_quantityController.text),
+        paymentMethod: _paymentMethod,
+      );
+      if (!mounted) {
+        return;
+      }
+      messenger.hideCurrentSnackBar();
+      navigator.pop();
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Venta guardada. Caja y stock al dia.')),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _saving = false);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+    }
+  }
+
+  String _friendlyError(Object error) {
+    final message = error.toString();
+    const prefix = 'Bad state: ';
+    if (message.startsWith(prefix)) {
+      return message.substring(prefix.length);
+    }
+    return message;
+  }
 }
 
 class _SummaryRow extends StatelessWidget {
-  const _SummaryRow({
-    required this.label,
-    required this.value,
-  });
+  const _SummaryRow({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -349,9 +448,9 @@ class _SummaryRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: scheme.outline,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: scheme.outline),
             ),
           ),
           Text(value, style: Theme.of(context).textTheme.titleMedium),

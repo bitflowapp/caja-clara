@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -36,47 +35,13 @@ class BPlusCommerceApp extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFFF3ECDD),
-                  Color(0xFFEEE6D8),
-                ],
+                colors: [Color(0xFFF3ECDD), Color(0xFFEEE6D8)],
               ),
             ),
-            child: Stack(
-              children: [
-                child ?? const SizedBox.shrink(),
-                if (kDebugMode)
-                  const Positioned(
-                    right: 10,
-                    bottom: 10,
-                    child: _DebugBadge(),
-                  ),
-              ],
-            ),
+            child: child ?? const SizedBox.shrink(),
           );
         },
         home: const ResponsiveShell(),
-      ),
-    );
-  }
-}
-
-class _DebugBadge extends StatelessWidget {
-  const _DebugBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Text(
-          'DEBUG',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
-        ),
       ),
     );
   }

@@ -6,8 +6,7 @@ Future<String?> showBarcodeInputDialog(
   BuildContext context, {
   String? initialValue,
   String title = 'Ingresar codigo',
-  String helper =
-      'Pega el foco aqui y usa el scanner como teclado. Enter confirma.',
+  String helper = 'Usa el scanner como teclado. Enter confirma.',
   String confirmLabel = 'Buscar producto',
 }) async {
   final controller = TextEditingController(text: initialValue ?? '');
@@ -42,7 +41,9 @@ Future<String?> showBarcodeInputDialog(
                     Expanded(
                       child: Text(
                         helper,
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(height: 1.3),
                       ),
                     ),
                   ],
@@ -54,7 +55,7 @@ Future<String?> showBarcodeInputDialog(
                 autofocus: true,
                 textInputAction: TextInputAction.search,
                 decoration: const InputDecoration(
-                  labelText: 'Codigo',
+                  labelText: 'Codigo de barras',
                   hintText: 'Ej. 7791234500011',
                   prefixIcon: Icon(Icons.qr_code_2_rounded),
                 ),
@@ -68,9 +69,9 @@ Future<String?> showBarcodeInputDialog(
                   if (!formKey.currentState!.validate()) {
                     return;
                   }
-                  Navigator.of(context).pop(
-                    CommerceStore.normalizeBarcode(controller.text),
-                  );
+                  Navigator.of(
+                    context,
+                  ).pop(CommerceStore.normalizeBarcode(controller.text));
                 },
               ),
             ],
@@ -81,16 +82,17 @@ Future<String?> showBarcodeInputDialog(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cancelar'),
           ),
-          FilledButton(
+          FilledButton.icon(
             onPressed: () {
               if (!formKey.currentState!.validate()) {
                 return;
               }
-              Navigator.of(context).pop(
-                CommerceStore.normalizeBarcode(controller.text),
-              );
+              Navigator.of(
+                context,
+              ).pop(CommerceStore.normalizeBarcode(controller.text));
             },
-            child: Text(confirmLabel),
+            icon: const Icon(Icons.search_rounded),
+            label: Text(confirmLabel),
           ),
         ],
       );

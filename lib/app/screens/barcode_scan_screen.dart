@@ -120,11 +120,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
     if (barcode == null) {
       return;
     }
-    await showProductEditor(
-      context,
-      store,
-      initialBarcode: barcode,
-    );
+    await showProductEditor(context, store, initialBarcode: barcode);
     if (!mounted) {
       return;
     }
@@ -169,7 +165,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Stock actualizado para ${product.name}'),
+          content: Text('Stock guardado para ${product.name}'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -180,7 +176,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No se pudo agregar stock: $error'),
+          content: Text(_friendlyError(error)),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -199,6 +195,15 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
       }
     }
     return null;
+  }
+
+  String _friendlyError(Object error) {
+    final message = error.toString();
+    const prefix = 'Bad state: ';
+    if (message.startsWith(prefix)) {
+      return message.substring(prefix.length);
+    }
+    return message;
   }
 
   @override
@@ -233,8 +238,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                   children: [
                     const SectionHeader(
                       title: 'Codigo de barras',
-                      subtitle:
-                          'Busca rapido por camara, scanner de teclado o codigo manual.',
+                      subtitle: 'Camara, scanner o codigo manual.',
                     ),
                     const SizedBox(height: 14),
                     if (_supportsCamera)
@@ -250,14 +254,15 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                                         ? 'Listo para leer'
                                         : 'Codigo leido',
                                     subtitle: _currentBarcode == null
-                                        ? 'Apunta la camara al producto.'
-                                        : 'Revisa el resultado y elige la accion.',
+                                        ? 'Apunta al codigo del producto.'
+                                        : 'Elige la accion y sigue.',
                                     active: _currentBarcode == null,
                                   ),
                                 ),
                                 TextButton.icon(
-                                  onPressed:
-                                      _currentBarcode == null ? _openManualInput : _restartCamera,
+                                  onPressed: _currentBarcode == null
+                                      ? _openManualInput
+                                      : _restartCamera,
                                   icon: Icon(
                                     _currentBarcode == null
                                         ? Icons.keyboard_alt_rounded
@@ -281,8 +286,9 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                                         controller: _cameraController,
                                         fit: BoxFit.cover,
                                         onDetect: (capture) {
-                                          final barcode =
-                                              _firstReadableBarcode(capture);
+                                          final barcode = _firstReadableBarcode(
+                                            capture,
+                                          );
                                           if (barcode != null) {
                                             _applyBarcode(barcode);
                                           }
@@ -292,8 +298,10 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                                         color: BpcColors.greenDeep,
                                         padding: const EdgeInsets.all(20),
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          mainAxisAlignment: MainAxisAlignment.end,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.end,
                                           children: [
                                             Text(
                                               'Codigo detectado',
@@ -301,7 +309,10 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                                                   .textTheme
                                                   .labelLarge
                                                   ?.copyWith(
-                                                    color: Colors.white.withValues(alpha: 0.72),
+                                                    color: Colors.white
+                                                        .withValues(
+                                                          alpha: 0.72,
+                                                        ),
                                                     fontWeight: FontWeight.w800,
                                                   ),
                                             ),
@@ -328,7 +339,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                       EmptyCard(
                         title: 'Usar codigo o scanner',
                         message:
-                            'En Windows el flujo recomendado es scanner USB/Bluetooth o ingreso manual.',
+                            'En Windows lo mas rapido es scanner USB/Bluetooth o ingreso manual.',
                         action: FilledButton.icon(
                           onPressed: _openManualInput,
                           icon: const Icon(Icons.keyboard_alt_rounded),
@@ -339,15 +350,16 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                     if (_currentBarcode == null)
                       const EmptyCard(
                         title: 'Esperando codigo',
-                        message:
-                            'Lee un producto o escribe el codigo para buscarlo en el catalogo.',
+                        message: 'Lee o ingresa un codigo para buscarlo.',
                         icon: Icons.qr_code_scanner_rounded,
                       )
                     else if (foundProduct == null)
                       _BarcodeNotFoundCard(
                         barcode: _currentBarcode!,
                         onCreateProduct: () => _openCreateProduct(store),
-                        onTryAnother: _supportsCamera ? _restartCamera : _openManualInput,
+                        onTryAnother: _supportsCamera
+                            ? _restartCamera
+                            : _openManualInput,
                       )
                     else
                       _BarcodeProductCard(
@@ -356,7 +368,9 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                         savingStock: _savingStock,
                         onSale: () => _openSale(foundProduct),
                         onAddStock: () => _addStock(store, foundProduct),
-                        onScanAnother: _supportsCamera ? _restartCamera : _openManualInput,
+                        onScanAnother: _supportsCamera
+                            ? _restartCamera
+                            : _openManualInput,
                       ),
                   ],
                 ),
@@ -401,10 +415,7 @@ class _BarcodeProductCard extends StatelessWidget {
                   color: BpcColors.income.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(
-                  Icons.check_rounded,
-                  color: BpcColors.income,
-                ),
+                child: const Icon(Icons.check_rounded, color: BpcColors.income),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -414,14 +425,15 @@ class _BarcodeProductCard extends StatelessWidget {
                     Text(
                       'Producto encontrado',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: BpcColors.mutedInk,
-                            fontWeight: FontWeight.w800,
-                          ),
+                        color: BpcColors.mutedInk,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       product.name,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
                             color: BpcColors.ink,
                             fontWeight: FontWeight.w900,
                             letterSpacing: -0.4,
@@ -436,16 +448,17 @@ class _BarcodeProductCard extends StatelessWidget {
           Text(
             'Cod. $barcode',
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: BpcColors.mutedInk,
-                  fontWeight: FontWeight.w800,
-                ),
+              color: BpcColors.mutedInk,
+              fontWeight: FontWeight.w800,
+            ),
           ),
           const SizedBox(height: 14),
           LayoutBuilder(
             builder: (context, constraints) {
               final wide = constraints.maxWidth >= 560;
-              final width =
-                  wide ? (constraints.maxWidth - 12) / 2 : constraints.maxWidth;
+              final width = wide
+                  ? (constraints.maxWidth - 12) / 2
+                  : constraints.maxWidth;
               return Wrap(
                 spacing: 12,
                 runSpacing: 12,
@@ -471,17 +484,26 @@ class _BarcodeProductCard extends StatelessWidget {
             },
           ),
           const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              FilledButton.icon(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 560;
+              final saleButton = FilledButton.icon(
                 onPressed: onSale,
+                style: compact
+                    ? FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                      )
+                    : null,
                 icon: const Icon(Icons.shopping_bag_rounded),
                 label: const Text('Registrar venta'),
-              ),
-              OutlinedButton.icon(
+              );
+              final stockButton = OutlinedButton.icon(
                 onPressed: savingStock ? null : onAddStock,
+                style: compact
+                    ? OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                      )
+                    : null,
                 icon: savingStock
                     ? const SizedBox(
                         width: 16,
@@ -490,13 +512,42 @@ class _BarcodeProductCard extends StatelessWidget {
                       )
                     : const Icon(Icons.add_box_rounded),
                 label: Text(savingStock ? 'Guardando' : 'Agregar stock'),
-              ),
-              TextButton.icon(
-                onPressed: onScanAnother,
-                icon: const Icon(Icons.restart_alt_rounded),
-                label: const Text('Buscar otro'),
-              ),
-            ],
+              );
+
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    saleButton,
+                    const SizedBox(height: 10),
+                    stockButton,
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: onScanAnother,
+                        icon: const Icon(Icons.restart_alt_rounded),
+                        label: const Text('Buscar otro'),
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  saleButton,
+                  stockButton,
+                  TextButton.icon(
+                    onPressed: onScanAnother,
+                    icon: const Icon(Icons.restart_alt_rounded),
+                    label: const Text('Buscar otro'),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -544,14 +595,15 @@ class _BarcodeNotFoundCard extends StatelessWidget {
                     Text(
                       'Codigo leido',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: BpcColors.mutedInk,
-                            fontWeight: FontWeight.w800,
-                          ),
+                        color: BpcColors.mutedInk,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'No esta en catalogo',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
                             color: BpcColors.ink,
                             fontWeight: FontWeight.w900,
                             letterSpacing: -0.4,
@@ -572,34 +624,64 @@ class _BarcodeNotFoundCard extends StatelessWidget {
             child: Text(
               'Cod. $barcode',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: BpcColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
+                color: BpcColors.ink,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Puedes crear el producto con este codigo ya cargado.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: BpcColors.subtleInk,
-                ),
+            'El codigo se leyo bien. Puedes crear el producto con este dato.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
           ),
           const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              FilledButton.icon(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 560;
+              final createButton = FilledButton.icon(
                 onPressed: onCreateProduct,
+                style: compact
+                    ? FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                      )
+                    : null,
                 icon: const Icon(Icons.add_box_rounded),
                 label: const Text('Crear producto'),
-              ),
-              TextButton.icon(
-                onPressed: onTryAnother,
-                icon: const Icon(Icons.restart_alt_rounded),
-                label: const Text('Buscar otro'),
-              ),
-            ],
+              );
+
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    createButton,
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: onTryAnother,
+                        icon: const Icon(Icons.restart_alt_rounded),
+                        label: const Text('Buscar otro'),
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  createButton,
+                  TextButton.icon(
+                    onPressed: onTryAnother,
+                    icon: const Icon(Icons.restart_alt_rounded),
+                    label: const Text('Buscar otro'),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -636,20 +718,21 @@ class _LookupInfo extends StatelessWidget {
             Text(
               label,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: BpcColors.mutedInk,
-                    fontWeight: FontWeight.w800,
-                  ),
+                color: BpcColors.mutedInk,
+                fontWeight: FontWeight.w800,
+              ),
             ),
             const SizedBox(height: 6),
             Text(
               value,
-              style: (emphasized
-                      ? Theme.of(context).textTheme.headlineSmall
-                      : Theme.of(context).textTheme.titleMedium)
-                  ?.copyWith(
-                    color: BpcColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
+              style:
+                  (emphasized
+                          ? Theme.of(context).textTheme.headlineSmall
+                          : Theme.of(context).textTheme.titleMedium)
+                      ?.copyWith(
+                        color: BpcColors.ink,
+                        fontWeight: FontWeight.w900,
+                      ),
             ),
           ],
         ),
@@ -688,18 +771,18 @@ class _CameraStatusBlock extends StatelessWidget {
             Text(
               title,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: BpcColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
+                color: BpcColors.ink,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ],
         ),
         const SizedBox(height: 4),
         Text(
           subtitle,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: BpcColors.subtleInk,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
         ),
       ],
     );
