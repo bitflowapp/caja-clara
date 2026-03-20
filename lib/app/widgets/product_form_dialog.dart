@@ -1,0 +1,279 @@
+import 'package:flutter/material.dart';
+
+import '../models/product.dart';
+import '../services/commerce_store.dart';
+import '../utils/formatters.dart';
+
+Future<void> showProductEditor(
+  BuildContext context,
+  CommerceStore store, {
+  Product? product,
+  String? initialBarcode,
+}) async {
+  await showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: _ProductFormDialog(
+            store: store,
+            product: product,
+            initialBarcode: initialBarcode,
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _ProductFormDialog extends StatefulWidget {
+  const _ProductFormDialog({
+    required this.store,
+    this.product,
+    this.initialBarcode,
+  });
+
+  final CommerceStore store;
+  final Product? product;
+  final String? initialBarcode;
+
+  @override
+  State<_ProductFormDialog> createState() => _ProductFormDialogState();
+}
+
+class _ProductFormDialogState extends State<_ProductFormDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  late final TextEditingController _categoryController;
+  late final TextEditingController _stockController;
+  late final TextEditingController _minStockController;
+  late final TextEditingController _costController;
+  late final TextEditingController _priceController;
+  late final TextEditingController _barcodeController;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final product = widget.product;
+    _nameController = TextEditingController(text: product?.name ?? '');
+    _categoryController = TextEditingController(text: product?.category ?? '');
+    _stockController =
+        TextEditingController(text: (product?.stockUnits ?? 0).toString());
+    _minStockController =
+        TextEditingController(text: (product?.minStockUnits ?? 5).toString());
+    _costController =
+        TextEditingController(text: (product?.costPesos ?? 0).toString());
+    _priceController =
+        TextEditingController(text: (product?.pricePesos ?? 0).toString());
+    _barcodeController = TextEditingController(
+      text: product?.barcode ?? widget.initialBarcode ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _categoryController.dispose();
+    _stockController.dispose();
+    _minStockController.dispose();
+    _costController.dispose();
+    _priceController.dispose();
+    _barcodeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.product == null ? 'Agregar producto' : 'Editar producto',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                IconButton(
+                  onPressed: _saving ? null : () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                SizedBox(
+                  width: 320,
+                  child: TextFormField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(labelText: 'Nombre'),
+                    validator: _required,
+                  ),
+                ),
+                SizedBox(
+                  width: 220,
+                  child: TextFormField(
+                    controller: _categoryController,
+                    decoration:
+                        const InputDecoration(labelText: 'Categoria (opcional)'),
+                  ),
+                ),
+                SizedBox(
+                  width: 220,
+                  child: TextFormField(
+                    controller: _barcodeController,
+                    decoration: const InputDecoration(
+                      labelText: 'Codigo de barras (opcional)',
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 150,
+                  child: TextFormField(
+                    controller: _stockController,
+                    decoration: const InputDecoration(labelText: 'Stock'),
+                    keyboardType: TextInputType.number,
+                    validator: (value) => _intMin(value, 0, 'El stock'),
+                  ),
+                ),
+                SizedBox(
+                  width: 150,
+                  child: TextFormField(
+                    controller: _minStockController,
+                    decoration: const InputDecoration(labelText: 'Stock minimo'),
+                    keyboardType: TextInputType.number,
+                    validator: (value) => _intMin(value, 0, 'El stock minimo'),
+                  ),
+                ),
+                SizedBox(
+                  width: 180,
+                  child: TextFormField(
+                    controller: _costController,
+                    decoration: const InputDecoration(labelText: 'Costo'),
+                    keyboardType: TextInputType.number,
+                    validator: (value) => _intMin(value, 1, 'El costo'),
+                  ),
+                ),
+                SizedBox(
+                  width: 180,
+                  child: TextFormField(
+                    controller: _priceController,
+                    decoration: const InputDecoration(labelText: 'Precio'),
+                    keyboardType: TextInputType.number,
+                    validator: (value) => _intMin(value, 1, 'El precio'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Vista previa: ${_nameController.text.isEmpty ? 'sin nombre' : _nameController.text} / ${formatMoney(_parseInt(_priceController.text))}',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: scheme.outline,
+                        ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _saving ? null : () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                const SizedBox(width: 10),
+                FilledButton(
+                  onPressed: _saving ? null : _save,
+                  child: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Guardar'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String? _required(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Campo obligatorio';
+    }
+    return null;
+  }
+
+  String? _intMin(String? value, int min, String label) {
+    final parsed = _parseInt(value);
+    if (parsed < min) {
+      return '$label debe ser ${min == 0 ? 'igual o mayor a 0' : 'mayor a 0'}.';
+    }
+    return null;
+  }
+
+  int _parseInt(String? value) {
+    final normalized = (value ?? '').replaceAll(RegExp(r'[^0-9]'), '');
+    if (normalized.isEmpty) {
+      return 0;
+    }
+    return int.tryParse(normalized) ?? 0;
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final id = widget.product?.id ??
+        'product-${DateTime.now().microsecondsSinceEpoch}';
+    final product = Product(
+      id: id,
+      name: _nameController.text.trim(),
+      stockUnits: _parseInt(_stockController.text),
+      minStockUnits: _parseInt(_minStockController.text),
+      costPesos: _parseInt(_costController.text),
+      pricePesos: _parseInt(_priceController.text),
+      category: _categoryController.text.trim().isEmpty
+          ? null
+          : _categoryController.text.trim(),
+      barcode: CommerceStore.normalizeBarcode(_barcodeController.text),
+    );
+
+    setState(() => _saving = true);
+    try {
+      await widget.store.addProduct(product);
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Producto guardado')),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    }
+  }
+}

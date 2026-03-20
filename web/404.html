@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>Caja Clara</title>
+    <style>
+      html, body { height: 100%; margin: 0; background: #F3F0E6; }
+      body { display: grid; place-items: center; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color: #1B1D1C; }
+      .card { max-width: 520px; padding: 18px 16px; border-radius: 16px; border: 1px solid rgba(18, 61, 52, 0.12); background: rgba(255,255,255,0.78); }
+      .t { font-weight: 800; letter-spacing: -0.02em; margin: 0 0 6px; }
+      .p { margin: 0; opacity: 0.78; line-height: 1.3; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <p class="t">Abriendo Caja Clara...</p>
+      <p class="p">Si esta pagina aparece, estas entrando por una ruta directa. Te redirigimos al inicio.</p>
+    </div>
+    <script>
+      (function () {
+        var parts = window.location.pathname.split('/');
+        // GitHub Pages project site: /<repo>/...
+        var base = (parts.length > 1 && parts[1]) ? ('/' + parts[1] + '/') : '/';
+        window.location.replace(base);
+      })();
+    </script>
+  </body>
+</html>

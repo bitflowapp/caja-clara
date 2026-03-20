@@ -1,0 +1,21 @@
+import 'package:b_plus_commerce/app/b_plus_commerce_app.dart';
+import 'package:b_plus_commerce/app/services/commerce_store.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('Home renders branding and primary actions', (tester) async {
+    final store = CommerceStore.seededForTest();
+    await tester.pumpWidget(BPlusCommerceApp(store: store));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Caja Clara'), findsWidgets);
+    expect(find.text('Nueva venta'), findsOneWidget);
+    expect(find.text('Registrar gasto'), findsOneWidget);
+    expect(find.text('Escanear producto'), findsOneWidget);
+    expect(find.text('Agregar producto'), findsOneWidget);
+    expect(find.text('Ver stock bajo'), findsOneWidget);
+    expect(find.text('Ultimos movimientos'), findsOneWidget);
+  });
+}

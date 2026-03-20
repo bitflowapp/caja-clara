@@ -1,0 +1,847 @@
+import 'dart:collection';
+
+import 'package:flutter/foundation.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+
+import '../models/movement.dart';
+import '../models/product.dart';
+import 'commerce_persistence.dart';
+
+class CommerceStore extends ChangeNotifier {
+  CommerceStore._(this._persistence, {required bool persistenceEnabled})
+      : _persistenceEnabled = persistenceEnabled;
+
+  static Future<CommerceStore> loadOrSeed() async {
+    await Hive.initFlutter();
+    final store = CommerceStore._(
+      CommercePersistence(),
+      persistenceEnabled: true,
+    );
+    await store._load();
+    return store;
+  }
+
+  @visibleForTesting
+  static CommerceStore seededForTest() {
+    final store = CommerceStore._(
+      CommercePersistence(),
+      persistenceEnabled: false,
+    );
+    store._seed();
+    store._ready = true;
+    return store;
+  }
+
+  final CommercePersistence _persistence;
+  final bool _persistenceEnabled;
+  final List<Product> _products = <Product>[];
+  final List<Movement> _movements = <Movement>[];
+
+  bool _ready = false;
+  bool _saving = false;
+  String? _lastError;
+  DateTime? _cashOpeningAt;
+  int? _cashOpeningBalancePesos;
+  DateTime? _cashClosingAt;
+  int? _cashClosingBalancePesos;
+
+  bool get isReady => _ready;
+  bool get isSaving => _saving;
+  String? get lastError => _lastError;
+
+  UnmodifiableListView<Product> get products => UnmodifiableListView(_products);
+  UnmodifiableListView<Movement> get movements =>
+      UnmodifiableListView(_movements);
+
+  Movement? get lastMovement => _movements.isEmpty ? null : _movements.first;
+  bool get canUndoLastMovement =>
+      _movements.isNotEmpty &&
+      _movements.first.resolvedOrigin != MovementOrigin.restore;
+
+  bool get hasCashOpeningToday =>
+      _cashOpeningAt != null && _isSameDay(_cashOpeningAt!, DateTime.now());
+
+  int? get todayOpeningCashPesos =>
+      hasCashOpeningToday ? _cashOpeningBalancePesos : null;
+
+  bool get hasCashClosingToday =>
+      _cashClosingAt != null && _isSameDay(_cashClosingAt!, DateTime.now());
+
+  int? get todayClosingCashPesos =>
+      hasCashClosingToday ? _cashClosingBalancePesos : null;
+
+  int? get todayExpectedCashPesos {
+    final opening = todayOpeningCashPesos;
+    if (opening == null) {
+      return null;
+    }
+    return opening + todaySalesPesos - todayExpensesPesos;
+  }
+
+  int? get todayClosingDifferencePesos {
+    final closing = todayClosingCashPesos;
+    final expected = todayExpectedCashPesos;
+    if (closing == null || expected == null) {
+      return null;
+    }
+    return closing - expected;
+  }
+
+  int? get currentDifferenceFromOpeningPesos {
+    final opening = todayOpeningCashPesos;
+    if (opening == null) {
+      return null;
+    }
+    return cashBalancePesos - opening;
+  }
+
+  Product? productById(String id) {
+    for (final product in _products) {
+      if (product.id == id) {
+        return product;
+      }
+    }
+    return null;
+  }
+
+  Product? productByBarcode(String barcode) {
+    final normalized = normalizeBarcode(barcode);
+    if (normalized == null) {
+      return null;
+    }
+    for (final product in _products) {
+      if (product.barcode == normalized) {
+        return product;
+      }
+    }
+    return null;
+  }
+
+  static String? normalizeBarcode(String? raw) {
+    if (raw == null) {
+      return null;
+    }
+    final normalized = raw.replaceAll(RegExp(r'\s+'), '').trim();
+    return normalized.isEmpty ? null : normalized;
+  }
+
+  List<Product> get lowStockProducts =>
+      _products.where((product) => product.isLowStock).toList(growable: false);
+
+  List<Movement> recentMovements([int limit = 8]) =>
+      _movements.take(limit).toList(growable: false);
+
+  int get cashBalancePesos =>
+      _movements.fold<int>(0, (sum, movement) => sum + movement.cashImpactPesos);
+
+  int get todaySalesPesos => _sumToday(
+        (movement) =>
+            movement.kind == MovementKind.sale ? movement.amountPesos : 0,
+      );
+
+  int get todayExpensesPesos => _sumToday(
+        (movement) =>
+            movement.kind == MovementKind.expense ? movement.amountPesos : 0,
+      );
+
+  int get todayEstimatedProfitPesos => _sumToday(
+        (movement) => movement.estimatedProfitImpactPesos,
+      );
+
+  int get todaySalesCount => _movements
+      .where(_isTodayMovement)
+      .where((movement) => movement.kind == MovementKind.sale)
+      .length;
+
+  int get lowStockCount => lowStockProducts.length;
+
+  int _sumToday(int Function(Movement movement) selector) {
+    return _movements
+        .where(_isTodayMovement)
+        .fold<int>(0, (sum, movement) => sum + selector(movement));
+  }
+
+  bool _isTodayMovement(Movement movement) {
+    return _isSameDay(movement.createdAt, DateTime.now());
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  Future<void> _load() async {
+    try {
+      final snapshot = await _persistence.load();
+      if (snapshot == null) {
+        _seed();
+        await _persist();
+      } else {
+        _applySnapshot(_parseSnapshot(snapshot));
+      }
+      _ready = true;
+      notifyListeners();
+    } catch (error, stack) {
+      if (kDebugMode) {
+        debugPrint('CommerceStore load failed: $error');
+        debugPrintStack(stackTrace: stack);
+      }
+      _seed();
+      _ready = true;
+      _lastError = 'No se pudo abrir el almacenamiento. Se cargaron datos base.';
+      notifyListeners();
+    }
+  }
+
+  void _seed() {
+    final now = DateTime.now();
+    _products
+      ..clear()
+      ..addAll(<Product>[
+        const Product(
+          id: 'p-1',
+          name: 'Yerba premium',
+          stockUnits: 8,
+          minStockUnits: 10,
+          costPesos: 2650,
+          pricePesos: 4100,
+          category: 'Almacen',
+          barcode: '7791234500011',
+        ),
+        const Product(
+          id: 'p-2',
+          name: 'Papel higienico x4',
+          stockUnits: 14,
+          minStockUnits: 8,
+          costPesos: 2200,
+          pricePesos: 3600,
+          category: 'Limpieza',
+          barcode: '7791234500028',
+        ),
+        const Product(
+          id: 'p-3',
+          name: 'Cafe molido',
+          stockUnits: 5,
+          minStockUnits: 7,
+          costPesos: 4300,
+          pricePesos: 6800,
+          category: 'Bebidas',
+          barcode: '7791234500035',
+        ),
+        const Product(
+          id: 'p-4',
+          name: 'Galletitas de manteca',
+          stockUnits: 22,
+          minStockUnits: 12,
+          costPesos: 950,
+          pricePesos: 1750,
+          category: 'Almacen',
+          barcode: '7791234500042',
+        ),
+        const Product(
+          id: 'p-5',
+          name: 'Aceite 900 ml',
+          stockUnits: 6,
+          minStockUnits: 8,
+          costPesos: 5200,
+          pricePesos: 8400,
+          category: 'Almacen',
+          barcode: '7791234500059',
+        ),
+      ]);
+
+    _movements
+      ..clear()
+      ..addAll(<Movement>[
+        Movement(
+          id: 'm-1',
+          kind: MovementKind.sale,
+          origin: MovementOrigin.sale,
+          amountPesos: 12300,
+          costOfSalePesos: 7190,
+          createdAt: now.subtract(const Duration(minutes: 18)),
+          title: 'Venta',
+          subtitle: 'Yerba premium + cafe',
+          quantityUnits: 3,
+          paymentMethod: 'Efectivo',
+          productId: 'p-1',
+        ),
+        Movement(
+          id: 'm-2',
+          kind: MovementKind.expense,
+          origin: MovementOrigin.expense,
+          amountPesos: 4500,
+          createdAt: now.subtract(const Duration(hours: 2, minutes: 12)),
+          title: 'Gasto',
+          subtitle: 'Reposicion de bolsas',
+          category: 'Insumos',
+        ),
+        Movement(
+          id: 'm-3',
+          kind: MovementKind.sale,
+          origin: MovementOrigin.sale,
+          amountPesos: 8800,
+          costOfSalePesos: 4600,
+          createdAt: now.subtract(const Duration(hours: 5, minutes: 5)),
+          title: 'Venta',
+          subtitle: 'Papel higienico x4',
+          quantityUnits: 2,
+          paymentMethod: 'Transferencia',
+          productId: 'p-2',
+        ),
+        Movement(
+          id: 'm-4',
+          kind: MovementKind.sale,
+          origin: MovementOrigin.sale,
+          amountPesos: 11500,
+          costOfSalePesos: 7260,
+          createdAt: now.subtract(const Duration(days: 1, hours: 1)),
+          title: 'Venta',
+          subtitle: 'Cafe molido + galletitas',
+          quantityUnits: 2,
+          paymentMethod: 'Debito',
+          productId: 'p-3',
+        ),
+      ])
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    _cashOpeningAt = null;
+    _cashOpeningBalancePesos = null;
+    _cashClosingAt = null;
+    _cashClosingBalancePesos = null;
+  }
+
+  Future<void> addProduct(Product product) async {
+    final sanitized = _validateProduct(product);
+    final index = _products.indexWhere((item) => item.id == sanitized.id);
+    if (index == -1) {
+      _products.add(sanitized);
+    } else {
+      _products[index] = sanitized;
+    }
+    _sortProducts();
+    await _persist();
+  }
+
+  Future<void> addStockToProduct({
+    required String productId,
+    required int quantityUnits,
+    String? note,
+    DateTime? createdAt,
+  }) async {
+    final index = _products.indexWhere((product) => product.id == productId);
+    if (index == -1) {
+      throw StateError('No se encontro el producto.');
+    }
+    if (quantityUnits <= 0) {
+      throw StateError('Ingresa una cantidad mayor a 0.');
+    }
+
+    final product = _products[index];
+    _products[index] = product.copyWith(
+      stockUnits: product.stockUnits + quantityUnits,
+    );
+    _movements.insert(
+      0,
+      Movement(
+        id: _buildId('stock'),
+        kind: MovementKind.adjustment,
+        origin: MovementOrigin.adjustment,
+        amountPesos: 0,
+        cashImpactOverridePesos: 0,
+        estimatedProfitImpactOverridePesos: 0,
+        createdAt: createdAt ?? DateTime.now(),
+        title: 'Ingreso de stock',
+        subtitle: note == null || note.trim().isEmpty
+            ? '${product.name} / +$quantityUnits u.'
+            : '${product.name} / +$quantityUnits u. / ${note.trim()}',
+        productId: product.id,
+        quantityUnits: quantityUnits,
+      ),
+    );
+    _sortProducts();
+    await _persist();
+  }
+
+  Future<void> removeProduct(String productId) async {
+    if (_movements.any((movement) => movement.productId == productId)) {
+      throw StateError(
+        'No se puede borrar un producto con movimientos registrados.',
+      );
+    }
+    _products.removeWhere((product) => product.id == productId);
+    await _persist();
+  }
+
+  Future<void> recordSale({
+    required String productId,
+    required int quantityUnits,
+    required String paymentMethod,
+    DateTime? createdAt,
+  }) async {
+    final index = _products.indexWhere((product) => product.id == productId);
+    if (index == -1) {
+      throw StateError('No se encontro el producto.');
+    }
+    if (quantityUnits <= 0) {
+      throw StateError('Ingresa una cantidad mayor a 0.');
+    }
+
+    final product = _products[index];
+    if (product.stockUnits < quantityUnits) {
+      throw StateError(
+        'No hay stock suficiente. Stock actual: ${product.stockUnits}.',
+      );
+    }
+
+    final revenue = product.pricePesos * quantityUnits;
+    final cost = product.costPesos * quantityUnits;
+    final timestamp = createdAt ?? DateTime.now();
+    _products[index] = product.copyWith(
+      stockUnits: product.stockUnits - quantityUnits,
+    );
+    _movements.insert(
+      0,
+      Movement(
+        id: _buildId('sale'),
+        kind: MovementKind.sale,
+        origin: MovementOrigin.sale,
+        amountPesos: revenue,
+        costOfSalePesos: cost,
+        createdAt: timestamp,
+        title: 'Venta',
+        subtitle: product.name,
+        productId: product.id,
+        quantityUnits: quantityUnits,
+        paymentMethod: paymentMethod.trim().isEmpty ? 'Sin dato' : paymentMethod,
+      ),
+    );
+    _sortProducts();
+    await _persist();
+  }
+
+  Future<void> recordExpense({
+    required String concept,
+    required int amountPesos,
+    required String category,
+    DateTime? createdAt,
+  }) async {
+    final cleanConcept = concept.trim();
+    final cleanCategory = category.trim().isEmpty ? 'General' : category.trim();
+
+    if (cleanConcept.isEmpty) {
+      throw StateError('Escribe un concepto.');
+    }
+    if (amountPesos <= 0) {
+      throw StateError('Ingresa un monto mayor a 0.');
+    }
+
+    _movements.insert(
+      0,
+      Movement(
+        id: _buildId('expense'),
+        kind: MovementKind.expense,
+        origin: MovementOrigin.expense,
+        amountPesos: amountPesos,
+        createdAt: createdAt ?? DateTime.now(),
+        title: cleanConcept,
+        subtitle: cleanCategory,
+        category: cleanCategory,
+      ),
+    );
+    await _persist();
+  }
+
+  Future<void> registerCashOpening({
+    required int openingBalancePesos,
+    DateTime? createdAt,
+    bool overwrite = false,
+  }) async {
+    final timestamp = createdAt ?? DateTime.now();
+    if (openingBalancePesos < 0) {
+      throw StateError('La apertura no puede ser negativa.');
+    }
+    if (hasCashOpeningToday && !overwrite) {
+      throw StateError('Ya hay una apertura de caja registrada hoy.');
+    }
+
+    _removeAdjustmentForDay(MovementOrigin.cashOpening, timestamp);
+    _removeAdjustmentForDay(MovementOrigin.cashClosing, timestamp);
+
+    _cashOpeningAt = timestamp;
+    _cashOpeningBalancePesos = openingBalancePesos;
+    _cashClosingAt = null;
+    _cashClosingBalancePesos = null;
+
+    _movements.insert(
+      0,
+      Movement(
+        id: _buildId('cash-open'),
+        kind: MovementKind.adjustment,
+        origin: MovementOrigin.cashOpening,
+        amountPesos: 0,
+        cashImpactOverridePesos: 0,
+        estimatedProfitImpactOverridePesos: 0,
+        createdAt: timestamp,
+        title: 'Apertura de caja',
+        subtitle: 'Caja inicial: $openingBalancePesos',
+      ),
+    );
+    await _persist();
+  }
+
+  Future<void> registerCashClosing({
+    required int closingBalancePesos,
+    DateTime? createdAt,
+    bool overwrite = false,
+  }) async {
+    final timestamp = createdAt ?? DateTime.now();
+    if (!hasCashOpeningToday) {
+      throw StateError('Registra primero una apertura de caja.');
+    }
+    if (closingBalancePesos < 0) {
+      throw StateError('El cierre no puede ser negativo.');
+    }
+    if (hasCashClosingToday && !overwrite) {
+      throw StateError('Ya hay un cierre de caja registrado hoy.');
+    }
+
+    _removeAdjustmentForDay(MovementOrigin.cashClosing, timestamp);
+
+    _cashClosingAt = timestamp;
+    _cashClosingBalancePesos = closingBalancePesos;
+
+    _movements.insert(
+      0,
+      Movement(
+        id: _buildId('cash-close'),
+        kind: MovementKind.adjustment,
+        origin: MovementOrigin.cashClosing,
+        amountPesos: 0,
+        cashImpactOverridePesos: 0,
+        estimatedProfitImpactOverridePesos: 0,
+        createdAt: timestamp,
+        title: 'Cierre de caja',
+        subtitle: 'Caja contada: $closingBalancePesos',
+      ),
+    );
+    await _persist();
+  }
+
+  Future<void> undoLastMovement() async {
+    if (_movements.isEmpty) {
+      throw StateError('No hay movimientos para deshacer.');
+    }
+
+    final movement = _movements.first;
+    if (movement.resolvedOrigin == MovementOrigin.restore) {
+      throw StateError('No se puede deshacer una restauracion de backup.');
+    }
+
+    if (movement.kind == MovementKind.sale) {
+      final productId = movement.productId;
+      final quantity = movement.quantityUnits ?? 0;
+      if (productId == null || quantity <= 0) {
+        throw StateError('La venta no se puede deshacer de forma segura.');
+      }
+      final index = _products.indexWhere((product) => product.id == productId);
+      if (index == -1) {
+        throw StateError(
+          'No se puede deshacer la venta porque falta el producto original.',
+        );
+      }
+      final product = _products[index];
+      _products[index] = product.copyWith(
+        stockUnits: product.stockUnits + quantity,
+      );
+      _sortProducts();
+    } else if (movement.kind == MovementKind.adjustment) {
+      final productId = movement.productId;
+      final quantity = movement.quantityUnits ?? 0;
+      if (productId != null && quantity > 0) {
+        final index = _products.indexWhere((product) => product.id == productId);
+        if (index == -1) {
+          throw StateError(
+            'No se puede deshacer el ajuste porque falta el producto original.',
+          );
+        }
+        final product = _products[index];
+        if (product.stockUnits < quantity) {
+          throw StateError(
+            'No se puede deshacer el ajuste porque el stock actual es menor al agregado.',
+          );
+        }
+        _products[index] = product.copyWith(
+          stockUnits: product.stockUnits - quantity,
+        );
+        _sortProducts();
+      }
+      _revertAdjustmentMetadata(movement);
+    }
+
+    _movements.removeAt(0);
+    await _persist();
+  }
+
+  Map<String, dynamic> buildSnapshot({DateTime? generatedAt}) {
+    return <String, dynamic>{
+      'version': 2,
+      'savedAt': (generatedAt ?? DateTime.now()).toIso8601String(),
+      'products': _products.map((product) => product.toJson()).toList(),
+      'movements': _movements.map((movement) => movement.toJson()).toList(),
+      'cashOpeningAt': _cashOpeningAt?.toIso8601String(),
+      'cashOpeningBalancePesos': _cashOpeningBalancePesos,
+      'cashClosingAt': _cashClosingAt?.toIso8601String(),
+      'cashClosingBalancePesos': _cashClosingBalancePesos,
+    };
+  }
+
+  Future<void> restoreSnapshot(Map<String, dynamic> snapshot) async {
+    final parsed = _parseSnapshot(snapshot);
+    _applySnapshot(parsed);
+    _movements.insert(
+      0,
+      Movement(
+        id: _buildId('restore'),
+        kind: MovementKind.adjustment,
+        origin: MovementOrigin.restore,
+        amountPesos: 0,
+        cashImpactOverridePesos: 0,
+        estimatedProfitImpactOverridePesos: 0,
+        createdAt: DateTime.now(),
+        title: 'Restauracion de backup',
+        subtitle: 'Estado restaurado correctamente',
+      ),
+    );
+    await _persist();
+  }
+
+  Future<void> ensureReady() async {
+    if (!_ready) {
+      await _load();
+    }
+  }
+
+  _SnapshotData _parseSnapshot(Map<String, dynamic> snapshot) {
+    final products = _readProducts(snapshot['products']);
+    final movements = _readMovements(snapshot['movements']);
+
+    final productIds = <String>{};
+    final productBarcodes = <String>{};
+    final validatedProducts = <Product>[];
+    for (final product in products) {
+      final valid = _validateProduct(
+        product,
+        allowZeroPrice: true,
+        allowZeroCost: true,
+        againstProducts: validatedProducts,
+      );
+      if (!productIds.add(valid.id)) {
+        throw StateError('Hay productos duplicados en el backup.');
+      }
+      final barcode = valid.barcode;
+      if (barcode != null && !productBarcodes.add(barcode)) {
+        throw StateError('Hay codigos de barras duplicados en el backup.');
+      }
+      validatedProducts.add(valid);
+    }
+
+    for (final movement in movements) {
+      _validateMovement(movement, productIds);
+    }
+
+    movements.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    return _SnapshotData(
+      products: validatedProducts,
+      movements: movements,
+      cashOpeningAt: _readDate(snapshot['cashOpeningAt']),
+      cashOpeningBalancePesos:
+          (snapshot['cashOpeningBalancePesos'] as num?)?.toInt(),
+      cashClosingAt: _readDate(snapshot['cashClosingAt']),
+      cashClosingBalancePesos:
+          (snapshot['cashClosingBalancePesos'] as num?)?.toInt(),
+    )..validateCashState();
+  }
+
+  List<Product> _readProducts(dynamic value) {
+    if (value is! List) {
+      return <Product>[];
+    }
+    return value
+        .whereType<Map>()
+        .map((raw) => Product.fromJson(raw.cast<String, dynamic>()))
+        .toList(growable: false);
+  }
+
+  List<Movement> _readMovements(dynamic value) {
+    if (value is! List) {
+      return <Movement>[];
+    }
+    return value
+        .whereType<Map>()
+        .map((raw) => Movement.fromJson(raw.cast<String, dynamic>()))
+        .toList(growable: false);
+  }
+
+  Product _validateProduct(
+    Product product, {
+    bool allowZeroPrice = false,
+    bool allowZeroCost = false,
+    Iterable<Product>? againstProducts,
+  }) {
+    final normalizedBarcode = normalizeBarcode(product.barcode);
+    if (product.id.trim().isEmpty) {
+      throw StateError('El producto necesita un id valido.');
+    }
+    if (product.name.trim().isEmpty) {
+      throw StateError('El producto necesita un nombre.');
+    }
+    if (product.stockUnits < 0) {
+      throw StateError('El stock no puede ser negativo.');
+    }
+    if (product.minStockUnits < 0) {
+      throw StateError('El stock minimo no puede ser negativo.');
+    }
+    if (product.costPesos < 0 || (!allowZeroCost && product.costPesos == 0)) {
+      throw StateError('El costo debe ser mayor a 0.');
+    }
+    if (product.pricePesos < 0 ||
+        (!allowZeroPrice && product.pricePesos == 0)) {
+      throw StateError('El precio debe ser mayor a 0.');
+    }
+    for (final existing in againstProducts ?? _products) {
+      if (existing.id != product.id && existing.barcode == normalizedBarcode) {
+        throw StateError('Ese codigo de barras ya esta asignado a otro producto.');
+      }
+    }
+    return product.copyWith(
+      name: product.name.trim(),
+      category:
+          product.category?.trim().isEmpty == true ? null : product.category?.trim(),
+      barcode: normalizedBarcode,
+    );
+  }
+
+  void _validateMovement(Movement movement, Set<String> productIds) {
+    if (movement.amountPesos < 0) {
+      throw StateError('Hay un movimiento con importe invalido.');
+    }
+    if (movement.title.trim().isEmpty) {
+      throw StateError('Hay un movimiento sin titulo.');
+    }
+    if (movement.kind == MovementKind.sale) {
+      if ((movement.quantityUnits ?? 0) <= 0) {
+        throw StateError('Hay una venta con cantidad invalida.');
+      }
+      final productId = movement.productId;
+      if (productId == null || !productIds.contains(productId)) {
+        throw StateError('Hay una venta asociada a un producto inexistente.');
+      }
+    }
+    if (movement.kind == MovementKind.expense && movement.title.trim().isEmpty) {
+      throw StateError('Hay un gasto sin concepto.');
+    }
+  }
+
+  DateTime? _readDate(dynamic raw) {
+    if (raw is! String || raw.isEmpty) {
+      return null;
+    }
+    return DateTime.tryParse(raw);
+  }
+
+  void _applySnapshot(_SnapshotData snapshot) {
+    _products
+      ..clear()
+      ..addAll(snapshot.products);
+    _movements
+      ..clear()
+      ..addAll(snapshot.movements);
+    _cashOpeningAt = snapshot.cashOpeningAt;
+    _cashOpeningBalancePesos = snapshot.cashOpeningBalancePesos;
+    _cashClosingAt = snapshot.cashClosingAt;
+    _cashClosingBalancePesos = snapshot.cashClosingBalancePesos;
+    _sortProducts();
+  }
+
+  void _removeAdjustmentForDay(MovementOrigin origin, DateTime day) {
+    _movements.removeWhere(
+      (movement) =>
+          movement.resolvedOrigin == origin && _isSameDay(movement.createdAt, day),
+    );
+  }
+
+  void _revertAdjustmentMetadata(Movement movement) {
+    switch (movement.resolvedOrigin) {
+      case MovementOrigin.cashOpening:
+        _cashOpeningAt = null;
+        _cashOpeningBalancePesos = null;
+        _cashClosingAt = null;
+        _cashClosingBalancePesos = null;
+      case MovementOrigin.cashClosing:
+        _cashClosingAt = null;
+        _cashClosingBalancePesos = null;
+      case MovementOrigin.sale:
+      case MovementOrigin.expense:
+      case MovementOrigin.restore:
+      case MovementOrigin.undo:
+      case MovementOrigin.adjustment:
+        break;
+    }
+  }
+
+  Future<void> _persist() async {
+    if (!_persistenceEnabled) return;
+    _saving = true;
+    _lastError = null;
+    notifyListeners();
+    try {
+      await _persistence.save(buildSnapshot());
+    } catch (error) {
+      _lastError = 'No se pudo guardar el cambio.';
+      if (kDebugMode) {
+        debugPrint('CommerceStore save failed: $error');
+      }
+      rethrow;
+    } finally {
+      _saving = false;
+      notifyListeners();
+    }
+  }
+
+  void _sortProducts() {
+    _products.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  }
+
+  String _buildId(String prefix) {
+    final now = DateTime.now().microsecondsSinceEpoch;
+    return '$prefix-$now';
+  }
+}
+
+class _SnapshotData {
+  _SnapshotData({
+    required this.products,
+    required this.movements,
+    required this.cashOpeningAt,
+    required this.cashOpeningBalancePesos,
+    required this.cashClosingAt,
+    required this.cashClosingBalancePesos,
+  });
+
+  final List<Product> products;
+  final List<Movement> movements;
+  final DateTime? cashOpeningAt;
+  final int? cashOpeningBalancePesos;
+  final DateTime? cashClosingAt;
+  final int? cashClosingBalancePesos;
+
+  void validateCashState() {
+    if (cashOpeningBalancePesos != null && cashOpeningBalancePesos! < 0) {
+      throw StateError('La apertura del backup es invalida.');
+    }
+    if (cashClosingBalancePesos != null && cashClosingBalancePesos! < 0) {
+      throw StateError('El cierre del backup es invalido.');
+    }
+  }
+}
