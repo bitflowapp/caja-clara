@@ -14,8 +14,16 @@ Future<String?> showBarcodeInputDialog(
 
   final result = await showDialog<String>(
     context: context,
+    useSafeArea: true,
     builder: (context) {
       return AlertDialog(
+        insetPadding: EdgeInsets.fromLTRB(
+          16,
+          24,
+          16,
+          16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        scrollable: true,
         title: Text(title),
         content: Form(
           key: formKey,

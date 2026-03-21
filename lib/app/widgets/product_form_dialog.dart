@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../models/product.dart';
 import '../services/commerce_store.dart';
 import '../utils/formatters.dart';
+import 'keyboard_aware_form.dart';
+import 'speech_dictation.dart';
 
 Future<void> showProductEditor(
   BuildContext context,
@@ -14,14 +16,16 @@ Future<void> showProductEditor(
     context: context,
     barrierDismissible: false,
     builder: (dialogContext) {
-      return Dialog(
-        insetPadding: const EdgeInsets.all(16),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
-          child: _ProductFormDialog(
-            store: store,
-            product: product,
-            initialBarcode: initialBarcode,
+      return KeyboardAwareDialogFrame(
+        child: Dialog(
+          insetPadding: EdgeInsets.zero,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: _ProductFormDialog(
+              store: store,
+              product: product,
+              initialBarcode: initialBarcode,
+            ),
           ),
         ),
       );
@@ -53,6 +57,8 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   late final TextEditingController _costController;
   late final TextEditingController _priceController;
   late final TextEditingController _barcodeController;
+  final _nameDictation = SpeechDictationController();
+  final _categoryDictation = SpeechDictationController();
   bool _saving = false;
 
   @override
@@ -61,17 +67,23 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     final product = widget.product;
     _nameController = TextEditingController(text: product?.name ?? '');
     _categoryController = TextEditingController(text: product?.category ?? '');
-    _stockController =
-        TextEditingController(text: (product?.stockUnits ?? 0).toString());
-    _minStockController =
-        TextEditingController(text: (product?.minStockUnits ?? 5).toString());
-    _costController =
-        TextEditingController(text: (product?.costPesos ?? 0).toString());
-    _priceController =
-        TextEditingController(text: (product?.pricePesos ?? 0).toString());
+    _stockController = TextEditingController(
+      text: (product?.stockUnits ?? 0).toString(),
+    );
+    _minStockController = TextEditingController(
+      text: (product?.minStockUnits ?? 5).toString(),
+    );
+    _costController = TextEditingController(
+      text: (product?.costPesos ?? 0).toString(),
+    );
+    _priceController = TextEditingController(
+      text: (product?.pricePesos ?? 0).toString(),
+    );
     _barcodeController = TextEditingController(
       text: product?.barcode ?? widget.initialBarcode ?? '',
     );
+    _nameDictation.initialize();
+    _categoryDictation.initialize();
   }
 
   @override
@@ -83,131 +95,205 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     _costController.dispose();
     _priceController.dispose();
     _barcodeController.dispose();
+    _nameDictation.dispose();
+    _categoryDictation.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    widget.product == null ? 'Agregar producto' : 'Editar producto',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ),
-                IconButton(
-                  onPressed: _saving ? null : () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close_rounded),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                SizedBox(
-                  width: 320,
-                  child: TextFormField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(labelText: 'Nombre'),
-                    validator: _required,
-                  ),
-                ),
-                SizedBox(
-                  width: 220,
-                  child: TextFormField(
-                    controller: _categoryController,
-                    decoration:
-                        const InputDecoration(labelText: 'Categoria (opcional)'),
-                  ),
-                ),
-                SizedBox(
-                  width: 220,
-                  child: TextFormField(
-                    controller: _barcodeController,
-                    decoration: const InputDecoration(
-                      labelText: 'Codigo de barras (opcional)',
+    final mediaQuery = MediaQuery.of(context);
+    final dialogHeight =
+        (mediaQuery.size.height - mediaQuery.viewInsets.bottom - 80)
+            .clamp(420.0, mediaQuery.size.height * 0.9)
+            .toDouble();
+    return SizedBox(
+      width: double.infinity,
+      height: dialogHeight,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.product == null
+                          ? 'Agregar producto'
+                          : 'Editar producto',
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ),
-                ),
-                SizedBox(
-                  width: 150,
-                  child: TextFormField(
-                    controller: _stockController,
-                    decoration: const InputDecoration(labelText: 'Stock'),
-                    keyboardType: TextInputType.number,
-                    validator: (value) => _intMin(value, 0, 'El stock'),
+                  IconButton(
+                    onPressed: _saving
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
                   ),
-                ),
-                SizedBox(
-                  width: 150,
-                  child: TextFormField(
-                    controller: _minStockController,
-                    decoration: const InputDecoration(labelText: 'Stock minimo'),
-                    keyboardType: TextInputType.number,
-                    validator: (value) => _intMin(value, 0, 'El stock minimo'),
-                  ),
-                ),
-                SizedBox(
-                  width: 180,
-                  child: TextFormField(
-                    controller: _costController,
-                    decoration: const InputDecoration(labelText: 'Costo'),
-                    keyboardType: TextInputType.number,
-                    validator: (value) => _intMin(value, 1, 'El costo'),
-                  ),
-                ),
-                SizedBox(
-                  width: 180,
-                  child: TextFormField(
-                    controller: _priceController,
-                    decoration: const InputDecoration(labelText: 'Precio'),
-                    keyboardType: TextInputType.number,
-                    validator: (value) => _intMin(value, 1, 'El precio'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Vista previa: ${_nameController.text.isEmpty ? 'sin nombre' : _nameController.text} / ${formatMoney(_parseInt(_priceController.text))}',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: scheme.outline,
+                ],
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  child: Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      SizedBox(
+                        width: 320,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            TextFormField(
+                              controller: _nameController,
+                              decoration: InputDecoration(
+                                labelText: 'Nombre',
+                                suffixIcon: SpeechDictationActionButton(
+                                  controller: _nameDictation,
+                                  textController: _nameController,
+                                  tooltip: 'Dictar nombre',
+                                ),
+                              ),
+                              validator: _required,
+                              onChanged: (_) => setState(() {}),
+                            ),
+                            SpeechDictationHint(controller: _nameDictation),
+                          ],
                         ),
+                      ),
+                      SizedBox(
+                        width: 220,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            TextFormField(
+                              controller: _categoryController,
+                              decoration: InputDecoration(
+                                labelText: 'Categoria (opcional)',
+                                suffixIcon: SpeechDictationActionButton(
+                                  controller: _categoryDictation,
+                                  textController: _categoryController,
+                                  tooltip: 'Dictar categoria',
+                                ),
+                              ),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                            SpeechDictationHint(controller: _categoryDictation),
+                          ],
+                        ),
+                      ),
+                      SizedBox(
+                        width: 220,
+                        child: TextFormField(
+                          controller: _barcodeController,
+                          decoration: const InputDecoration(
+                            labelText: 'Codigo de barras (opcional)',
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 150,
+                        child: TextFormField(
+                          controller: _stockController,
+                          decoration: const InputDecoration(labelText: 'Stock'),
+                          keyboardType: TextInputType.number,
+                          validator: (value) => _intMin(value, 0, 'El stock'),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 150,
+                        child: TextFormField(
+                          controller: _minStockController,
+                          decoration: const InputDecoration(
+                            labelText: 'Stock minimo',
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (value) =>
+                              _intMin(value, 0, 'El stock minimo'),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 180,
+                        child: TextFormField(
+                          controller: _costController,
+                          decoration: const InputDecoration(labelText: 'Costo'),
+                          keyboardType: TextInputType.number,
+                          validator: (value) => _intMin(value, 1, 'El costo'),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 180,
+                        child: TextFormField(
+                          controller: _priceController,
+                          decoration: const InputDecoration(
+                            labelText: 'Precio',
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (value) => _intMin(value, 1, 'El precio'),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                TextButton(
-                  onPressed: _saving ? null : () => Navigator.of(context).pop(),
-                  child: const Text('Cancelar'),
-                ),
-                const SizedBox(width: 10),
-                FilledButton(
-                  onPressed: _saving ? null : _save,
-                  child: _saving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Guardar'),
-                ),
-              ],
-            ),
-          ],
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Vista previa: ${_nameController.text.isEmpty ? 'sin nombre' : _nameController.text} / ${formatMoney(_parseInt(_priceController.text))}',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: scheme.outline),
+              ),
+              const SizedBox(height: 16),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 520;
+                  final cancelButton = TextButton(
+                    onPressed: _saving
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                    child: const Text('Cancelar'),
+                  );
+                  final saveButton = FilledButton(
+                    onPressed: _saving ? null : _save,
+                    child: _saving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Guardar'),
+                  );
+
+                  if (compact) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        saveButton,
+                        const SizedBox(height: 10),
+                        cancelButton,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      const Spacer(),
+                      cancelButton,
+                      const SizedBox(width: 10),
+                      saveButton,
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -241,7 +327,8 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       return;
     }
 
-    final id = widget.product?.id ??
+    final id =
+        widget.product?.id ??
         'product-${DateTime.now().microsecondsSinceEpoch}';
     final product = Product(
       id: id,
@@ -263,17 +350,17 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
         return;
       }
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Producto guardado')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Producto guardado')));
     } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
     }
   }
 }

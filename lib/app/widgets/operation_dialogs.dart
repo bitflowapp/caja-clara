@@ -8,8 +8,16 @@ Future<bool> showDangerConfirmationDialog(
 }) async {
   final result = await showDialog<bool>(
     context: context,
+    useSafeArea: true,
     builder: (context) {
       return AlertDialog(
+        insetPadding: EdgeInsets.fromLTRB(
+          16,
+          24,
+          16,
+          16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        scrollable: true,
         title: Text(title),
         content: Text(message),
         actions: [
@@ -44,8 +52,16 @@ Future<int?> showAmountEntryDialog(
 
   final result = await showDialog<int>(
     context: context,
+    useSafeArea: true,
     builder: (context) {
       return AlertDialog(
+        insetPadding: EdgeInsets.fromLTRB(
+          16,
+          24,
+          16,
+          16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        scrollable: true,
         title: Text(title),
         content: Form(
           key: formKey,
@@ -53,10 +69,7 @@ Future<int?> showAmountEntryDialog(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (helper != null) ...[
-                Text(helper),
-                const SizedBox(height: 12),
-              ],
+              if (helper != null) ...[Text(helper), const SizedBox(height: 12)],
               TextFormField(
                 controller: controller,
                 keyboardType: TextInputType.number,

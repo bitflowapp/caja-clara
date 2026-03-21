@@ -4,6 +4,8 @@ import '../services/commerce_store.dart';
 import '../utils/formatters.dart';
 import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
+import '../widgets/keyboard_aware_form.dart';
+import '../widgets/speech_dictation.dart';
 
 class ExpenseScreen extends StatefulWidget {
   const ExpenseScreen({super.key});
@@ -20,8 +22,17 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
   final _conceptFocusNode = FocusNode();
   final _amountFocusNode = FocusNode();
   final _categoryFocusNode = FocusNode();
+  final _conceptDictation = SpeechDictationController();
+  final _categoryDictation = SpeechDictationController();
   DateTime _dateTime = DateTime.now();
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _conceptDictation.initialize();
+    _categoryDictation.initialize();
+  }
 
   @override
   void dispose() {
@@ -31,6 +42,8 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
     _conceptFocusNode.dispose();
     _amountFocusNode.dispose();
     _categoryFocusNode.dispose();
+    _conceptDictation.dispose();
+    _categoryDictation.dispose();
     super.dispose();
   }
 
@@ -39,57 +52,64 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
     final store = CommerceScope.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Registrar gasto')),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 760),
-            child: BpcPanel(
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Nuevo gasto',
-                      style: Theme.of(context).textTheme.titleLarge,
+      body: KeyboardAwarePageBody(
+        child: BpcPanel(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Nuevo gasto',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Dejalo claro y corto para que la caja quede al dia.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                TextFormField(
+                  controller: _conceptController,
+                  focusNode: _conceptFocusNode,
+                  autofocus: true,
+                  textInputAction: TextInputAction.next,
+                  decoration: InputDecoration(
+                    labelText: 'Concepto',
+                    suffixIcon: SpeechDictationActionButton(
+                      controller: _conceptDictation,
+                      textController: _conceptController,
+                      tooltip: 'Dictar concepto',
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Dejalo claro y corto para que la caja quede al dia.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.outline,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    TextFormField(
-                      controller: _conceptController,
-                      focusNode: _conceptFocusNode,
-                      autofocus: true,
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(labelText: 'Concepto'),
-                      onFieldSubmitted: (_) => _amountFocusNode.requestFocus(),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Escribi un concepto';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final wide = constraints.maxWidth >= 600;
-                        final fieldWidth = wide
-                            ? (constraints.maxWidth - 12) / 2
-                            : constraints.maxWidth;
-                        return Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: [
-                            SizedBox(
-                              width: fieldWidth,
-                              child: TextFormField(
+                  ),
+                  onFieldSubmitted: (_) => _amountFocusNode.requestFocus(),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Escribi un concepto';
+                    }
+                    return null;
+                  },
+                ),
+                SpeechDictationHint(controller: _conceptDictation),
+                const SizedBox(height: 12),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final wide = constraints.maxWidth >= 600;
+                    final fieldWidth = wide
+                        ? (constraints.maxWidth - 12) / 2
+                        : constraints.maxWidth;
+                    return Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        SizedBox(
+                          width: fieldWidth,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              TextFormField(
                                 controller: _amountController,
                                 focusNode: _amountFocusNode,
                                 keyboardType: TextInputType.number,
@@ -107,100 +127,111 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                                   return null;
                                 },
                               ),
-                            ),
-                            SizedBox(
-                              width: fieldWidth,
-                              child: TextFormField(
+                            ],
+                          ),
+                        ),
+                        SizedBox(
+                          width: fieldWidth,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              TextFormField(
                                 controller: _categoryController,
                                 focusNode: _categoryFocusNode,
                                 textInputAction: TextInputAction.done,
-                                decoration: const InputDecoration(
+                                decoration: InputDecoration(
                                   labelText: 'Categoria',
+                                  suffixIcon: SpeechDictationActionButton(
+                                    controller: _categoryDictation,
+                                    textController: _categoryController,
+                                    tooltip: 'Dictar categoria',
+                                  ),
                                 ),
                                 onFieldSubmitted: (_) => _save(store),
                               ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    BpcPanel(
-                      color: Theme.of(context).colorScheme.surfaceContainerLow,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Fecha y hora',
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                          ),
-                          Text(formatDateTimeShort(_dateTime)),
-                          const SizedBox(width: 12),
-                          TextButton(
-                            onPressed: _pickDateTime,
-                            child: const Text('Cambiar'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final compact = constraints.maxWidth < 520;
-                        final saveButton = FilledButton.icon(
-                          onPressed: _saving ? null : () => _save(store),
-                          style: compact
-                              ? FilledButton.styleFrom(
-                                  minimumSize: const Size.fromHeight(52),
-                                )
-                              : null,
-                          icon: _saving
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.save_rounded),
-                          label: Text(_saving ? 'Guardando' : 'Guardar gasto'),
-                        );
-
-                        if (compact) {
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              saveButton,
-                              const SizedBox(height: 10),
-                              TextButton(
-                                onPressed: _saving
-                                    ? null
-                                    : () => Navigator.of(context).pop(),
-                                child: const Text('Cancelar'),
+                              SpeechDictationHint(
+                                controller: _categoryDictation,
                               ),
                             ],
-                          );
-                        }
-
-                        return Row(
-                          children: [
-                            const Spacer(),
-                            TextButton(
-                              onPressed: _saving
-                                  ? null
-                                  : () => Navigator.of(context).pop(),
-                              child: const Text('Cancelar'),
-                            ),
-                            const SizedBox(width: 12),
-                            saveButton,
-                          ],
-                        );
-                      },
-                    ),
-                  ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
-              ),
+                const SizedBox(height: 12),
+                BpcPanel(
+                  color: Theme.of(context).colorScheme.surfaceContainerLow,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Fecha y hora',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ),
+                      Text(formatDateTimeShort(_dateTime)),
+                      const SizedBox(width: 12),
+                      TextButton(
+                        onPressed: _pickDateTime,
+                        child: const Text('Cambiar'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final compact = constraints.maxWidth < 520;
+                    final saveButton = FilledButton.icon(
+                      onPressed: _saving ? null : () => _save(store),
+                      style: compact
+                          ? FilledButton.styleFrom(
+                              minimumSize: const Size.fromHeight(52),
+                            )
+                          : null,
+                      icon: _saving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.save_rounded),
+                      label: Text(_saving ? 'Guardando' : 'Guardar gasto'),
+                    );
+
+                    if (compact) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          saveButton,
+                          const SizedBox(height: 10),
+                          TextButton(
+                            onPressed: _saving
+                                ? null
+                                : () => Navigator.of(context).pop(),
+                            child: const Text('Cancelar'),
+                          ),
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        const Spacer(),
+                        TextButton(
+                          onPressed: _saving
+                              ? null
+                              : () => Navigator.of(context).pop(),
+                          child: const Text('Cancelar'),
+                        ),
+                        const SizedBox(width: 12),
+                        saveButton,
+                      ],
+                    );
+                  },
+                ),
+              ],
             ),
           ),
         ),
