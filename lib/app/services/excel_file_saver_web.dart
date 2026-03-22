@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:js_interop';
 import 'dart:typed_data';
 
@@ -14,7 +15,8 @@ class WebExcelFileSaver implements ExcelFileSaver {
     final blob = web.Blob(
       <web.BlobPart>[bytes.toJS].toJS,
       web.BlobPropertyBag(
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        type:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       ),
     );
     final url = web.URL.createObjectURL(blob);
@@ -25,12 +27,12 @@ class WebExcelFileSaver implements ExcelFileSaver {
 
     web.document.body?.append(anchor);
     anchor.click();
-    anchor.remove();
-    web.URL.revokeObjectURL(url);
+    Timer(const Duration(seconds: 1), () {
+      anchor.remove();
+      web.URL.revokeObjectURL(url);
+    });
 
-    return const ExcelSaveResult(
-      disposition: ExcelSaveDisposition.downloaded,
-    );
+    return const ExcelSaveResult(disposition: ExcelSaveDisposition.downloaded);
   }
 }
 

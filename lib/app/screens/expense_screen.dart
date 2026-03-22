@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/commerce_store.dart';
 import '../utils/formatters.dart';
+import '../utils/user_facing_errors.dart';
 import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
 import '../widgets/keyboard_aware_form.dart';
@@ -298,7 +299,9 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
       }
       setState(() => _saving = false);
       messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(userFacingErrorMessage(error))),
+      );
     }
   }
 
@@ -308,14 +311,5 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
       return 0;
     }
     return int.tryParse(normalized) ?? 0;
-  }
-
-  String _friendlyError(Object error) {
-    final message = error.toString();
-    const prefix = 'Bad state: ';
-    if (message.startsWith(prefix)) {
-      return message.substring(prefix.length);
-    }
-    return message;
   }
 }

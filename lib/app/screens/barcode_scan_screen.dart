@@ -6,6 +6,7 @@ import '../models/product.dart';
 import '../services/commerce_store.dart';
 import '../theme/bpc_colors.dart';
 import '../utils/formatters.dart';
+import '../utils/user_facing_errors.dart';
 import '../widgets/barcode_input_dialog.dart';
 import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
@@ -176,7 +177,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_friendlyError(error)),
+          content: Text(userFacingErrorMessage(error)),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -195,15 +196,6 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
       }
     }
     return null;
-  }
-
-  String _friendlyError(Object error) {
-    final message = error.toString();
-    const prefix = 'Bad state: ';
-    if (message.startsWith(prefix)) {
-      return message.substring(prefix.length);
-    }
-    return message;
   }
 
   @override

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/product.dart';
 import '../services/commerce_store.dart';
 import '../utils/formatters.dart';
+import '../utils/user_facing_errors.dart';
 import 'keyboard_aware_form.dart';
 import 'speech_dictation.dart';
 
@@ -152,6 +153,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                           children: [
                             TextFormField(
                               controller: _nameController,
+                              autofocus: true,
                               decoration: InputDecoration(
                                 labelText: 'Nombre',
                                 suffixIcon: SpeechDictationActionButton(
@@ -360,7 +362,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       setState(() => _saving = false);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      ).showSnackBar(SnackBar(content: Text(userFacingErrorMessage(error))));
     }
   }
 }

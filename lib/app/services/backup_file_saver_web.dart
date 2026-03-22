@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:js_interop';
 import 'dart:typed_data';
 
@@ -23,8 +24,10 @@ class WebBackupFileSaver implements BackupFileSaver {
 
     web.document.body?.append(anchor);
     anchor.click();
-    anchor.remove();
-    web.URL.revokeObjectURL(url);
+    Timer(const Duration(seconds: 1), () {
+      anchor.remove();
+      web.URL.revokeObjectURL(url);
+    });
 
     return const BackupSaveResult(
       disposition: BackupSaveDisposition.downloaded,

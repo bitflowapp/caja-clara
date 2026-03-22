@@ -9,6 +9,7 @@ import '../screens/summary_screen.dart';
 import '../services/backup_service.dart';
 import '../services/excel_export_service.dart';
 import '../theme/bpc_colors.dart';
+import '../utils/user_facing_errors.dart';
 import 'caja_clara_brand.dart';
 import 'commerce_scope.dart';
 import 'operation_dialogs.dart';
@@ -88,7 +89,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       }
       messenger.showSnackBar(
         SnackBar(
-          content: Text('No se pudo exportar Excel: $error'),
+          content: Text(
+            'No se pudo exportar Excel: ${userFacingErrorMessage(error)}',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -134,7 +137,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       }
       messenger.showSnackBar(
         SnackBar(
-          content: Text('No se pudo exportar el backup: $error'),
+          content: Text(
+            'No se pudo exportar el backup: ${userFacingErrorMessage(error)}',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -188,7 +193,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       }
       messenger.showSnackBar(
         SnackBar(
-          content: Text('No se pudo restaurar el backup: $error'),
+          content: Text(
+            'No se pudo restaurar el backup: ${userFacingErrorMessage(error)}',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -240,7 +247,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       }
       messenger.showSnackBar(
         SnackBar(
-          content: Text('No se pudo deshacer: $error'),
+          content: Text(
+            'No se pudo deshacer: ${userFacingErrorMessage(error)}',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -313,7 +322,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       }
       messenger.showSnackBar(
         SnackBar(
-          content: Text('No se pudo registrar la apertura: $error'),
+          content: Text(
+            'No se pudo registrar la apertura: ${userFacingErrorMessage(error)}',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -384,7 +395,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       }
       messenger.showSnackBar(
         SnackBar(
-          content: Text('No se pudo registrar el cierre: $error'),
+          content: Text(
+            'No se pudo registrar el cierre: ${userFacingErrorMessage(error)}',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );

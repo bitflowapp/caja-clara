@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/product.dart';
 import '../services/commerce_store.dart';
 import '../utils/formatters.dart';
+import '../utils/user_facing_errors.dart';
 import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
 import '../widgets/keyboard_aware_form.dart';
@@ -417,17 +418,10 @@ class _SaleScreenState extends State<SaleScreen> {
       }
       setState(() => _saving = false);
       messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(userFacingErrorMessage(error))),
+      );
     }
-  }
-
-  String _friendlyError(Object error) {
-    final message = error.toString();
-    const prefix = 'Bad state: ';
-    if (message.startsWith(prefix)) {
-      return message.substring(prefix.length);
-    }
-    return message;
   }
 }
 
