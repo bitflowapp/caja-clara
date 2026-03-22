@@ -4,6 +4,7 @@ import '../models/product.dart';
 import '../services/commerce_store.dart';
 import '../utils/formatters.dart';
 import '../utils/user_facing_errors.dart';
+import '../utils/text_field_selection.dart';
 import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
 import '../widgets/keyboard_aware_form.dart';
@@ -23,6 +24,7 @@ class _SaleScreenState extends State<SaleScreen> {
   final _quantityController = TextEditingController(text: '1');
   final _productFocusNode = FocusNode();
   final _quantityFocusNode = FocusNode();
+  TextEditingController? _productSearchController;
   final _productSearchDictation = SpeechDictationController();
   Product? _selectedProduct;
   String _paymentMethod = 'Efectivo';
@@ -32,6 +34,7 @@ class _SaleScreenState extends State<SaleScreen> {
   void initState() {
     super.initState();
     _selectedProduct = widget.initialProduct;
+    selectAllTextOnFocus(_quantityFocusNode, _quantityController);
     _productSearchDictation.initialize();
   }
 
@@ -73,7 +76,7 @@ class _SaleScreenState extends State<SaleScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Selecciona un producto, cantidad y medio de pago.',
+                      'Elegi producto, cantidad y medio de pago. Guardar es directo.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.outline,
                       ),
@@ -89,10 +92,35 @@ class _SaleScreenState extends State<SaleScreen> {
                             const Icon(Icons.qr_code_scanner_rounded),
                             const SizedBox(width: 10),
                             Expanded(
-                              child: Text(
-                                'Producto resuelto. Ajusta cantidad y confirma.',
-                                style: Theme.of(context).textTheme.bodyMedium,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Producto listo',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(fontWeight: FontWeight.w800),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Ajusta cantidad y confirma.',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
+                                  ),
+                                ],
                               ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _selectedProduct = null;
+                                  _productSearchController?.clear();
+                                });
+                                _productFocusNode.requestFocus();
+                              },
+                              child: const Text('Cambiar producto'),
                             ),
                           ],
                         ),
@@ -127,6 +155,7 @@ class _SaleScreenState extends State<SaleScreen> {
                       },
                       fieldViewBuilder:
                           (context, controller, focusNode, onFieldSubmitted) {
+                            _productSearchController = controller;
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [

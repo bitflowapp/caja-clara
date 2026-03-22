@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/commerce_store.dart';
 import '../utils/formatters.dart';
 import '../utils/user_facing_errors.dart';
+import '../utils/text_field_selection.dart';
 import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
 import '../widgets/keyboard_aware_form.dart';
@@ -33,6 +34,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
     super.initState();
     _conceptDictation.initialize();
     _categoryDictation.initialize();
+    selectAllTextOnFocus(_categoryFocusNode, _categoryController);
   }
 
   @override
@@ -66,7 +68,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Dejalo claro y corto para que la caja quede al dia.',
+                  'Anota el gasto, guarda y sigue. Sin vueltas.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.outline,
                   ),
@@ -141,7 +143,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                                 focusNode: _categoryFocusNode,
                                 textInputAction: TextInputAction.done,
                                 decoration: InputDecoration(
-                                  labelText: 'Categoria',
+                                  labelText: 'Categoria (opcional)',
                                   suffixIcon: SpeechDictationActionButton(
                                     controller: _categoryDictation,
                                     textController: _categoryController,

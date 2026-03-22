@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../utils/text_field_selection.dart';
+
 Future<bool> showDangerConfirmationDialog(
   BuildContext context, {
   required String title,
@@ -48,7 +50,9 @@ Future<int?> showAmountEntryDialog(
   final controller = TextEditingController(
     text: initialValue == null ? '' : initialValue.toString(),
   );
+  final focusNode = FocusNode();
   final formKey = GlobalKey<FormState>();
+  selectAllTextOnFocus(focusNode, controller);
 
   final result = await showDialog<int>(
     context: context,
@@ -72,16 +76,18 @@ Future<int?> showAmountEntryDialog(
               if (helper != null) ...[Text(helper), const SizedBox(height: 12)],
               TextFormField(
                 controller: controller,
+                focusNode: focusNode,
                 keyboardType: TextInputType.number,
                 autofocus: true,
+                textInputAction: TextInputAction.done,
                 decoration: InputDecoration(labelText: label),
                 validator: (value) {
-                  final parsed = _parseInt(value);
-                  if (parsed < 0) {
-                    return 'Ingresa un valor valido.';
-                  }
                   if (value == null || value.trim().isEmpty) {
                     return 'Completa este campo.';
+                  }
+                  final parsed = _parseInt(value);
+                  if (parsed <= 0) {
+                    return 'Ingresa un valor mayor a 0.';
                   }
                   return null;
                 },
@@ -109,6 +115,7 @@ Future<int?> showAmountEntryDialog(
   );
 
   controller.dispose();
+  focusNode.dispose();
   return result;
 }
 

@@ -4,6 +4,7 @@ import '../models/product.dart';
 import '../services/commerce_store.dart';
 import '../utils/formatters.dart';
 import '../utils/user_facing_errors.dart';
+import '../utils/text_field_selection.dart';
 import 'keyboard_aware_form.dart';
 import 'speech_dictation.dart';
 
@@ -58,6 +59,12 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   late final TextEditingController _costController;
   late final TextEditingController _priceController;
   late final TextEditingController _barcodeController;
+  final _categoryFocusNode = FocusNode();
+  final _barcodeFocusNode = FocusNode();
+  final _stockFocusNode = FocusNode();
+  final _minStockFocusNode = FocusNode();
+  final _costFocusNode = FocusNode();
+  final _priceFocusNode = FocusNode();
   final _nameDictation = SpeechDictationController();
   final _categoryDictation = SpeechDictationController();
   bool _saving = false;
@@ -83,6 +90,12 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     _barcodeController = TextEditingController(
       text: product?.barcode ?? widget.initialBarcode ?? '',
     );
+    selectAllTextOnFocus(_categoryFocusNode, _categoryController);
+    selectAllTextOnFocus(_barcodeFocusNode, _barcodeController);
+    selectAllTextOnFocus(_stockFocusNode, _stockController);
+    selectAllTextOnFocus(_minStockFocusNode, _minStockController);
+    selectAllTextOnFocus(_costFocusNode, _costController);
+    selectAllTextOnFocus(_priceFocusNode, _priceController);
     _nameDictation.initialize();
     _categoryDictation.initialize();
   }
@@ -96,6 +109,12 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     _costController.dispose();
     _priceController.dispose();
     _barcodeController.dispose();
+    _categoryFocusNode.dispose();
+    _barcodeFocusNode.dispose();
+    _stockFocusNode.dispose();
+    _minStockFocusNode.dispose();
+    _costFocusNode.dispose();
+    _priceFocusNode.dispose();
     _nameDictation.dispose();
     _categoryDictation.dispose();
     super.dispose();
@@ -176,6 +195,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                           children: [
                             TextFormField(
                               controller: _categoryController,
+                              focusNode: _categoryFocusNode,
                               decoration: InputDecoration(
                                 labelText: 'Categoria (opcional)',
                                 suffixIcon: SpeechDictationActionButton(
@@ -194,6 +214,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                         width: 220,
                         child: TextFormField(
                           controller: _barcodeController,
+                          focusNode: _barcodeFocusNode,
                           decoration: const InputDecoration(
                             labelText: 'Codigo de barras (opcional)',
                           ),
@@ -203,6 +224,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                         width: 150,
                         child: TextFormField(
                           controller: _stockController,
+                          focusNode: _stockFocusNode,
                           decoration: const InputDecoration(labelText: 'Stock'),
                           keyboardType: TextInputType.number,
                           validator: (value) => _intMin(value, 0, 'El stock'),
@@ -212,6 +234,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                         width: 150,
                         child: TextFormField(
                           controller: _minStockController,
+                          focusNode: _minStockFocusNode,
                           decoration: const InputDecoration(
                             labelText: 'Stock minimo',
                           ),
@@ -224,6 +247,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                         width: 180,
                         child: TextFormField(
                           controller: _costController,
+                          focusNode: _costFocusNode,
                           decoration: const InputDecoration(labelText: 'Costo'),
                           keyboardType: TextInputType.number,
                           validator: (value) => _intMin(value, 1, 'El costo'),
@@ -233,6 +257,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                         width: 180,
                         child: TextFormField(
                           controller: _priceController,
+                          focusNode: _priceFocusNode,
                           decoration: const InputDecoration(
                             labelText: 'Precio',
                           ),
