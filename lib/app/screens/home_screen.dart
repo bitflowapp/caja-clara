@@ -57,14 +57,14 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 16),
               const SectionHeader(
                 title: 'Ultimos movimientos',
-                subtitle: 'Lo ultimo en caja, sin ruido.',
+                subtitle: 'Todo lo que movio caja y stock, en una sola lista.',
               ),
               const SizedBox(height: 10),
               if (recent.isEmpty)
                 EmptyCard(
                   title: 'Sin movimientos todavia',
                   message:
-                      'Registra una venta o un gasto. Queda guardado offline.',
+                      'Empieza con una venta o un gasto. Todo queda guardado en este dispositivo.',
                   action: FilledButton(
                     onPressed: onNewSale,
                     child: const Text('Nueva venta'),
@@ -239,7 +239,7 @@ class _PrimaryActions extends StatelessWidget {
       children: [
         ActionCard(
           title: 'Nueva venta',
-          subtitle: 'Vende y actualiza caja',
+          subtitle: 'Registra una venta y actualiza caja al instante',
           icon: Icons.shopping_bag_rounded,
           onTap: onNewSale,
           fillColor: Theme.of(context).colorScheme.primary,
@@ -254,14 +254,14 @@ class _PrimaryActions extends StatelessWidget {
             children: [
               _InlineActionRow(
                 title: 'Registrar gasto',
-                subtitle: 'Resta de caja',
+                subtitle: 'Anota una salida y deja la caja al dia',
                 icon: Icons.receipt_long_rounded,
                 onTap: onNewExpense,
               ),
               const Divider(height: 1),
               _InlineActionRow(
                 title: 'Escanear producto',
-                subtitle: 'Camara, scanner o codigo',
+                subtitle: 'Camara, scanner o ingreso manual',
                 icon: Icons.qr_code_scanner_rounded,
                 onTap: onScanProduct,
               ),
@@ -297,7 +297,7 @@ class _SecondaryActions extends StatelessWidget {
         children: [
           _InlineActionRow(
             title: 'Agregar producto',
-            subtitle: 'Nombre, barcode, stock, costo y precio',
+            subtitle: 'Carga nombre, stock, precio y codigo de barras',
             icon: Icons.add_box_rounded,
             onTap: onAddProduct,
           ),
@@ -314,8 +314,8 @@ class _SecondaryActions extends StatelessWidget {
           _InlineActionRow(
             title: 'Exportar Excel',
             subtitle: exportingExcel
-                ? 'Generando archivo'
-                : 'Resumen, productos, ventas, gastos y movimientos',
+                ? 'Preparando archivo'
+                : 'Lleva ventas, gastos, productos y movimientos',
             icon: Icons.file_download_rounded,
             onTap: onExportExcel,
           ),

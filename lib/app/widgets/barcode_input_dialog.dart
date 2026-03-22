@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 
 import '../services/commerce_store.dart';
+import '../utils/text_field_selection.dart';
 
 Future<String?> showBarcodeInputDialog(
   BuildContext context, {
   String? initialValue,
   String title = 'Ingresar codigo',
-  String helper = 'Usa el scanner como teclado. Enter confirma.',
+  String helper = 'Escanea o pega el codigo. Enter busca al instante.',
   String confirmLabel = 'Buscar producto',
 }) async {
   final controller = TextEditingController(text: initialValue ?? '');
+  final focusNode = FocusNode();
   final formKey = GlobalKey<FormState>();
+  selectAllTextOnFocus(focusNode, controller);
 
   final result = await showDialog<String>(
     context: context,
@@ -60,6 +63,7 @@ Future<String?> showBarcodeInputDialog(
               const SizedBox(height: 14),
               TextFormField(
                 controller: controller,
+                focusNode: focusNode,
                 autofocus: true,
                 textInputAction: TextInputAction.search,
                 decoration: const InputDecoration(
@@ -108,5 +112,6 @@ Future<String?> showBarcodeInputDialog(
   );
 
   controller.dispose();
+  focusNode.dispose();
   return result;
 }

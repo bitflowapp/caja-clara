@@ -37,7 +37,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
               SectionHeader(
                 title: 'Productos',
                 subtitle:
-                    'Stock actual, costo, precio, barcode y alertas de reposicion',
+                    'Carga, busca y corrige productos sin perder de vista stock y precio',
                 trailing: FilledButton.icon(
                   onPressed: () => showProductEditor(context, store),
                   icon: const Icon(Icons.add_rounded),
@@ -81,7 +81,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
               if (products.isEmpty)
                 EmptyCard(
                   title: 'Sin resultados',
-                  message: 'Proba con otro texto o agrega un producto nuevo.',
+                  message:
+                      'No hay productos con ese filtro. Ajusta la busqueda o carga uno nuevo.',
                   action: FilledButton(
                     onPressed: () => showProductEditor(context, store),
                     child: const Text('Agregar producto'),
@@ -114,22 +115,22 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   List<Product> _filteredProducts(List<Product> products) {
     final query = _searchController.text.trim().toLowerCase();
-    return products.where((product) {
-      final matchesQuery = query.isEmpty ||
-          product.name.toLowerCase().contains(query) ||
-          (product.category ?? '').toLowerCase().contains(query) ||
-          (product.barcode ?? '').toLowerCase().contains(query);
-      final matchesLowStock = !_onlyLowStock || product.isLowStock;
-      return matchesQuery && matchesLowStock;
-    }).toList(growable: false);
+    return products
+        .where((product) {
+          final matchesQuery =
+              query.isEmpty ||
+              product.name.toLowerCase().contains(query) ||
+              (product.category ?? '').toLowerCase().contains(query) ||
+              (product.barcode ?? '').toLowerCase().contains(query);
+          final matchesLowStock = !_onlyLowStock || product.isLowStock;
+          return matchesQuery && matchesLowStock;
+        })
+        .toList(growable: false);
   }
 }
 
 class _ProductTile extends StatelessWidget {
-  const _ProductTile({
-    required this.product,
-    required this.onTap,
-  });
+  const _ProductTile({required this.product, required this.onTap});
 
   final Product product;
   final VoidCallback onTap;
@@ -170,7 +171,8 @@ class _ProductTile extends StatelessWidget {
                           const SizedBox(height: 6),
                           Text(
                             'Cod. ${product.barcode}',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
                                   color: scheme.outline,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -230,10 +232,7 @@ class _ProductTile extends StatelessWidget {
 }
 
 class _InfoChip extends StatelessWidget {
-  const _InfoChip({
-    required this.label,
-    required this.value,
-  });
+  const _InfoChip({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -252,9 +251,9 @@ class _InfoChip extends StatelessWidget {
         children: [
           Text(
             label,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: scheme.outline,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(color: scheme.outline),
           ),
           const SizedBox(height: 4),
           Text(value, style: Theme.of(context).textTheme.titleMedium),

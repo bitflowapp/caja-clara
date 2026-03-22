@@ -4,6 +4,9 @@
 
 Caja Clara es una app Flutter para comercios chicos y pymes que necesitan operar ventas, gastos, productos, caja, stock y barcode desde una base local, simple y offline.
 
+Carga productos, registra ventas y gastos, controla caja y exporta la informacion sin depender de un backend.
+Esta pensada para negocios chicos que necesitan una herramienta clara, rapida y facil de mostrar o usar todos los dias.
+
 Este repo esta preparado para dos salidas reales:
 
 - Windows desktop
@@ -27,6 +30,15 @@ https://TU-USUARIO.github.io/caja-clara/
 - undo del ultimo movimiento
 - apertura y cierre de caja
 - flujo de barcode con camara o ingreso manual
+
+## Propuesta de valor corta
+
+Caja Clara ordena lo esencial de un comercio chico en una sola app: productos, ventas, gastos, caja y barcode.
+Sirve para vender rapido, entender la caja en segundos y llevarse la informacion en Excel o backup local.
+
+## Mini manual
+
+- [`docs/mini_manual_caja_clara.md`](docs/mini_manual_caja_clara.md)
 
 ## Estructura
 

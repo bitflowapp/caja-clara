@@ -45,7 +45,7 @@ class SummaryScreen extends StatelessWidget {
             children: [
               const SectionHeader(
                 title: 'Caja / Resumen',
-                subtitle: 'Operacion basica, caja y respaldo local',
+                subtitle: 'Caja del dia, exportacion y respaldo local',
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -204,13 +204,14 @@ class SummaryScreen extends StatelessWidget {
               const SizedBox(height: 18),
               const SectionHeader(
                 title: 'Movimientos recientes',
-                subtitle: 'Venta, gasto, apertura, cierre o restauracion',
+                subtitle: 'Todo lo que impacta en caja y stock',
               ),
               const SizedBox(height: 10),
               if (recent.isEmpty)
                 const EmptyCard(
                   title: 'Sin movimientos',
-                  message: 'Cuando registres ventas o gastos, aparecen aca.',
+                  message:
+                      'Cuando registres ventas, gastos o ajustes, se veran aqui.',
                 )
               else
                 BpcPanel(

@@ -13,6 +13,7 @@ import '../utils/user_facing_errors.dart';
 import 'caja_clara_brand.dart';
 import 'commerce_scope.dart';
 import 'operation_dialogs.dart';
+import 'quick_help_dialog.dart';
 
 enum CommerceTab { home, products, summary }
 
@@ -51,6 +52,10 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
 
   void _openProducts() {
     setState(() => _tab = CommerceTab.products);
+  }
+
+  Future<void> _openQuickHelp() async {
+    await showQuickHelpDialog(context);
   }
 
   Future<void> _exportExcel() async {
@@ -551,7 +556,20 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(20, 16, 18, 16),
-                      child: page,
+                      child: Column(
+                        children: [
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              onPressed: _openQuickHelp,
+                              icon: const Icon(Icons.help_outline_rounded),
+                              label: const Text('Ayuda'),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Expanded(child: page),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -564,7 +582,20 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
           body: SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: page,
+              child: Column(
+                children: [
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: _openQuickHelp,
+                      icon: const Icon(Icons.help_outline_rounded),
+                      label: const Text('Ayuda'),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Expanded(child: page),
+                ],
+              ),
             ),
           ),
           bottomNavigationBar: NavigationBar(

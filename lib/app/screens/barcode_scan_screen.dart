@@ -230,7 +230,8 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                   children: [
                     const SectionHeader(
                       title: 'Codigo de barras',
-                      subtitle: 'Camara, scanner o codigo manual.',
+                      subtitle:
+                          'Busca un producto por camara, scanner o ingreso manual.',
                     ),
                     const SizedBox(height: 14),
                     if (_supportsCamera)
@@ -331,7 +332,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                       EmptyCard(
                         title: 'Usar codigo o scanner',
                         message:
-                            'En Windows lo mas rapido es scanner USB/Bluetooth o ingreso manual.',
+                            'En Windows suele ser mas rapido usar scanner USB/Bluetooth o escribir el codigo.',
                         action: FilledButton.icon(
                           onPressed: _openManualInput,
                           icon: const Icon(Icons.keyboard_alt_rounded),
@@ -342,7 +343,8 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                     if (_currentBarcode == null)
                       const EmptyCard(
                         title: 'Esperando codigo',
-                        message: 'Lee o ingresa un codigo para buscarlo.',
+                        message:
+                            'Lee o escribe un codigo para encontrar el producto al instante.',
                         icon: Icons.qr_code_scanner_rounded,
                       )
                     else if (foundProduct == null)
@@ -623,7 +625,7 @@ class _BarcodeNotFoundCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'El codigo se leyo bien. Puedes crear el producto con este dato.',
+            'El codigo se leyo bien. Puedes dar de alta el producto con este codigo cargado.',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
