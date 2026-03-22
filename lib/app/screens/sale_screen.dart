@@ -32,6 +32,7 @@ class _SaleScreenState extends State<SaleScreen> {
   final _productSearchDictation = SpeechDictationController();
   Product? _selectedProduct;
   String _paymentMethod = 'Efectivo';
+  AutovalidateMode _autoValidateMode = AutovalidateMode.disabled;
   bool _saving = false;
 
   @override
@@ -107,6 +108,7 @@ class _SaleScreenState extends State<SaleScreen> {
                 child: FocusTraversalGroup(
                   child: Form(
                     key: _formKey,
+                    autovalidateMode: _autoValidateMode,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -238,14 +240,17 @@ class _SaleScreenState extends State<SaleScreen> {
                                         }
                                       },
                                       onFieldSubmitted: (_) {
-                                        if (_selectedProduct != null) {
+                                        final resolvedProduct =
+                                            _selectedProduct ??
+                                            _resolveTypedProduct(store);
+                                        if (resolvedProduct != null) {
                                           _quantityFocusNode.requestFocus();
                                         } else {
                                           onFieldSubmitted();
                                         }
                                       },
                                       validator: (_) => _selectedProduct == null
-                                          ? 'Elegi un producto'
+                                          ? 'Selecciona un producto de la lista o por codigo.'
                                           : null,
                                     ),
                                     SpeechDictationHint(
@@ -532,17 +537,68 @@ class _SaleScreenState extends State<SaleScreen> {
     return int.tryParse(normalized) ?? 0;
   }
 
+  Product? _resolveTypedProduct(CommerceStore store) {
+    final query = _productSearchController?.text.trim() ?? '';
+    if (query.isEmpty) {
+      return null;
+    }
+
+    final queryLower = query.toLowerCase();
+    final normalizedBarcode = CommerceStore.normalizeBarcode(query);
+    final barcodeMatches = normalizedBarcode == null
+        ? const <Product>[]
+        : store.products
+              .where((product) => product.barcode == normalizedBarcode)
+              .toList(growable: false);
+    final nameMatches = store.products
+        .where((product) => product.name.toLowerCase() == queryLower)
+        .toList(growable: false);
+    final match = barcodeMatches.length == 1
+        ? barcodeMatches.first
+        : nameMatches.length == 1
+        ? nameMatches.first
+        : null;
+    if (match == null) {
+      return null;
+    }
+
+    _productSearchController?.value = TextEditingValue(
+      text: match.name,
+      selection: TextSelection.collapsed(offset: match.name.length),
+    );
+    setState(() => _selectedProduct = match);
+    return match;
+  }
+
+  void _showBlockedFeedback(String message) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+  }
+
   Future<void> _submitSale(CommerceStore store) async {
     if (_saving) {
       return;
     }
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-    if (_selectedProduct == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Elegi un producto')));
+    final resolvedProduct = _selectedProduct ?? _resolveTypedProduct(store);
+    final quantity = _parseInt(_quantityController.text);
+    final validationMessage = resolvedProduct == null
+        ? 'Selecciona un producto de la lista o escanea un codigo.'
+        : store.saleReadinessMessage(
+            resolvedProduct.id,
+            quantityUnits: quantity,
+          );
+
+    if (resolvedProduct == null || validationMessage != null) {
+      if (_autoValidateMode == AutovalidateMode.disabled) {
+        setState(() => _autoValidateMode = AutovalidateMode.onUserInteraction);
+      }
+      _formKey.currentState!.validate();
+      _showBlockedFeedback(
+        validationMessage ?? 'Revisa los datos de la venta.',
+      );
       return;
     }
 
@@ -552,8 +608,8 @@ class _SaleScreenState extends State<SaleScreen> {
 
     try {
       await store.recordSale(
-        productId: _selectedProduct!.id,
-        quantityUnits: _parseInt(_quantityController.text),
+        productId: resolvedProduct.id,
+        quantityUnits: quantity,
         paymentMethod: _paymentMethod,
       );
       if (!mounted) {
