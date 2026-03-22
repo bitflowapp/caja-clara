@@ -23,20 +23,19 @@ class BpcPanel extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: color ?? scheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.72)),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.34),
+        ),
         boxShadow: const [
           BoxShadow(
             color: BpcColors.shadow,
-            blurRadius: 22,
-            offset: Offset(0, 10),
+            blurRadius: 12,
+            offset: Offset(0, 4),
           ),
         ],
       ),
-      child: Padding(
-        padding: padding,
-        child: child,
-      ),
+      child: Padding(padding: padding, child: child),
     );
   }
 }
@@ -101,9 +100,13 @@ class MetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return BpcPanel(
-      padding: EdgeInsets.all(tight ? 14 : 18),
-      color: accentColor ?? scheme.surface,
+    return Container(
+      padding: EdgeInsets.all(tight ? 14 : 16),
+      decoration: BoxDecoration(
+        color:
+            accentColor ?? scheme.surfaceContainerLow.withValues(alpha: 0.64),
+        borderRadius: BorderRadius.circular(18),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -111,24 +114,24 @@ class MetricCard extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: BpcColors.mutedInk,
-                  fontWeight: FontWeight.w800,
-                ),
+              color: BpcColors.mutedInk,
+              fontWeight: FontWeight.w800,
+            ),
           ),
           const SizedBox(height: 10),
           Text(
             value,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: BpcColors.ink,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineMedium?.copyWith(color: BpcColors.ink),
           ),
           if (helper != null) ...[
             const SizedBox(height: 6),
             Text(
               helper!,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: BpcColors.subtleInk,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
             ),
           ],
         ],
@@ -163,29 +166,29 @@ class ActionCard extends StatelessWidget {
     final fg = contentColor ?? scheme.onSurface;
     final iconSurface = emphasized
         ? Colors.white.withValues(alpha: 0.16)
-        : scheme.primary.withValues(alpha: 0.10);
+        : scheme.primary.withValues(alpha: 0.08);
     return Material(
-      color: fillColor ?? scheme.surface,
-      borderRadius: BorderRadius.circular(24),
+      color: fillColor ?? scheme.surfaceContainerLow.withValues(alpha: 0.42),
+      borderRadius: BorderRadius.circular(emphasized ? 24 : 20),
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(emphasized ? 24 : 20),
         onTap: onTap,
         child: Container(
-          constraints: BoxConstraints(minHeight: emphasized ? 112 : 92),
-          padding: EdgeInsets.all(emphasized ? 20 : 18),
+          constraints: BoxConstraints(minHeight: emphasized ? 112 : 84),
+          padding: EdgeInsets.all(emphasized ? 20 : 16),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(emphasized ? 24 : 20),
             border: Border.all(
               color: emphasized
                   ? Colors.white.withValues(alpha: 0.14)
-                  : scheme.outlineVariant.withValues(alpha: 0.55),
+                  : Colors.transparent,
             ),
             boxShadow: emphasized
                 ? const [
                     BoxShadow(
                       color: Color(0x22122520),
-                      blurRadius: 24,
-                      offset: Offset(0, 12),
+                      blurRadius: 16,
+                      offset: Offset(0, 8),
                     ),
                   ]
                 : null,
@@ -214,24 +217,24 @@ class ActionCard extends StatelessWidget {
                     Text(
                       title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: fg,
-                            fontSize: emphasized ? 22 : 16,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.35,
-                          ),
+                        color: fg,
+                        fontSize: emphasized ? 22 : 16,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.35,
+                      ),
                     ),
                     if (subtitle != null) ...[
                       const SizedBox(height: 6),
                       Text(
                         subtitle!,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: emphasized
-                                  ? Colors.white.withValues(alpha: 0.82)
-                                  : BpcColors.subtleInk,
-                              fontWeight: emphasized
-                                  ? FontWeight.w600
-                                  : FontWeight.w500,
-                            ),
+                          color: emphasized
+                              ? Colors.white.withValues(alpha: 0.82)
+                              : BpcColors.mutedInk,
+                          fontWeight: emphasized
+                              ? FontWeight.w600
+                              : FontWeight.w500,
+                        ),
                       ),
                     ],
                   ],
@@ -250,10 +253,12 @@ class MovementsListTile extends StatelessWidget {
     super.key,
     required this.movement,
     this.productName,
+    this.showDivider = true,
   });
 
   final Movement movement;
   final String? productName;
+  final bool showDivider;
 
   @override
   Widget build(BuildContext context) {
@@ -264,82 +269,95 @@ class MovementsListTile extends StatelessWidget {
     final label = movement.isNeutral
         ? formatMoney(0)
         : movement.isIncome
-            ? formatMoney(movement.amountPesos)
-            : '-${formatMoney(movement.amountPesos)}';
-    final subtitle = movement.subtitle ??
+        ? formatMoney(movement.amountPesos)
+        : '-${formatMoney(movement.amountPesos)}';
+    final subtitle =
+        movement.subtitle ??
         (movement.kind == MovementKind.sale
             ? '${movement.originLabel} / ${movement.quantityUnits ?? 0} u. / ${movement.paymentMethod ?? 'Caja'}'
             : movement.kind == MovementKind.expense
-                ? '${movement.originLabel} / ${movement.category ?? 'Gasto'}'
-                : movement.originLabel);
+            ? '${movement.originLabel} / ${movement.category ?? 'Gasto'}'
+            : movement.originLabel);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
-      child: Container(
-        decoration: BoxDecoration(
-          color: scheme.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.52)),
-        ),
-        child: ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: Container(
-            width: 46,
-            height: 46,
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        border: showDivider
+            ? Border(
+                bottom: BorderSide(
+                  color: scheme.outlineVariant.withValues(alpha: 0.44),
+                ),
+              )
+            : null,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.13),
+              color: color.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: Icon(
               movement.isNeutral
                   ? Icons.sync_alt_rounded
                   : movement.isIncome
-                      ? Icons.add_rounded
-                      : Icons.remove_rounded,
+                  ? Icons.add_rounded
+                  : Icons.remove_rounded,
               color: color,
+              size: 20,
             ),
           ),
-          title: Text(
-            movement.title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: BpcColors.ink,
-                  fontWeight: FontWeight.w900,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  movement.title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: BpcColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-          ),
-          subtitle: Text(
-            '$subtitle${productName == null ? '' : ' / $productName'}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: BpcColors.subtleInk,
-                  fontWeight: FontWeight.w600,
+                const SizedBox(height: 4),
+                Text(
+                  '$subtitle${productName == null ? '' : ' / $productName'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: BpcColors.subtleInk,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
+              ],
+            ),
           ),
-          trailing: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          const SizedBox(width: 12),
+          Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
                 label,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: color,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 20,
-                      letterSpacing: -0.35,
-                    ),
+                  color: color,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 20,
+                  letterSpacing: -0.35,
+                ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               Text(
                 formatMovementDate(movement.createdAt),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: BpcColors.subtleInk,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  color: BpcColors.subtleInk,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -381,14 +399,11 @@ class EmptyCard extends StatelessWidget {
           Text(
             message,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: BpcColors.subtleInk,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
           ),
-          if (action != null) ...[
-            const SizedBox(height: 14),
-            action!,
-          ],
+          if (action != null) ...[const SizedBox(height: 14), action!],
         ],
       ),
     );
@@ -396,10 +411,7 @@ class EmptyCard extends StatelessWidget {
 }
 
 class StockBadge extends StatelessWidget {
-  const StockBadge({
-    super.key,
-    required this.product,
-  });
+  const StockBadge({super.key, required this.product});
 
   final Product product;
 

@@ -31,21 +31,21 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
   bool _savingCashEvent = false;
 
   void _openSale() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const SaleScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const SaleScreen()));
   }
 
   void _openExpense() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const ExpenseScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const ExpenseScreen()));
   }
 
   void _openBarcodeScan() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const BarcodeScanScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const BarcodeScanScreen()));
   }
 
   void _openProducts() {
@@ -260,7 +260,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     final store = CommerceScope.of(context);
     final amount = await showAmountEntryDialog(
       context,
-      title: store.hasCashOpeningToday ? 'Actualizar apertura' : 'Apertura de caja',
+      title: store.hasCashOpeningToday
+          ? 'Actualizar apertura'
+          : 'Apertura de caja',
       label: 'Caja inicial',
       confirmLabel: store.hasCashOpeningToday ? 'Actualizar' : 'Guardar',
       helper: 'Ingresa el efectivo inicial del dia.',
@@ -349,7 +351,8 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       overwrite = await showDangerConfirmationDialog(
         context,
         title: 'Reemplazar cierre',
-        message: 'Ya existe un cierre registrado hoy. Se reemplazara por el nuevo valor.',
+        message:
+            'Ya existe un cierre registrado hoy. Se reemplazara por el nuevo valor.',
         confirmLabel: 'Reemplazar',
       );
       if (!overwrite) {
@@ -437,12 +440,12 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                     decoration: BoxDecoration(
                       color: BpcColors.surface.withValues(alpha: 0.88),
                       borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: BpcColors.lineStrong),
+                      border: Border.all(color: BpcColors.line),
                       boxShadow: const [
                         BoxShadow(
                           color: BpcColors.shadow,
-                          blurRadius: 24,
-                          offset: Offset(0, 10),
+                          blurRadius: 14,
+                          offset: Offset(0, 5),
                         ),
                       ],
                     ),
@@ -450,15 +453,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                       children: [
                         Padding(
                           padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: BpcColors.greenDeep,
-                              borderRadius: BorderRadius.circular(22),
-                            ),
-                            child: const Padding(
-                              padding: EdgeInsets.fromLTRB(16, 14, 16, 14),
-                              child: _RailBrand(),
-                            ),
+                          child: const Padding(
+                            padding: EdgeInsets.fromLTRB(2, 4, 2, 6),
+                            child: _RailBrand(),
                           ),
                         ),
                         Expanded(
@@ -486,8 +483,12 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                                 label: const Text('Productos'),
                               ),
                               const NavigationRailDestination(
-                                icon: Icon(Icons.account_balance_wallet_outlined),
-                                selectedIcon: Icon(Icons.account_balance_wallet_rounded),
+                                icon: Icon(
+                                  Icons.account_balance_wallet_outlined,
+                                ),
+                                selectedIcon: Icon(
+                                  Icons.account_balance_wallet_rounded,
+                                ),
                                 label: Text('Caja'),
                               ),
                             ],
@@ -501,7 +502,6 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                             decoration: BoxDecoration(
                               color: BpcColors.surfaceStrong,
                               borderRadius: BorderRadius.circular(18),
-                              border: Border.all(color: BpcColors.line),
                             ),
                             child: Row(
                               children: [
@@ -516,8 +516,13 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    store.isSaving ? 'Guardando' : 'Local listo',
-                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    store.isSaving
+                                        ? 'Guardando'
+                                        : 'Local listo',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
                                           color: BpcColors.ink,
                                           fontWeight: FontWeight.w800,
                                         ),
@@ -562,7 +567,10 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
               ),
               NavigationDestination(
                 icon: _ProductsIconBadge(count: lowStockCount),
-                selectedIcon: _ProductsIconBadge(count: lowStockCount, selected: true),
+                selectedIcon: _ProductsIconBadge(
+                  count: lowStockCount,
+                  selected: true,
+                ),
                 label: 'Productos',
               ),
               const NavigationDestination(
@@ -586,7 +594,9 @@ class _ProductsIconBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final icon = selected ? Icons.inventory_2_rounded : Icons.inventory_2_outlined;
+    final icon = selected
+        ? Icons.inventory_2_rounded
+        : Icons.inventory_2_outlined;
     if (count <= 0) return Icon(icon);
 
     final scheme = Theme.of(context).colorScheme;
@@ -635,7 +645,7 @@ class _RailBrand extends StatelessWidget {
         Text(
           'Caja, ventas, stock y barcode',
           style: theme.textTheme.bodySmall?.copyWith(
-            color: Colors.white.withValues(alpha: 0.72),
+            color: BpcColors.subtleInk,
             fontWeight: FontWeight.w700,
           ),
         ),

@@ -72,15 +72,19 @@ class HomeScreen extends StatelessWidget {
                 )
               else
                 BpcPanel(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
                   child: Column(
                     children: [
-                      for (final movement in recent)
+                      for (var index = 0; index < recent.length; index++)
                         MovementsListTile(
-                          movement: movement,
+                          movement: recent[index],
                           productName: store
-                              .productById(movement.productId ?? '')
+                              .productById(recent[index].productId ?? '')
                               ?.name,
+                          showDivider: index != recent.length - 1,
                         ),
                     ],
                   ),
@@ -108,7 +112,7 @@ class _HeaderStrip extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       color: Colors.white.withValues(alpha: 0.82),
       child: Wrap(
-        spacing: 10,
+        spacing: 18,
         runSpacing: 10,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
@@ -192,35 +196,27 @@ class _HeaderMetric extends StatelessWidget {
 
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 148),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
-        decoration: BoxDecoration(
-          color: BpcColors.surfaceStrong,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: BpcColors.line),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: BpcColors.mutedInk,
-                fontWeight: FontWeight.w800,
-                fontSize: 12,
-              ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: BpcColors.mutedInk,
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
             ),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: BpcColors.ink,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.45,
-              ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: BpcColors.ink,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.45,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -239,7 +235,6 @@ class _PrimaryActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Column(
       children: [
         ActionCard(
@@ -247,24 +242,31 @@ class _PrimaryActions extends StatelessWidget {
           subtitle: 'Vende y actualiza caja',
           icon: Icons.shopping_bag_rounded,
           onTap: onNewSale,
-          fillColor: scheme.primary,
-          contentColor: scheme.onPrimary,
+          fillColor: Theme.of(context).colorScheme.primary,
+          contentColor: Theme.of(context).colorScheme.onPrimary,
           emphasized: true,
         ),
         const SizedBox(height: 12),
-        ActionCard(
-          title: 'Registrar gasto',
-          subtitle: 'Resta de caja',
-          icon: Icons.receipt_long_rounded,
-          onTap: onNewExpense,
-          fillColor: Colors.white.withValues(alpha: 0.78),
-        ),
-        const SizedBox(height: 12),
-        ActionCard(
-          title: 'Escanear producto',
-          subtitle: 'Camara, scanner o codigo',
-          icon: Icons.qr_code_scanner_rounded,
-          onTap: onScanProduct,
+        BpcPanel(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          color: Colors.white.withValues(alpha: 0.76),
+          child: Column(
+            children: [
+              _InlineActionRow(
+                title: 'Registrar gasto',
+                subtitle: 'Resta de caja',
+                icon: Icons.receipt_long_rounded,
+                onTap: onNewExpense,
+              ),
+              const Divider(height: 1),
+              _InlineActionRow(
+                title: 'Escanear producto',
+                subtitle: 'Camara, scanner o codigo',
+                icon: Icons.qr_code_scanner_rounded,
+                onTap: onScanProduct,
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -288,50 +290,101 @@ class _SecondaryActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final wide = constraints.maxWidth >= 760;
-        final width = wide
-            ? (constraints.maxWidth - 12) / 2
-            : constraints.maxWidth;
-        return Wrap(
-          spacing: 12,
-          runSpacing: 12,
+    return BpcPanel(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      color: Colors.white.withValues(alpha: 0.74),
+      child: Column(
+        children: [
+          _InlineActionRow(
+            title: 'Agregar producto',
+            subtitle: 'Nombre, barcode, stock, costo y precio',
+            icon: Icons.add_box_rounded,
+            onTap: onAddProduct,
+          ),
+          const Divider(height: 1),
+          _InlineActionRow(
+            title: 'Ver stock bajo',
+            subtitle: lowStockCount == 0
+                ? 'Sin alertas'
+                : '$lowStockCount productos a reponer',
+            icon: Icons.warning_amber_rounded,
+            onTap: onOpenLowStock,
+          ),
+          const Divider(height: 1),
+          _InlineActionRow(
+            title: 'Exportar Excel',
+            subtitle: exportingExcel
+                ? 'Generando archivo'
+                : 'Resumen, productos, ventas, gastos y movimientos',
+            icon: Icons.file_download_rounded,
+            onTap: onExportExcel,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InlineActionRow extends StatelessWidget {
+  const _InlineActionRow({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
           children: [
-            SizedBox(
-              width: width,
-              child: ActionCard(
-                title: 'Agregar producto',
-                subtitle: 'Nombre, barcode, stock, costo y precio',
-                icon: Icons.add_box_rounded,
-                onTap: onAddProduct,
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: Theme.of(context).colorScheme.primary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: BpcColors.ink,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: BpcColors.subtleInk,
+                    ),
+                  ),
+                ],
               ),
             ),
-            SizedBox(
-              width: width,
-              child: ActionCard(
-                title: 'Ver stock bajo',
-                subtitle: lowStockCount == 0
-                    ? 'Sin alertas'
-                    : '$lowStockCount productos a reponer',
-                icon: Icons.warning_amber_rounded,
-                onTap: onOpenLowStock,
-              ),
-            ),
-            SizedBox(
-              width: constraints.maxWidth,
-              child: ActionCard(
-                title: 'Exportar Excel',
-                subtitle: exportingExcel
-                    ? 'Generando archivo'
-                    : 'Resumen, productos, ventas, gastos y movimientos',
-                icon: Icons.file_download_rounded,
-                onTap: onExportExcel,
-              ),
-            ),
+            const SizedBox(width: 12),
+            const Icon(Icons.chevron_right_rounded, color: BpcColors.mutedInk),
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 }

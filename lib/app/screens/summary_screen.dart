@@ -127,74 +127,79 @@ class SummaryScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final wide = constraints.maxWidth >= 900;
-                  final width =
-                      wide ? (constraints.maxWidth - 32) / 3 : constraints.maxWidth;
-                  return Wrap(
-                    spacing: 16,
-                    runSpacing: 16,
-                    children: [
-                      SizedBox(
-                        width: width,
-                        child: MetricCard(
-                          label: 'Caja actual',
-                          value: formatMoney(store.cashBalancePesos),
-                          helper: 'Saldo total',
+              BpcPanel(
+                padding: const EdgeInsets.all(16),
+                color: Colors.white.withValues(alpha: 0.78),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final wide = constraints.maxWidth >= 900;
+                    final width = wide
+                        ? (constraints.maxWidth - 20) / 3
+                        : constraints.maxWidth;
+                    return Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        SizedBox(
+                          width: width,
+                          child: MetricCard(
+                            label: 'Caja actual',
+                            value: formatMoney(store.cashBalancePesos),
+                            helper: 'Saldo total',
+                          ),
                         ),
-                      ),
-                      SizedBox(
-                        width: width,
-                        child: MetricCard(
-                          label: 'Apertura del dia',
-                          value: store.todayOpeningCashPesos == null
-                              ? 'Sin abrir'
-                              : formatMoney(store.todayOpeningCashPesos!),
-                          helper: 'Caja inicial del dia',
+                        SizedBox(
+                          width: width,
+                          child: MetricCard(
+                            label: 'Apertura del dia',
+                            value: store.todayOpeningCashPesos == null
+                                ? 'Sin abrir'
+                                : formatMoney(store.todayOpeningCashPesos!),
+                            helper: 'Caja inicial del dia',
+                          ),
                         ),
-                      ),
-                      SizedBox(
-                        width: width,
-                        child: MetricCard(
-                          label: 'Ventas del dia',
-                          value: formatMoney(store.todaySalesPesos),
-                          helper: 'Ingresos hoy',
+                        SizedBox(
+                          width: width,
+                          child: MetricCard(
+                            label: 'Ventas del dia',
+                            value: formatMoney(store.todaySalesPesos),
+                            helper: 'Ingresos hoy',
+                          ),
                         ),
-                      ),
-                      SizedBox(
-                        width: width,
-                        child: MetricCard(
-                          label: 'Gastos del dia',
-                          value: formatMoney(store.todayExpensesPesos),
-                          helper: 'Egresos hoy',
+                        SizedBox(
+                          width: width,
+                          child: MetricCard(
+                            label: 'Gastos del dia',
+                            value: formatMoney(store.todayExpensesPesos),
+                            helper: 'Egresos hoy',
+                          ),
                         ),
-                      ),
-                      SizedBox(
-                        width: width,
-                        child: MetricCard(
-                          label: 'Caja esperada',
-                          value: store.todayExpectedCashPesos == null
-                              ? 'Sin apertura'
-                              : formatMoney(store.todayExpectedCashPesos!),
-                          helper: 'Apertura + ventas - gastos',
+                        SizedBox(
+                          width: width,
+                          child: MetricCard(
+                            label: 'Caja esperada',
+                            value: store.todayExpectedCashPesos == null
+                                ? 'Sin apertura'
+                                : formatMoney(store.todayExpectedCashPesos!),
+                            helper: 'Apertura + ventas - gastos',
+                          ),
                         ),
-                      ),
-                      SizedBox(
-                        width: width,
-                        child: MetricCard(
-                          label: 'Cierre registrado',
-                          value: store.todayClosingCashPesos == null
-                              ? 'Sin cierre'
-                              : formatMoney(store.todayClosingCashPesos!),
-                          helper: store.todayClosingDifferencePesos == null
-                              ? 'Caja contada al cierre'
-                              : 'Diferencia: ${formatMoney(store.todayClosingDifferencePesos!)}',
+                        SizedBox(
+                          width: width,
+                          child: MetricCard(
+                            label: 'Cierre registrado',
+                            value: store.todayClosingCashPesos == null
+                                ? 'Sin cierre'
+                                : formatMoney(store.todayClosingCashPesos!),
+                            helper: store.todayClosingDifferencePesos == null
+                                ? 'Caja contada al cierre'
+                                : 'Diferencia: ${formatMoney(store.todayClosingDifferencePesos!)}',
+                          ),
                         ),
-                      ),
-                    ],
-                  );
-                },
+                      ],
+                    );
+                  },
+                ),
               ),
               const SizedBox(height: 18),
               const SectionHeader(
@@ -209,14 +214,19 @@ class SummaryScreen extends StatelessWidget {
                 )
               else
                 BpcPanel(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
                   child: Column(
                     children: [
-                      for (final movement in recent)
+                      for (var index = 0; index < recent.length; index++)
                         MovementsListTile(
-                          movement: movement,
-                          productName:
-                              store.productById(movement.productId ?? '')?.name,
+                          movement: recent[index],
+                          productName: store
+                              .productById(recent[index].productId ?? '')
+                              ?.name,
+                          showDivider: index != recent.length - 1,
                         ),
                     ],
                   ),
