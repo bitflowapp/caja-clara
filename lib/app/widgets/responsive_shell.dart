@@ -27,6 +27,7 @@ class ResponsiveShell extends StatefulWidget {
 class _ResponsiveShellState extends State<ResponsiveShell> {
   CommerceTab _tab = CommerceTab.home;
   bool _exportingExcel = false;
+  bool _applyingStarterTemplate = false;
   bool _exportingBackup = false;
   bool _restoringBackup = false;
   bool _undoingMovement = false;
@@ -56,6 +57,53 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
 
   Future<void> _openQuickHelp() async {
     await showQuickHelpDialog(context);
+  }
+
+  Future<void> _applyStarterTemplate() async {
+    if (_applyingStarterTemplate) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    final store = CommerceScope.of(context);
+
+    setState(() => _applyingStarterTemplate = true);
+    try {
+      final result = await store.applyArgentinianKioskTemplate();
+      if (!mounted) {
+        return;
+      }
+
+      setState(() => _tab = CommerceTab.products);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            result.fullySkipped
+                ? 'La plantilla kiosco ya estaba cargada.'
+                : result.skippedCount == 0
+                ? 'Plantilla kiosco cargada: ${result.addedCount} productos nuevos.'
+                : 'Plantilla kiosco cargada: ${result.addedCount} nuevos y ${result.skippedCount} repetidos salteados.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'No se pudo cargar la plantilla: ${userFacingErrorMessage(error)}',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _applyingStarterTemplate = false);
+      }
+    }
   }
 
   Future<void> _exportExcel() async {
@@ -423,9 +471,14 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         onScanProduct: _openBarcodeScan,
         onOpenProducts: _openProducts,
         onExportExcel: _exportExcel,
+        onApplyStarterTemplate: _applyStarterTemplate,
         exportingExcel: _exportingExcel,
+        applyingStarterTemplate: _applyingStarterTemplate,
       ),
-      CommerceTab.products: const ProductsScreen(),
+      CommerceTab.products: ProductsScreen(
+        onApplyStarterTemplate: _applyStarterTemplate,
+        applyingStarterTemplate: _applyingStarterTemplate,
+      ),
       CommerceTab.summary: SummaryScreen(
         onExportExcel: _exportExcel,
         exportingExcel: _exportingExcel,

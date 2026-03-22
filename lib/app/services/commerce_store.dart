@@ -6,10 +6,11 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../models/movement.dart';
 import '../models/product.dart';
 import 'commerce_persistence.dart';
+import 'starter_templates.dart';
 
 class CommerceStore extends ChangeNotifier {
   CommerceStore._(this._persistence, {required bool persistenceEnabled})
-      : _persistenceEnabled = persistenceEnabled;
+    : _persistenceEnabled = persistenceEnabled;
 
   static Future<CommerceStore> loadOrSeed() async {
     await Hive.initFlutter();
@@ -27,7 +28,18 @@ class CommerceStore extends ChangeNotifier {
       CommercePersistence(),
       persistenceEnabled: false,
     );
-    store._seed();
+    store._seedDemoData();
+    store._ready = true;
+    return store;
+  }
+
+  @visibleForTesting
+  static CommerceStore emptyForTest() {
+    final store = CommerceStore._(
+      CommercePersistence(),
+      persistenceEnabled: false,
+    );
+    store._seedEmptyState();
     store._ready = true;
     return store;
   }
@@ -48,6 +60,8 @@ class CommerceStore extends ChangeNotifier {
   bool get isReady => _ready;
   bool get isSaving => _saving;
   String? get lastError => _lastError;
+  bool get hasProducts => _products.isNotEmpty;
+  bool get hasMovements => _movements.isNotEmpty;
 
   UnmodifiableListView<Product> get products => UnmodifiableListView(_products);
   UnmodifiableListView<Movement> get movements =>
@@ -131,22 +145,22 @@ class CommerceStore extends ChangeNotifier {
   List<Movement> recentMovements([int limit = 8]) =>
       _movements.take(limit).toList(growable: false);
 
-  int get cashBalancePesos =>
-      _movements.fold<int>(0, (sum, movement) => sum + movement.cashImpactPesos);
+  int get cashBalancePesos => _movements.fold<int>(
+    0,
+    (sum, movement) => sum + movement.cashImpactPesos,
+  );
 
   int get todaySalesPesos => _sumToday(
-        (movement) =>
-            movement.kind == MovementKind.sale ? movement.amountPesos : 0,
-      );
+    (movement) => movement.kind == MovementKind.sale ? movement.amountPesos : 0,
+  );
 
   int get todayExpensesPesos => _sumToday(
-        (movement) =>
-            movement.kind == MovementKind.expense ? movement.amountPesos : 0,
-      );
+    (movement) =>
+        movement.kind == MovementKind.expense ? movement.amountPesos : 0,
+  );
 
-  int get todayEstimatedProfitPesos => _sumToday(
-        (movement) => movement.estimatedProfitImpactPesos,
-      );
+  int get todayEstimatedProfitPesos =>
+      _sumToday((movement) => movement.estimatedProfitImpactPesos);
 
   int get todaySalesCount => _movements
       .where(_isTodayMovement)
@@ -173,7 +187,7 @@ class CommerceStore extends ChangeNotifier {
     try {
       final snapshot = await _persistence.load();
       if (snapshot == null) {
-        _seed();
+        _seedEmptyState();
         await _persist();
       } else {
         _applySnapshot(_parseSnapshot(snapshot));
@@ -185,14 +199,24 @@ class CommerceStore extends ChangeNotifier {
         debugPrint('CommerceStore load failed: $error');
         debugPrintStack(stackTrace: stack);
       }
-      _seed();
+      _seedEmptyState();
       _ready = true;
-      _lastError = 'No se pudo abrir el almacenamiento. Se cargaron datos base.';
+      _lastError =
+          'No se pudo abrir el almacenamiento. La app quedo lista para cargar tus datos.';
       notifyListeners();
     }
   }
 
-  void _seed() {
+  void _seedEmptyState() {
+    _products.clear();
+    _movements.clear();
+    _cashOpeningAt = null;
+    _cashOpeningBalancePesos = null;
+    _cashClosingAt = null;
+    _cashClosingBalancePesos = null;
+  }
+
+  void _seedDemoData() {
     final now = DateTime.now();
     _products
       ..clear()
@@ -310,6 +334,52 @@ class CommerceStore extends ChangeNotifier {
     _cashClosingBalancePesos = null;
   }
 
+  Future<StarterTemplateApplyResult> applyArgentinianKioskTemplate() async {
+    final existingProducts = List<Product>.of(_products, growable: false);
+    final existingKeys = existingProducts
+        .map(_starterTemplateKeyForProduct)
+        .toSet();
+    final pendingProducts = <Product>[];
+    var skippedCount = 0;
+
+    for (final seed in argentinianKioskTemplateProducts) {
+      final key = _starterTemplateKey(seed.name, seed.category);
+      if (existingKeys.contains(key)) {
+        skippedCount += 1;
+        continue;
+      }
+
+      final product = _validateProduct(
+        Product(
+          id: _buildId('product'),
+          name: seed.name,
+          stockUnits: seed.stockUnits,
+          minStockUnits: seed.minStockUnits,
+          costPesos: seed.costPesos,
+          pricePesos: seed.pricePesos,
+          category: seed.category,
+        ),
+        againstProducts: <Product>[...existingProducts, ...pendingProducts],
+      );
+
+      pendingProducts.add(product);
+      existingKeys.add(key);
+    }
+
+    if (pendingProducts.isNotEmpty) {
+      _products.addAll(pendingProducts);
+      _sortProducts();
+      await _persist();
+    }
+
+    return StarterTemplateApplyResult(
+      templateName: argentinianKioskTemplateName,
+      totalCount: argentinianKioskTemplateProducts.length,
+      addedCount: pendingProducts.length,
+      skippedCount: skippedCount,
+    );
+  }
+
   Future<void> addProduct(Product product) async {
     final sanitized = _validateProduct(product);
     final index = _products.indexWhere((item) => item.id == sanitized.id);
@@ -387,6 +457,9 @@ class CommerceStore extends ChangeNotifier {
     }
 
     final product = _products[index];
+    if (product.pricePesos <= 0) {
+      throw StateError('Define un precio antes de vender este producto.');
+    }
     if (product.stockUnits < quantityUnits) {
       throw StateError(
         'No hay stock suficiente. Stock actual: ${product.stockUnits}.',
@@ -412,7 +485,9 @@ class CommerceStore extends ChangeNotifier {
         subtitle: product.name,
         productId: product.id,
         quantityUnits: quantityUnits,
-        paymentMethod: paymentMethod.trim().isEmpty ? 'Sin dato' : paymentMethod,
+        paymentMethod: paymentMethod.trim().isEmpty
+            ? 'Sin dato'
+            : paymentMethod,
       ),
     );
     _sortProducts();
@@ -558,7 +633,9 @@ class CommerceStore extends ChangeNotifier {
       final productId = movement.productId;
       final quantity = movement.quantityUnits ?? 0;
       if (productId != null && quantity > 0) {
-        final index = _products.indexWhere((product) => product.id == productId);
+        final index = _products.indexWhere(
+          (product) => product.id == productId,
+        );
         if (index == -1) {
           throw StateError(
             'No se puede deshacer el ajuste porque falta el producto original.',
@@ -655,11 +732,11 @@ class CommerceStore extends ChangeNotifier {
       products: validatedProducts,
       movements: movements,
       cashOpeningAt: _readDate(snapshot['cashOpeningAt']),
-      cashOpeningBalancePesos:
-          (snapshot['cashOpeningBalancePesos'] as num?)?.toInt(),
+      cashOpeningBalancePesos: (snapshot['cashOpeningBalancePesos'] as num?)
+          ?.toInt(),
       cashClosingAt: _readDate(snapshot['cashClosingAt']),
-      cashClosingBalancePesos:
-          (snapshot['cashClosingBalancePesos'] as num?)?.toInt(),
+      cashClosingBalancePesos: (snapshot['cashClosingBalancePesos'] as num?)
+          ?.toInt(),
     )..validateCashState();
   }
 
@@ -685,8 +762,8 @@ class CommerceStore extends ChangeNotifier {
 
   Product _validateProduct(
     Product product, {
-    bool allowZeroPrice = false,
-    bool allowZeroCost = false,
+    bool allowZeroPrice = true,
+    bool allowZeroCost = true,
     Iterable<Product>? againstProducts,
   }) {
     final normalizedBarcode = normalizeBarcode(product.barcode);
@@ -710,14 +787,19 @@ class CommerceStore extends ChangeNotifier {
       throw StateError('El precio debe ser mayor a 0.');
     }
     for (final existing in againstProducts ?? _products) {
-      if (existing.id != product.id && existing.barcode == normalizedBarcode) {
-        throw StateError('Ese codigo de barras ya esta asignado a otro producto.');
+      if (normalizedBarcode != null &&
+          existing.id != product.id &&
+          existing.barcode == normalizedBarcode) {
+        throw StateError(
+          'Ese codigo de barras ya esta asignado a otro producto.',
+        );
       }
     }
     return product.copyWith(
       name: product.name.trim(),
-      category:
-          product.category?.trim().isEmpty == true ? null : product.category?.trim(),
+      category: product.category?.trim().isEmpty == true
+          ? null
+          : product.category?.trim(),
       barcode: normalizedBarcode,
     );
   }
@@ -738,7 +820,8 @@ class CommerceStore extends ChangeNotifier {
         throw StateError('Hay una venta asociada a un producto inexistente.');
       }
     }
-    if (movement.kind == MovementKind.expense && movement.title.trim().isEmpty) {
+    if (movement.kind == MovementKind.expense &&
+        movement.title.trim().isEmpty) {
       throw StateError('Hay un gasto sin concepto.');
     }
   }
@@ -767,7 +850,8 @@ class CommerceStore extends ChangeNotifier {
   void _removeAdjustmentForDay(MovementOrigin origin, DateTime day) {
     _movements.removeWhere(
       (movement) =>
-          movement.resolvedOrigin == origin && _isSameDay(movement.createdAt, day),
+          movement.resolvedOrigin == origin &&
+          _isSameDay(movement.createdAt, day),
     );
   }
 
@@ -810,13 +894,42 @@ class CommerceStore extends ChangeNotifier {
   }
 
   void _sortProducts() {
-    _products.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    _products.sort(
+      (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+    );
+  }
+
+  String _starterTemplateKeyForProduct(Product product) {
+    return _starterTemplateKey(product.name, product.category ?? '');
+  }
+
+  String _starterTemplateKey(String name, String category) {
+    final normalizedName = name.trim().toLowerCase();
+    final normalizedCategory = category.trim().toLowerCase();
+    return '$normalizedCategory::$normalizedName';
   }
 
   String _buildId(String prefix) {
     final now = DateTime.now().microsecondsSinceEpoch;
     return '$prefix-$now';
   }
+}
+
+class StarterTemplateApplyResult {
+  const StarterTemplateApplyResult({
+    required this.templateName,
+    required this.totalCount,
+    required this.addedCount,
+    required this.skippedCount,
+  });
+
+  final String templateName;
+  final int totalCount;
+  final int addedCount;
+  final int skippedCount;
+
+  bool get addedAny => addedCount > 0;
+  bool get fullySkipped => addedCount == 0 && skippedCount == totalCount;
 }
 
 class _SnapshotData {

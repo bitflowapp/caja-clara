@@ -10,6 +10,7 @@ import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
 import '../widgets/input_shortcuts.dart';
 import '../widgets/keyboard_aware_form.dart';
+import '../widgets/product_form_dialog.dart';
 import '../widgets/speech_dictation.dart';
 
 class SaleScreen extends StatefulWidget {
@@ -59,6 +60,34 @@ class _SaleScreenState extends State<SaleScreen> {
       body: AnimatedBuilder(
         animation: store,
         builder: (context, _) {
+          if (!store.hasProducts) {
+            return KeyboardAwarePageBody(
+              child: BpcPanel(
+                child: EmptyCard(
+                  title: 'Primero carga tus productos',
+                  message:
+                      'Para vender sin vueltas, empieza con la plantilla kiosco o agrega tu primer producto manualmente.',
+                  icon: Icons.inventory_2_rounded,
+                  action: Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      FilledButton(
+                        onPressed: () => _loadStarterTemplate(store),
+                        child: const Text('Cargar plantilla kiosco'),
+                      ),
+                      TextButton(
+                        onPressed: () => showProductEditor(context, store),
+                        child: const Text('Agregar producto'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+
           final product = _selectedProduct == null
               ? null
               : store.productById(_selectedProduct!.id) ?? _selectedProduct;
@@ -446,6 +475,36 @@ class _SaleScreenState extends State<SaleScreen> {
         },
       ),
     );
+  }
+
+  Future<void> _loadStarterTemplate(CommerceStore store) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final result = await store.applyArgentinianKioskTemplate();
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            result.fullySkipped
+                ? 'La plantilla kiosco ya estaba cargada.'
+                : 'Plantilla kiosco cargada. Ya puedes buscar y vender.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(userFacingErrorMessage(error)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   int _parseInt(String? value) {

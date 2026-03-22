@@ -18,4 +18,14 @@ void main() {
     expect(find.text('Ver stock bajo'), findsOneWidget);
     expect(find.text('Ultimos movimientos'), findsOneWidget);
   });
+
+  testWidgets('Home guides first use with kiosk template', (tester) async {
+    final store = CommerceStore.emptyForTest();
+    await tester.pumpWidget(BPlusCommerceApp(store: store));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Arranca con una base de kiosco'), findsOneWidget);
+    expect(find.text('Cargar Kiosco argentino'), findsOneWidget);
+    expect(find.text('Agregar producto manualmente'), findsOneWidget);
+  });
 }

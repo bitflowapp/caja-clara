@@ -1,15 +1,25 @@
 import 'package:flutter/material.dart';
 
 import '../models/product.dart';
+import '../services/commerce_store.dart';
 import '../utils/formatters.dart';
 import '../utils/text_field_selection.dart';
+import '../utils/user_facing_errors.dart';
 import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
 import '../widgets/input_shortcuts.dart';
+import '../widgets/operation_dialogs.dart';
 import '../widgets/product_form_dialog.dart';
 
 class ProductsScreen extends StatefulWidget {
-  const ProductsScreen({super.key});
+  const ProductsScreen({
+    super.key,
+    required this.onApplyStarterTemplate,
+    required this.applyingStarterTemplate,
+  });
+
+  final Future<void> Function() onApplyStarterTemplate;
+  final bool applyingStarterTemplate;
 
   @override
   State<ProductsScreen> createState() => _ProductsScreenState();
@@ -34,6 +44,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
       animation: store,
       builder: (context, _) {
         final products = _filteredProducts(store.products);
+        final emptyCatalog = store.products.isEmpty;
+        final filteredEmpty = products.isEmpty && !emptyCatalog;
         return InputShortcutScope(
           onCancel: () {
             if (_searchController.text.isNotEmpty) {
@@ -48,15 +60,37 @@ class _ProductsScreenState extends State<ProductsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SectionHeader(
+                  const SectionHeader(
                     title: 'Productos',
                     subtitle:
                         'Carga, busca y corrige productos sin perder de vista stock y precio',
-                    trailing: FilledButton.icon(
-                      onPressed: () => showProductEditor(context, store),
-                      icon: const Icon(Icons.add_rounded),
-                      label: const Text('Agregar'),
-                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: widget.applyingStarterTemplate
+                            ? null
+                            : () => widget.onApplyStarterTemplate(),
+                        icon: widget.applyingStarterTemplate
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.storefront_rounded),
+                        label: const Text('Plantilla kiosco'),
+                      ),
+                      FilledButton.icon(
+                        onPressed: () => showProductEditor(context, store),
+                        icon: const Icon(Icons.add_rounded),
+                        label: const Text('Agregar producto'),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 14),
                   LayoutBuilder(
@@ -99,12 +133,41 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   const SizedBox(height: 16),
                   if (products.isEmpty)
                     EmptyCard(
-                      title: 'Sin resultados',
-                      message:
-                          'No hay productos con ese filtro. Ajusta la busqueda o carga uno nuevo.',
-                      action: FilledButton(
-                        onPressed: () => showProductEditor(context, store),
-                        child: const Text('Agregar producto'),
+                      title: emptyCatalog
+                          ? 'Todavia no cargaste productos'
+                          : 'Sin resultados',
+                      message: emptyCatalog
+                          ? 'Puedes empezar con la plantilla kiosco o crear tus productos a mano. Todo queda editable y se guarda localmente.'
+                          : 'No hay productos con ese filtro. Ajusta la busqueda o carga uno nuevo.',
+                      action: Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          if (emptyCatalog)
+                            FilledButton(
+                              onPressed: widget.applyingStarterTemplate
+                                  ? null
+                                  : () => widget.onApplyStarterTemplate(),
+                              child: Text(
+                                widget.applyingStarterTemplate
+                                    ? 'Cargando plantilla...'
+                                    : 'Cargar plantilla kiosco',
+                              ),
+                            ),
+                          if (filteredEmpty)
+                            FilledButton(
+                              onPressed: () => setState(() {
+                                _searchController.clear();
+                                _onlyLowStock = false;
+                              }),
+                              child: const Text('Limpiar filtros'),
+                            ),
+                          TextButton(
+                            onPressed: () => showProductEditor(context, store),
+                            child: const Text('Agregar producto'),
+                          ),
+                        ],
                       ),
                     )
                   else
@@ -120,6 +183,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                 store,
                                 product: product,
                               ),
+                              onDelete: () => _deleteProduct(store, product),
                             ),
                           ),
                       ],
@@ -148,13 +212,55 @@ class _ProductsScreenState extends State<ProductsScreen> {
         })
         .toList(growable: false);
   }
+
+  Future<void> _deleteProduct(CommerceStore store, Product product) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDangerConfirmationDialog(
+      context,
+      title: 'Eliminar producto',
+      message:
+          'Se va a eliminar "${product.name}". Si ya tiene movimientos, la app lo bloqueara para cuidar tu historial.',
+      confirmLabel: 'Eliminar',
+    );
+    if (!confirmed || !mounted) {
+      return;
+    }
+
+    try {
+      await store.removeProduct(product.id);
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('${product.name} se elimino del catalogo'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(userFacingErrorMessage(error)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
 }
 
 class _ProductTile extends StatelessWidget {
-  const _ProductTile({required this.product, required this.onTap});
+  const _ProductTile({
+    required this.product,
+    required this.onTap,
+    required this.onDelete,
+  });
 
   final Product product;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -202,6 +308,27 @@ class _ProductTile extends StatelessWidget {
                       ],
                     ),
                   ),
+                  PopupMenuButton<_ProductTileAction>(
+                    tooltip: 'Acciones',
+                    onSelected: (value) {
+                      if (value == _ProductTileAction.edit) {
+                        onTap();
+                        return;
+                      }
+                      onDelete();
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: _ProductTileAction.edit,
+                        child: Text('Editar'),
+                      ),
+                      PopupMenuItem(
+                        value: _ProductTileAction.delete,
+                        child: Text('Eliminar'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 6),
                   StockBadge(product: product),
                 ],
               ),
@@ -251,6 +378,8 @@ class _ProductTile extends StatelessWidget {
     );
   }
 }
+
+enum _ProductTileAction { edit, delete }
 
 class _InfoChip extends StatelessWidget {
   const _InfoChip({required this.label, required this.value});

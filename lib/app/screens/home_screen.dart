@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/commerce_store.dart';
+import '../services/starter_templates.dart';
 import '../theme/bpc_colors.dart';
 import '../utils/formatters.dart';
 import '../widgets/caja_clara_brand.dart';
@@ -16,7 +17,9 @@ class HomeScreen extends StatelessWidget {
     required this.onScanProduct,
     required this.onOpenProducts,
     required this.onExportExcel,
+    required this.onApplyStarterTemplate,
     required this.exportingExcel,
+    required this.applyingStarterTemplate,
   });
 
   final VoidCallback onNewSale;
@@ -24,7 +27,9 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onScanProduct;
   final VoidCallback onOpenProducts;
   final VoidCallback onExportExcel;
+  final VoidCallback onApplyStarterTemplate;
   final bool exportingExcel;
+  final bool applyingStarterTemplate;
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +45,14 @@ class HomeScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _HeaderStrip(now: now, store: store),
+              if (!store.hasProducts) ...[
+                const SizedBox(height: 14),
+                _StarterTemplateCard(
+                  onApplyStarterTemplate: onApplyStarterTemplate,
+                  onAddProduct: () => showProductEditor(context, store),
+                  applyingStarterTemplate: applyingStarterTemplate,
+                ),
+              ],
               const SizedBox(height: 14),
               _PrimaryActions(
                 onNewSale: onNewSale,
@@ -53,6 +66,7 @@ class HomeScreen extends StatelessWidget {
                 onOpenLowStock: onOpenProducts,
                 onExportExcel: onExportExcel,
                 exportingExcel: exportingExcel,
+                hasProducts: store.hasProducts,
               ),
               const SizedBox(height: 16),
               const SectionHeader(
@@ -62,12 +76,34 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 10),
               if (recent.isEmpty)
                 EmptyCard(
-                  title: 'Sin movimientos todavia',
-                  message:
-                      'Empieza con una venta o un gasto. Todo queda guardado en este dispositivo.',
-                  action: FilledButton(
-                    onPressed: onNewSale,
-                    child: const Text('Nueva venta'),
+                  title: store.hasProducts
+                      ? 'Todavia no registraste movimientos'
+                      : 'Arranca cargando tu negocio',
+                  message: store.hasProducts
+                      ? 'Empieza con una venta o un gasto. Todo queda guardado en este dispositivo.'
+                      : 'Puedes cargar la plantilla kiosco para empezar en minutos o crear tus primeros productos a mano.',
+                  action: Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      FilledButton(
+                        onPressed: store.hasProducts
+                            ? onNewSale
+                            : onApplyStarterTemplate,
+                        child: Text(
+                          store.hasProducts
+                              ? 'Nueva venta'
+                              : applyingStarterTemplate
+                              ? 'Cargando plantilla...'
+                              : 'Cargar plantilla kiosco',
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => showProductEditor(context, store),
+                        child: const Text('Agregar producto'),
+                      ),
+                    ],
                   ),
                 )
               else
@@ -280,6 +316,7 @@ class _SecondaryActions extends StatelessWidget {
     required this.onOpenLowStock,
     required this.onExportExcel,
     required this.exportingExcel,
+    required this.hasProducts,
   });
 
   final int lowStockCount;
@@ -287,6 +324,7 @@ class _SecondaryActions extends StatelessWidget {
   final VoidCallback onOpenLowStock;
   final VoidCallback onExportExcel;
   final bool exportingExcel;
+  final bool hasProducts;
 
   @override
   Widget build(BuildContext context) {
@@ -297,14 +335,18 @@ class _SecondaryActions extends StatelessWidget {
         children: [
           _InlineActionRow(
             title: 'Agregar producto',
-            subtitle: 'Carga nombre, stock, precio y codigo de barras',
+            subtitle: hasProducts
+                ? 'Carga nombre, stock, precio y codigo de barras'
+                : 'Empieza a cargar tu catalogo manualmente',
             icon: Icons.add_box_rounded,
             onTap: onAddProduct,
           ),
           const Divider(height: 1),
           _InlineActionRow(
             title: 'Ver stock bajo',
-            subtitle: lowStockCount == 0
+            subtitle: !hasProducts
+                ? 'Todavia no hay productos cargados'
+                : lowStockCount == 0
                 ? 'Sin alertas'
                 : '$lowStockCount productos a reponer',
             icon: Icons.warning_amber_rounded,
@@ -315,9 +357,79 @@ class _SecondaryActions extends StatelessWidget {
             title: 'Exportar Excel',
             subtitle: exportingExcel
                 ? 'Preparando archivo'
-                : 'Lleva ventas, gastos, productos y movimientos',
+                : hasProducts
+                ? 'Lleva ventas, gastos, productos y movimientos'
+                : 'Disponible cuando empieces a cargar datos',
             icon: Icons.file_download_rounded,
             onTap: onExportExcel,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StarterTemplateCard extends StatelessWidget {
+  const _StarterTemplateCard({
+    required this.onApplyStarterTemplate,
+    required this.onAddProduct,
+    required this.applyingStarterTemplate,
+  });
+
+  final VoidCallback onApplyStarterTemplate;
+  final VoidCallback onAddProduct;
+  final bool applyingStarterTemplate;
+
+  @override
+  Widget build(BuildContext context) {
+    return BpcPanel(
+      padding: const EdgeInsets.all(16),
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Arranca con una base de kiosco',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: BpcColors.ink,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Carga una plantilla opcional con bebidas, golosinas, snacks y mostrador. Los productos se crean en 0 para que completes tus precios sin apuro.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              FilledButton.icon(
+                onPressed: applyingStarterTemplate
+                    ? null
+                    : onApplyStarterTemplate,
+                icon: applyingStarterTemplate
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.storefront_rounded),
+                label: Text(
+                  applyingStarterTemplate
+                      ? 'Cargando plantilla...'
+                      : 'Cargar $argentinianKioskTemplateName',
+                ),
+              ),
+              TextButton.icon(
+                onPressed: onAddProduct,
+                icon: const Icon(Icons.add_box_rounded),
+                label: const Text('Agregar producto manualmente'),
+              ),
+            ],
           ),
         ],
       ),

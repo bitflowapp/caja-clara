@@ -150,11 +150,22 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          widget.product == null
-                              ? 'Agregar producto'
-                              : 'Editar producto',
-                          style: Theme.of(context).textTheme.titleLarge,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.product == null
+                                  ? 'Agregar producto'
+                                  : 'Editar producto',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Completa lo basico y guarda. Si todavia no definiste costo o precio, puedes dejarlo en 0 y ajustarlo despues.',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: scheme.outline),
+                            ),
+                          ],
                         ),
                       ),
                       IconButton(
@@ -307,7 +318,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                               onFieldSubmitted: (_) =>
                                   _priceFocusNode.requestFocus(),
                               validator: (value) =>
-                                  _intMin(value, 1, 'El costo'),
+                                  _intMin(value, 0, 'El costo'),
                             ),
                           ),
                           SizedBox(
@@ -327,7 +338,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                               onTapOutside: (_) => _priceFocusNode.unfocus(),
                               onFieldSubmitted: (_) => _save(),
                               validator: (value) =>
-                                  _intMin(value, 1, 'El precio'),
+                                  _intMin(value, 0, 'El precio'),
                               onChanged: (_) => setState(() {}),
                             ),
                           ),
