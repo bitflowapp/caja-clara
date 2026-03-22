@@ -1,5 +1,7 @@
 import 'package:b_plus_commerce/app/services/backup_service.dart';
+import 'package:b_plus_commerce/app/services/commerce_persistence.dart';
 import 'package:b_plus_commerce/app/services/commerce_store.dart';
+import 'package:b_plus_commerce/app/models/product.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -32,11 +34,7 @@ void main() {
       expect(store.movements.length, initialMovements + 1);
 
       await expectLater(
-        store.recordExpense(
-          concept: '',
-          amountPesos: 0,
-          category: 'General',
-        ),
+        store.recordExpense(concept: '', amountPesos: 0, category: 'General'),
         throwsA(isA<StateError>()),
       );
     });
@@ -60,6 +58,32 @@ void main() {
       expect(store.productById('p-2')!.stockUnits, initialStock);
       expect(store.movements.length, initialMovements);
     });
+
+    test('rolls back in-memory changes when persistence fails', () async {
+      final store = CommerceStore.withPersistenceForTest(
+        _FailingPersistence(),
+        seedDemoData: true,
+      );
+      final initialProducts = store.products.length;
+
+      await expectLater(
+        store.addProduct(
+          const Product(
+            id: 'p-fail',
+            name: 'Producto temporal',
+            stockUnits: 1,
+            minStockUnits: 0,
+            costPesos: 100,
+            pricePesos: 200,
+          ),
+        ),
+        throwsA(isA<Exception>()),
+      );
+
+      expect(store.products.length, initialProducts);
+      expect(store.productById('p-fail'), isNull);
+      expect(store.lastError, 'No se pudo guardar el cambio.');
+    });
   });
 
   group('BackupService', () {
@@ -78,26 +102,36 @@ void main() {
       expect(parsed['backupGeneratedAt'], isNotNull);
     });
 
-    test('restore snapshot rebuilds products movements and cash session', () async {
-      final source = CommerceStore.seededForTest();
-      await source.registerCashOpening(openingBalancePesos: 50000);
-      await source.recordExpense(
-        concept: 'Flete',
-        amountPesos: 1800,
-        category: 'Logistica',
-      );
-      final snapshot = source.buildSnapshot(
-        generatedAt: DateTime(2026, 3, 20, 12, 0),
-      );
+    test(
+      'restore snapshot rebuilds products movements and cash session',
+      () async {
+        final source = CommerceStore.seededForTest();
+        await source.registerCashOpening(openingBalancePesos: 50000);
+        await source.recordExpense(
+          concept: 'Flete',
+          amountPesos: 1800,
+          category: 'Logistica',
+        );
+        final snapshot = source.buildSnapshot(
+          generatedAt: DateTime(2026, 3, 20, 12, 0),
+        );
 
-      final restored = CommerceStore.seededForTest();
-      await restored.restoreSnapshot(snapshot);
+        final restored = CommerceStore.seededForTest();
+        await restored.restoreSnapshot(snapshot);
 
-      expect(restored.products.length, source.products.length);
-      expect(restored.cashBalancePesos, source.cashBalancePesos);
-      expect(restored.todayOpeningCashPesos, 50000);
-      expect(restored.movements.first.title, 'Restauracion de backup');
-      expect(restored.movements.length, source.movements.length + 1);
-    });
+        expect(restored.products.length, source.products.length);
+        expect(restored.cashBalancePesos, source.cashBalancePesos);
+        expect(restored.todayOpeningCashPesos, 50000);
+        expect(restored.movements.first.title, 'Restauracion de backup');
+        expect(restored.movements.length, source.movements.length + 1);
+      },
+    );
   });
+}
+
+class _FailingPersistence extends CommercePersistence {
+  @override
+  Future<void> save(Map<String, dynamic> json) async {
+    throw Exception('disk full');
+  }
 }

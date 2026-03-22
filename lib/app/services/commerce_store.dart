@@ -44,6 +44,21 @@ class CommerceStore extends ChangeNotifier {
     return store;
   }
 
+  @visibleForTesting
+  static CommerceStore withPersistenceForTest(
+    CommercePersistence persistence, {
+    bool seedDemoData = false,
+  }) {
+    final store = CommerceStore._(persistence, persistenceEnabled: true);
+    if (seedDemoData) {
+      store._seedDemoData();
+    } else {
+      store._seedEmptyState();
+    }
+    store._ready = true;
+    return store;
+  }
+
   final CommercePersistence _persistence;
   final bool _persistenceEnabled;
   final List<Product> _products = <Product>[];
@@ -168,6 +183,23 @@ class CommerceStore extends ChangeNotifier {
       .length;
 
   int get lowStockCount => lowStockProducts.length;
+
+  String? saleReadinessMessage(String productId, {required int quantityUnits}) {
+    final product = productById(productId);
+    if (product == null) {
+      return 'El producto ya no esta disponible.';
+    }
+    if (quantityUnits <= 0) {
+      return 'Ingresa una cantidad mayor a 0.';
+    }
+    if (product.pricePesos <= 0) {
+      return 'Define un precio antes de vender este producto.';
+    }
+    if (product.stockUnits < quantityUnits) {
+      return 'No hay stock suficiente. Stock actual: ${product.stockUnits}.';
+    }
+    return null;
+  }
 
   int _sumToday(int Function(Movement movement) selector) {
     return _movements
@@ -367,9 +399,10 @@ class CommerceStore extends ChangeNotifier {
     }
 
     if (pendingProducts.isNotEmpty) {
-      _products.addAll(pendingProducts);
-      _sortProducts();
-      await _persist();
+      await _runPersistedMutation(() {
+        _products.addAll(pendingProducts);
+        _sortProducts();
+      });
     }
 
     return StarterTemplateApplyResult(
@@ -382,14 +415,15 @@ class CommerceStore extends ChangeNotifier {
 
   Future<void> addProduct(Product product) async {
     final sanitized = _validateProduct(product);
-    final index = _products.indexWhere((item) => item.id == sanitized.id);
-    if (index == -1) {
-      _products.add(sanitized);
-    } else {
-      _products[index] = sanitized;
-    }
-    _sortProducts();
-    await _persist();
+    await _runPersistedMutation(() {
+      final index = _products.indexWhere((item) => item.id == sanitized.id);
+      if (index == -1) {
+        _products.add(sanitized);
+      } else {
+        _products[index] = sanitized;
+      }
+      _sortProducts();
+    });
   }
 
   Future<void> addStockToProduct({
@@ -407,39 +441,45 @@ class CommerceStore extends ChangeNotifier {
     }
 
     final product = _products[index];
-    _products[index] = product.copyWith(
-      stockUnits: product.stockUnits + quantityUnits,
-    );
-    _movements.insert(
-      0,
-      Movement(
-        id: _buildId('stock'),
-        kind: MovementKind.adjustment,
-        origin: MovementOrigin.adjustment,
-        amountPesos: 0,
-        cashImpactOverridePesos: 0,
-        estimatedProfitImpactOverridePesos: 0,
-        createdAt: createdAt ?? DateTime.now(),
-        title: 'Ingreso de stock',
-        subtitle: note == null || note.trim().isEmpty
-            ? '${product.name} / +$quantityUnits u.'
-            : '${product.name} / +$quantityUnits u. / ${note.trim()}',
-        productId: product.id,
-        quantityUnits: quantityUnits,
-      ),
-    );
-    _sortProducts();
-    await _persist();
+    await _runPersistedMutation(() {
+      _products[index] = product.copyWith(
+        stockUnits: product.stockUnits + quantityUnits,
+      );
+      _movements.insert(
+        0,
+        Movement(
+          id: _buildId('stock'),
+          kind: MovementKind.adjustment,
+          origin: MovementOrigin.adjustment,
+          amountPesos: 0,
+          cashImpactOverridePesos: 0,
+          estimatedProfitImpactOverridePesos: 0,
+          createdAt: createdAt ?? DateTime.now(),
+          title: 'Ingreso de stock',
+          subtitle: note == null || note.trim().isEmpty
+              ? '${product.name} / +$quantityUnits u.'
+              : '${product.name} / +$quantityUnits u. / ${note.trim()}',
+          productId: product.id,
+          quantityUnits: quantityUnits,
+        ),
+      );
+      _sortProducts();
+    });
   }
 
   Future<void> removeProduct(String productId) async {
+    final productExists = _products.any((product) => product.id == productId);
+    if (!productExists) {
+      throw StateError('No se encontro el producto.');
+    }
     if (_movements.any((movement) => movement.productId == productId)) {
       throw StateError(
         'No se puede borrar un producto con movimientos registrados.',
       );
     }
-    _products.removeWhere((product) => product.id == productId);
-    await _persist();
+    await _runPersistedMutation(() {
+      _products.removeWhere((product) => product.id == productId);
+    });
   }
 
   Future<void> recordSale({
@@ -457,41 +497,41 @@ class CommerceStore extends ChangeNotifier {
     }
 
     final product = _products[index];
-    if (product.pricePesos <= 0) {
-      throw StateError('Define un precio antes de vender este producto.');
-    }
-    if (product.stockUnits < quantityUnits) {
-      throw StateError(
-        'No hay stock suficiente. Stock actual: ${product.stockUnits}.',
-      );
+    final readinessMessage = saleReadinessMessage(
+      product.id,
+      quantityUnits: quantityUnits,
+    );
+    if (readinessMessage != null) {
+      throw StateError(readinessMessage);
     }
 
     final revenue = product.pricePesos * quantityUnits;
     final cost = product.costPesos * quantityUnits;
     final timestamp = createdAt ?? DateTime.now();
-    _products[index] = product.copyWith(
-      stockUnits: product.stockUnits - quantityUnits,
-    );
-    _movements.insert(
-      0,
-      Movement(
-        id: _buildId('sale'),
-        kind: MovementKind.sale,
-        origin: MovementOrigin.sale,
-        amountPesos: revenue,
-        costOfSalePesos: cost,
-        createdAt: timestamp,
-        title: 'Venta',
-        subtitle: product.name,
-        productId: product.id,
-        quantityUnits: quantityUnits,
-        paymentMethod: paymentMethod.trim().isEmpty
-            ? 'Sin dato'
-            : paymentMethod,
-      ),
-    );
-    _sortProducts();
-    await _persist();
+    await _runPersistedMutation(() {
+      _products[index] = product.copyWith(
+        stockUnits: product.stockUnits - quantityUnits,
+      );
+      _movements.insert(
+        0,
+        Movement(
+          id: _buildId('sale'),
+          kind: MovementKind.sale,
+          origin: MovementOrigin.sale,
+          amountPesos: revenue,
+          costOfSalePesos: cost,
+          createdAt: timestamp,
+          title: 'Venta',
+          subtitle: product.name,
+          productId: product.id,
+          quantityUnits: quantityUnits,
+          paymentMethod: paymentMethod.trim().isEmpty
+              ? 'Sin dato'
+              : paymentMethod,
+        ),
+      );
+      _sortProducts();
+    });
   }
 
   Future<void> recordExpense({
@@ -510,20 +550,21 @@ class CommerceStore extends ChangeNotifier {
       throw StateError('Ingresa un monto mayor a 0.');
     }
 
-    _movements.insert(
-      0,
-      Movement(
-        id: _buildId('expense'),
-        kind: MovementKind.expense,
-        origin: MovementOrigin.expense,
-        amountPesos: amountPesos,
-        createdAt: createdAt ?? DateTime.now(),
-        title: cleanConcept,
-        subtitle: cleanCategory,
-        category: cleanCategory,
-      ),
-    );
-    await _persist();
+    await _runPersistedMutation(() {
+      _movements.insert(
+        0,
+        Movement(
+          id: _buildId('expense'),
+          kind: MovementKind.expense,
+          origin: MovementOrigin.expense,
+          amountPesos: amountPesos,
+          createdAt: createdAt ?? DateTime.now(),
+          title: cleanConcept,
+          subtitle: cleanCategory,
+          category: cleanCategory,
+        ),
+      );
+    });
   }
 
   Future<void> registerCashOpening({
@@ -539,29 +580,30 @@ class CommerceStore extends ChangeNotifier {
       throw StateError('Ya hay una apertura de caja registrada hoy.');
     }
 
-    _removeAdjustmentForDay(MovementOrigin.cashOpening, timestamp);
-    _removeAdjustmentForDay(MovementOrigin.cashClosing, timestamp);
+    await _runPersistedMutation(() {
+      _removeAdjustmentForDay(MovementOrigin.cashOpening, timestamp);
+      _removeAdjustmentForDay(MovementOrigin.cashClosing, timestamp);
 
-    _cashOpeningAt = timestamp;
-    _cashOpeningBalancePesos = openingBalancePesos;
-    _cashClosingAt = null;
-    _cashClosingBalancePesos = null;
+      _cashOpeningAt = timestamp;
+      _cashOpeningBalancePesos = openingBalancePesos;
+      _cashClosingAt = null;
+      _cashClosingBalancePesos = null;
 
-    _movements.insert(
-      0,
-      Movement(
-        id: _buildId('cash-open'),
-        kind: MovementKind.adjustment,
-        origin: MovementOrigin.cashOpening,
-        amountPesos: 0,
-        cashImpactOverridePesos: 0,
-        estimatedProfitImpactOverridePesos: 0,
-        createdAt: timestamp,
-        title: 'Apertura de caja',
-        subtitle: 'Caja inicial: $openingBalancePesos',
-      ),
-    );
-    await _persist();
+      _movements.insert(
+        0,
+        Movement(
+          id: _buildId('cash-open'),
+          kind: MovementKind.adjustment,
+          origin: MovementOrigin.cashOpening,
+          amountPesos: 0,
+          cashImpactOverridePesos: 0,
+          estimatedProfitImpactOverridePesos: 0,
+          createdAt: timestamp,
+          title: 'Apertura de caja',
+          subtitle: 'Caja inicial: $openingBalancePesos',
+        ),
+      );
+    });
   }
 
   Future<void> registerCashClosing({
@@ -580,26 +622,27 @@ class CommerceStore extends ChangeNotifier {
       throw StateError('Ya hay un cierre de caja registrado hoy.');
     }
 
-    _removeAdjustmentForDay(MovementOrigin.cashClosing, timestamp);
+    await _runPersistedMutation(() {
+      _removeAdjustmentForDay(MovementOrigin.cashClosing, timestamp);
 
-    _cashClosingAt = timestamp;
-    _cashClosingBalancePesos = closingBalancePesos;
+      _cashClosingAt = timestamp;
+      _cashClosingBalancePesos = closingBalancePesos;
 
-    _movements.insert(
-      0,
-      Movement(
-        id: _buildId('cash-close'),
-        kind: MovementKind.adjustment,
-        origin: MovementOrigin.cashClosing,
-        amountPesos: 0,
-        cashImpactOverridePesos: 0,
-        estimatedProfitImpactOverridePesos: 0,
-        createdAt: timestamp,
-        title: 'Cierre de caja',
-        subtitle: 'Caja contada: $closingBalancePesos',
-      ),
-    );
-    await _persist();
+      _movements.insert(
+        0,
+        Movement(
+          id: _buildId('cash-close'),
+          kind: MovementKind.adjustment,
+          origin: MovementOrigin.cashClosing,
+          amountPesos: 0,
+          cashImpactOverridePesos: 0,
+          estimatedProfitImpactOverridePesos: 0,
+          createdAt: timestamp,
+          title: 'Cierre de caja',
+          subtitle: 'Caja contada: $closingBalancePesos',
+        ),
+      );
+    });
   }
 
   Future<void> undoLastMovement() async {
@@ -612,51 +655,54 @@ class CommerceStore extends ChangeNotifier {
       throw StateError('No se puede deshacer una restauracion de backup.');
     }
 
-    if (movement.kind == MovementKind.sale) {
-      final productId = movement.productId;
-      final quantity = movement.quantityUnits ?? 0;
-      if (productId == null || quantity <= 0) {
-        throw StateError('La venta no se puede deshacer de forma segura.');
-      }
-      final index = _products.indexWhere((product) => product.id == productId);
-      if (index == -1) {
-        throw StateError(
-          'No se puede deshacer la venta porque falta el producto original.',
-        );
-      }
-      final product = _products[index];
-      _products[index] = product.copyWith(
-        stockUnits: product.stockUnits + quantity,
-      );
-      _sortProducts();
-    } else if (movement.kind == MovementKind.adjustment) {
-      final productId = movement.productId;
-      final quantity = movement.quantityUnits ?? 0;
-      if (productId != null && quantity > 0) {
+    await _runPersistedMutation(() {
+      if (movement.kind == MovementKind.sale) {
+        final productId = movement.productId;
+        final quantity = movement.quantityUnits ?? 0;
+        if (productId == null || quantity <= 0) {
+          throw StateError('La venta no se puede deshacer de forma segura.');
+        }
         final index = _products.indexWhere(
           (product) => product.id == productId,
         );
         if (index == -1) {
           throw StateError(
-            'No se puede deshacer el ajuste porque falta el producto original.',
+            'No se puede deshacer la venta porque falta el producto original.',
           );
         }
         final product = _products[index];
-        if (product.stockUnits < quantity) {
-          throw StateError(
-            'No se puede deshacer el ajuste porque el stock actual es menor al agregado.',
-          );
-        }
         _products[index] = product.copyWith(
-          stockUnits: product.stockUnits - quantity,
+          stockUnits: product.stockUnits + quantity,
         );
         _sortProducts();
+      } else if (movement.kind == MovementKind.adjustment) {
+        final productId = movement.productId;
+        final quantity = movement.quantityUnits ?? 0;
+        if (productId != null && quantity > 0) {
+          final index = _products.indexWhere(
+            (product) => product.id == productId,
+          );
+          if (index == -1) {
+            throw StateError(
+              'No se puede deshacer el ajuste porque falta el producto original.',
+            );
+          }
+          final product = _products[index];
+          if (product.stockUnits < quantity) {
+            throw StateError(
+              'No se puede deshacer el ajuste porque el stock actual es menor al agregado.',
+            );
+          }
+          _products[index] = product.copyWith(
+            stockUnits: product.stockUnits - quantity,
+          );
+          _sortProducts();
+        }
+        _revertAdjustmentMetadata(movement);
       }
-      _revertAdjustmentMetadata(movement);
-    }
 
-    _movements.removeAt(0);
-    await _persist();
+      _movements.removeAt(0);
+    });
   }
 
   Map<String, dynamic> buildSnapshot({DateTime? generatedAt}) {
@@ -674,28 +720,33 @@ class CommerceStore extends ChangeNotifier {
 
   Future<void> restoreSnapshot(Map<String, dynamic> snapshot) async {
     final parsed = _parseSnapshot(snapshot);
-    _applySnapshot(parsed);
-    _movements.insert(
-      0,
-      Movement(
-        id: _buildId('restore'),
-        kind: MovementKind.adjustment,
-        origin: MovementOrigin.restore,
-        amountPesos: 0,
-        cashImpactOverridePesos: 0,
-        estimatedProfitImpactOverridePesos: 0,
-        createdAt: DateTime.now(),
-        title: 'Restauracion de backup',
-        subtitle: 'Estado restaurado correctamente',
-      ),
-    );
-    await _persist();
+    await _runPersistedMutation(() {
+      _applySnapshot(parsed);
+      _movements.insert(
+        0,
+        Movement(
+          id: _buildId('restore'),
+          kind: MovementKind.adjustment,
+          origin: MovementOrigin.restore,
+          amountPesos: 0,
+          cashImpactOverridePesos: 0,
+          estimatedProfitImpactOverridePesos: 0,
+          createdAt: DateTime.now(),
+          title: 'Restauracion de backup',
+          subtitle: 'Estado restaurado correctamente',
+        ),
+      );
+    });
   }
 
   Future<void> ensureReady() async {
     if (!_ready) {
       await _load();
     }
+  }
+
+  Future<void> retrySave() async {
+    await _persist();
   }
 
   _SnapshotData _parseSnapshot(Map<String, dynamic> snapshot) {
@@ -893,6 +944,43 @@ class CommerceStore extends ChangeNotifier {
     }
   }
 
+  Future<void> _runPersistedMutation(VoidCallback mutation) async {
+    final previousState = _captureState();
+    mutation();
+    try {
+      await _persist();
+    } catch (_) {
+      _restoreState(previousState);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  _MutableStoreState _captureState() {
+    return _MutableStoreState(
+      products: List<Product>.of(_products, growable: false),
+      movements: List<Movement>.of(_movements, growable: false),
+      cashOpeningAt: _cashOpeningAt,
+      cashOpeningBalancePesos: _cashOpeningBalancePesos,
+      cashClosingAt: _cashClosingAt,
+      cashClosingBalancePesos: _cashClosingBalancePesos,
+    );
+  }
+
+  void _restoreState(_MutableStoreState state) {
+    _products
+      ..clear()
+      ..addAll(state.products);
+    _movements
+      ..clear()
+      ..addAll(state.movements);
+    _cashOpeningAt = state.cashOpeningAt;
+    _cashOpeningBalancePesos = state.cashOpeningBalancePesos;
+    _cashClosingAt = state.cashClosingAt;
+    _cashClosingBalancePesos = state.cashClosingBalancePesos;
+    _sortProducts();
+  }
+
   void _sortProducts() {
     _products.sort(
       (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
@@ -930,6 +1018,24 @@ class StarterTemplateApplyResult {
 
   bool get addedAny => addedCount > 0;
   bool get fullySkipped => addedCount == 0 && skippedCount == totalCount;
+}
+
+class _MutableStoreState {
+  const _MutableStoreState({
+    required this.products,
+    required this.movements,
+    required this.cashOpeningAt,
+    required this.cashOpeningBalancePesos,
+    required this.cashClosingAt,
+    required this.cashClosingBalancePesos,
+  });
+
+  final List<Product> products;
+  final List<Movement> movements;
+  final DateTime? cashOpeningAt;
+  final int? cashOpeningBalancePesos;
+  final DateTime? cashClosingAt;
+  final int? cashClosingBalancePesos;
 }
 
 class _SnapshotData {

@@ -207,6 +207,9 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
         final foundProduct = _currentBarcode == null
             ? null
             : store.productByBarcode(_currentBarcode!);
+        final saleWarning = foundProduct == null
+            ? null
+            : store.saleReadinessMessage(foundProduct.id, quantityUnits: 1);
 
         return Scaffold(
           appBar: AppBar(
@@ -359,6 +362,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                       _BarcodeProductCard(
                         barcode: _currentBarcode!,
                         product: foundProduct,
+                        saleWarning: saleWarning,
                         savingStock: _savingStock,
                         onSale: () => _openSale(foundProduct),
                         onAddStock: () => _addStock(store, foundProduct),
@@ -381,6 +385,7 @@ class _BarcodeProductCard extends StatelessWidget {
   const _BarcodeProductCard({
     required this.barcode,
     required this.product,
+    required this.saleWarning,
     required this.savingStock,
     required this.onSale,
     required this.onAddStock,
@@ -389,6 +394,7 @@ class _BarcodeProductCard extends StatelessWidget {
 
   final String barcode;
   final Product product;
+  final String? saleWarning;
   final bool savingStock;
   final VoidCallback onSale;
   final VoidCallback onAddStock;
@@ -477,12 +483,22 @@ class _BarcodeProductCard extends StatelessWidget {
               );
             },
           ),
+          if (saleWarning != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              saleWarning!,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, constraints) {
               final compact = constraints.maxWidth < 560;
               final saleButton = FilledButton.icon(
-                onPressed: onSale,
+                onPressed: saleWarning == null ? onSale : null,
                 style: compact
                     ? FilledButton.styleFrom(
                         minimumSize: const Size.fromHeight(52),

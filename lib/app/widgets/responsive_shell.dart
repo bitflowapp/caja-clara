@@ -11,6 +11,7 @@ import '../services/excel_export_service.dart';
 import '../theme/bpc_colors.dart';
 import '../utils/user_facing_errors.dart';
 import 'caja_clara_brand.dart';
+import 'commerce_components.dart';
 import 'commerce_scope.dart';
 import 'operation_dialogs.dart';
 import 'quick_help_dialog.dart';
@@ -30,6 +31,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
   bool _applyingStarterTemplate = false;
   bool _exportingBackup = false;
   bool _restoringBackup = false;
+  bool _retryingSave = false;
   bool _undoingMovement = false;
   bool _savingCashEvent = false;
 
@@ -57,6 +59,42 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
 
   Future<void> _openQuickHelp() async {
     await showQuickHelpDialog(context);
+  }
+
+  Future<void> _retrySave() async {
+    if (_retryingSave) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    final store = CommerceScope.of(context);
+    setState(() => _retryingSave = true);
+    try {
+      await store.retrySave();
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Guardado recuperado. Todo vuelve a estar en orden.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(userFacingErrorMessage(error)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _retryingSave = false);
+      }
+    }
   }
 
   Future<void> _applyStarterTemplate() async {
@@ -587,7 +625,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    store.isSaving
+                                    store.lastError != null
+                                        ? 'Guardado con problema'
+                                        : store.isSaving
                                         ? 'Guardando'
                                         : 'Local listo',
                                     style: Theme.of(context)
@@ -611,6 +651,15 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                       padding: const EdgeInsets.fromLTRB(20, 16, 18, 16),
                       child: Column(
                         children: [
+                          if (store.lastError != null) ...[
+                            _SaveErrorBanner(
+                              message:
+                                  'El ultimo cambio no se pudo guardar. Revisa el aviso y vuelve a intentar.',
+                              retrying: _retryingSave || store.isSaving,
+                              onRetry: _retrySave,
+                            ),
+                            const SizedBox(height: 10),
+                          ],
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton.icon(
@@ -637,6 +686,15 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
               child: Column(
                 children: [
+                  if (store.lastError != null) ...[
+                    _SaveErrorBanner(
+                      message:
+                          'El ultimo cambio no se pudo guardar. Puedes reintentar sin perder el control.',
+                      retrying: _retryingSave || store.isSaving,
+                      onRetry: _retrySave,
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton.icon(
@@ -747,6 +805,48 @@ class _RailBrand extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SaveErrorBanner extends StatelessWidget {
+  const _SaveErrorBanner({
+    required this.message,
+    required this.retrying,
+    required this.onRetry,
+  });
+
+  final String message;
+  final bool retrying;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return BpcPanel(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      color: scheme.errorContainer.withValues(alpha: 0.72),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline_rounded, color: scheme.error),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: BpcColors.ink,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          FilledButton.tonal(
+            onPressed: retrying ? null : onRetry,
+            child: Text(retrying ? 'Reintentando' : 'Reintentar'),
+          ),
+        ],
+      ),
     );
   }
 }

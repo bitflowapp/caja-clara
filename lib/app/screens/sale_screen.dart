@@ -92,6 +92,9 @@ class _SaleScreenState extends State<SaleScreen> {
               ? null
               : store.productById(_selectedProduct!.id) ?? _selectedProduct;
           final quantity = _parseInt(_quantityController.text);
+          final saleWarning = product == null
+              ? null
+              : store.saleReadinessMessage(product.id, quantityUnits: quantity);
           final total = product == null ? 0 : product.pricePesos * quantity;
           final remaining = product == null
               ? null
@@ -325,15 +328,16 @@ class _SaleScreenState extends State<SaleScreen> {
                                     onFieldSubmitted: (_) =>
                                         _paymentFocusNode.requestFocus(),
                                     validator: (value) {
-                                      final parsed = _parseInt(value);
-                                      if (parsed <= 0) {
-                                        return 'Ingresa una cantidad';
+                                      if (product == null) {
+                                        final parsed = _parseInt(value);
+                                        return parsed <= 0
+                                            ? 'Ingresa una cantidad'
+                                            : null;
                                       }
-                                      if (product != null &&
-                                          parsed > product.stockUnits) {
-                                        return 'No hay stock suficiente';
-                                      }
-                                      return null;
+                                      return store.saleReadinessMessage(
+                                        product.id,
+                                        quantityUnits: _parseInt(value),
+                                      );
                                     },
                                   ),
                                 ),
@@ -404,6 +408,19 @@ class _SaleScreenState extends State<SaleScreen> {
                                     ? '-'
                                     : remaining.toString(),
                               ),
+                              if (saleWarning != null) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  saleWarning,
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.error,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
