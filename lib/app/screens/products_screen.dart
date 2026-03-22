@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../models/product.dart';
 import '../utils/formatters.dart';
+import '../utils/text_field_selection.dart';
 import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
+import '../widgets/input_shortcuts.dart';
 import '../widgets/product_form_dialog.dart';
 
 class ProductsScreen extends StatefulWidget {
@@ -15,11 +17,13 @@ class ProductsScreen extends StatefulWidget {
 
 class _ProductsScreenState extends State<ProductsScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   bool _onlyLowStock = false;
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -30,83 +34,100 @@ class _ProductsScreenState extends State<ProductsScreen> {
       animation: store,
       builder: (context, _) {
         final products = _filteredProducts(store.products);
-        return SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SectionHeader(
-                title: 'Productos',
-                subtitle:
-                    'Carga, busca y corrige productos sin perder de vista stock y precio',
-                trailing: FilledButton.icon(
-                  onPressed: () => showProductEditor(context, store),
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Agregar'),
-                ),
-              ),
-              const SizedBox(height: 14),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final wide = constraints.maxWidth >= 700;
-                  return Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      SizedBox(
-                        width: wide
-                            ? constraints.maxWidth - 180
-                            : constraints.maxWidth,
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: (_) => setState(() {}),
-                          decoration: const InputDecoration(
-                            prefixIcon: Icon(Icons.search_rounded),
-                            labelText: 'Buscar producto',
-                          ),
-                        ),
-                      ),
-                      FilterChip(
-                        selected: _onlyLowStock,
-                        label: const Text('Solo bajo stock'),
-                        onSelected: (value) {
-                          setState(() => _onlyLowStock = value);
-                        },
-                      ),
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
-              if (products.isEmpty)
-                EmptyCard(
-                  title: 'Sin resultados',
-                  message:
-                      'No hay productos con ese filtro. Ajusta la busqueda o carga uno nuevo.',
-                  action: FilledButton(
-                    onPressed: () => showProductEditor(context, store),
-                    child: const Text('Agregar producto'),
+        return InputShortcutScope(
+          onCancel: () {
+            if (_searchController.text.isNotEmpty) {
+              setState(() => _searchController.clear());
+            }
+            _searchFocusNode.unfocus();
+          },
+          onFocusSearch: () =>
+              focusAndSelectAll(_searchFocusNode, _searchController),
+          child: FocusTraversalGroup(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SectionHeader(
+                    title: 'Productos',
+                    subtitle:
+                        'Carga, busca y corrige productos sin perder de vista stock y precio',
+                    trailing: FilledButton.icon(
+                      onPressed: () => showProductEditor(context, store),
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Agregar'),
+                    ),
                   ),
-                )
-              else
-                Column(
-                  children: [
-                    for (final product in products)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _ProductTile(
-                          product: product,
-                          onTap: () => showProductEditor(
-                            context,
-                            store,
-                            product: product,
+                  const SizedBox(height: 14),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final wide = constraints.maxWidth >= 700;
+                      return Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: wide
+                                ? constraints.maxWidth - 180
+                                : constraints.maxWidth,
+                            child: TextField(
+                              controller: _searchController,
+                              focusNode: _searchFocusNode,
+                              onChanged: (_) => setState(() {}),
+                              textInputAction: TextInputAction.search,
+                              onTapOutside: (_) => _searchFocusNode.unfocus(),
+                              decoration: const InputDecoration(
+                                prefixIcon: Icon(Icons.search_rounded),
+                                labelText: 'Buscar producto',
+                                hintText:
+                                    'Nombre, categoria o codigo de barras',
+                              ),
+                            ),
                           ),
-                        ),
+                          FilterChip(
+                            selected: _onlyLowStock,
+                            label: const Text('Solo bajo stock'),
+                            onSelected: (value) {
+                              setState(() => _onlyLowStock = value);
+                            },
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  if (products.isEmpty)
+                    EmptyCard(
+                      title: 'Sin resultados',
+                      message:
+                          'No hay productos con ese filtro. Ajusta la busqueda o carga uno nuevo.',
+                      action: FilledButton(
+                        onPressed: () => showProductEditor(context, store),
+                        child: const Text('Agregar producto'),
                       ),
-                  ],
-                ),
-              const SizedBox(height: 18),
-            ],
+                    )
+                  else
+                    Column(
+                      children: [
+                        for (final product in products)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _ProductTile(
+                              product: product,
+                              onTap: () => showProductEditor(
+                                context,
+                                store,
+                                product: product,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  const SizedBox(height: 18),
+                ],
+              ),
+            ),
           ),
         );
       },

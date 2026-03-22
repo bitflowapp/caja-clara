@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../services/commerce_store.dart';
 import '../utils/text_field_selection.dart';
+import 'input_shortcuts.dart';
 
 Future<String?> showBarcodeInputDialog(
   BuildContext context, {
@@ -19,94 +21,98 @@ Future<String?> showBarcodeInputDialog(
     context: context,
     useSafeArea: true,
     builder: (context) {
-      return AlertDialog(
-        insetPadding: EdgeInsets.fromLTRB(
-          16,
-          24,
-          16,
-          16 + MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        scrollable: true,
-        title: Text(title),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.keyboard_alt_rounded,
-                      color: Theme.of(context).colorScheme.primary,
+      void submit() {
+        if (!formKey.currentState!.validate()) {
+          return;
+        }
+        FocusScope.of(context).unfocus();
+        Navigator.of(
+          context,
+        ).pop(CommerceStore.normalizeBarcode(controller.text));
+      }
+
+      return InputShortcutScope(
+        onCancel: () => Navigator.of(context).pop(),
+        child: AlertDialog(
+          insetPadding: EdgeInsets.fromLTRB(
+            16,
+            24,
+            16,
+            16 + MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          scrollable: true,
+          title: Text(title),
+          content: Form(
+            key: formKey,
+            child: FocusTraversalGroup(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        helper,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodyMedium?.copyWith(height: 1.3),
-                      ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.keyboard_alt_rounded,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            helper,
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodyMedium?.copyWith(height: 1.3),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    autofocus: true,
+                    keyboardType: const TextInputType.numberWithOptions(),
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    textInputAction: TextInputAction.search,
+                    decoration: const InputDecoration(
+                      labelText: 'Codigo de barras',
+                      hintText: 'Ej. 7791234500011',
+                      prefixIcon: Icon(Icons.qr_code_2_rounded),
+                    ),
+                    onTapOutside: (_) => focusNode.unfocus(),
+                    validator: (value) {
+                      if (CommerceStore.normalizeBarcode(value) == null) {
+                        return 'Ingresa un codigo valido.';
+                      }
+                      return null;
+                    },
+                    onFieldSubmitted: (_) => submit(),
+                  ),
+                ],
               ),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: controller,
-                focusNode: focusNode,
-                autofocus: true,
-                textInputAction: TextInputAction.search,
-                decoration: const InputDecoration(
-                  labelText: 'Codigo de barras',
-                  hintText: 'Ej. 7791234500011',
-                  prefixIcon: Icon(Icons.qr_code_2_rounded),
-                ),
-                validator: (value) {
-                  if (CommerceStore.normalizeBarcode(value) == null) {
-                    return 'Ingresa un codigo valido.';
-                  }
-                  return null;
-                },
-                onFieldSubmitted: (_) {
-                  if (!formKey.currentState!.validate()) {
-                    return;
-                  }
-                  Navigator.of(
-                    context,
-                  ).pop(CommerceStore.normalizeBarcode(controller.text));
-                },
-              ),
-            ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton.icon(
+              onPressed: submit,
+              icon: const Icon(Icons.search_rounded),
+              label: Text(confirmLabel),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton.icon(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) {
-                return;
-              }
-              Navigator.of(
-                context,
-              ).pop(CommerceStore.normalizeBarcode(controller.text));
-            },
-            icon: const Icon(Icons.search_rounded),
-            label: Text(confirmLabel),
-          ),
-        ],
       );
     },
   );

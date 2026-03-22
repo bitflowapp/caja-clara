@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/product.dart';
 import '../services/commerce_store.dart';
 import '../utils/formatters.dart';
 import '../utils/user_facing_errors.dart';
 import '../utils/text_field_selection.dart';
+import 'input_shortcuts.dart';
 import 'keyboard_aware_form.dart';
 import 'speech_dictation.dart';
 
@@ -59,6 +61,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   late final TextEditingController _costController;
   late final TextEditingController _priceController;
   late final TextEditingController _barcodeController;
+  final _nameFocusNode = FocusNode();
   final _categoryFocusNode = FocusNode();
   final _barcodeFocusNode = FocusNode();
   final _stockFocusNode = FocusNode();
@@ -90,6 +93,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     _barcodeController = TextEditingController(
       text: product?.barcode ?? widget.initialBarcode ?? '',
     );
+    selectAllTextOnFocus(_nameFocusNode, _nameController);
     selectAllTextOnFocus(_categoryFocusNode, _categoryController);
     selectAllTextOnFocus(_barcodeFocusNode, _barcodeController);
     selectAllTextOnFocus(_stockFocusNode, _stockController);
@@ -109,6 +113,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     _costController.dispose();
     _priceController.dispose();
     _barcodeController.dispose();
+    _nameFocusNode.dispose();
     _categoryFocusNode.dispose();
     _barcodeFocusNode.dispose();
     _stockFocusNode.dispose();
@@ -131,195 +136,259 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     return SizedBox(
       width: double.infinity,
       height: dialogHeight,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+      child: InputShortcutScope(
+        onSave: _saving ? null : _save,
+        onCancel: _saving ? null : () => Navigator.of(context).pop(),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: FocusTraversalGroup(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.product == null
+                              ? 'Agregar producto'
+                              : 'Editar producto',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: _saving
+                            ? null
+                            : () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                   Expanded(
-                    child: Text(
-                      widget.product == null
-                          ? 'Agregar producto'
-                          : 'Editar producto',
-                      style: Theme.of(context).textTheme.titleLarge,
+                    child: SingleChildScrollView(
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      child: Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          SizedBox(
+                            width: 320,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                TextFormField(
+                                  controller: _nameController,
+                                  focusNode: _nameFocusNode,
+                                  autofocus: true,
+                                  textInputAction: TextInputAction.next,
+                                  textCapitalization: TextCapitalization.words,
+                                  decoration: InputDecoration(
+                                    labelText: 'Nombre',
+                                    suffixIcon: SpeechDictationActionButton(
+                                      controller: _nameDictation,
+                                      textController: _nameController,
+                                      tooltip: 'Dictar nombre',
+                                    ),
+                                  ),
+                                  onTapOutside: (_) => _nameFocusNode.unfocus(),
+                                  onFieldSubmitted: (_) =>
+                                      _categoryFocusNode.requestFocus(),
+                                  validator: _required,
+                                  onChanged: (_) => setState(() {}),
+                                ),
+                                SpeechDictationHint(controller: _nameDictation),
+                              ],
+                            ),
+                          ),
+                          SizedBox(
+                            width: 220,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                TextFormField(
+                                  controller: _categoryController,
+                                  focusNode: _categoryFocusNode,
+                                  textInputAction: TextInputAction.next,
+                                  textCapitalization: TextCapitalization.words,
+                                  decoration: InputDecoration(
+                                    labelText: 'Categoria (opcional)',
+                                    suffixIcon: SpeechDictationActionButton(
+                                      controller: _categoryDictation,
+                                      textController: _categoryController,
+                                      tooltip: 'Dictar categoria',
+                                    ),
+                                  ),
+                                  onTapOutside: (_) =>
+                                      _categoryFocusNode.unfocus(),
+                                  onFieldSubmitted: (_) =>
+                                      _barcodeFocusNode.requestFocus(),
+                                  onChanged: (_) => setState(() {}),
+                                ),
+                                SpeechDictationHint(
+                                  controller: _categoryDictation,
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(
+                            width: 220,
+                            child: TextFormField(
+                              controller: _barcodeController,
+                              focusNode: _barcodeFocusNode,
+                              textInputAction: TextInputAction.next,
+                              decoration: const InputDecoration(
+                                labelText: 'Codigo de barras (opcional)',
+                              ),
+                              onTapOutside: (_) => _barcodeFocusNode.unfocus(),
+                              onFieldSubmitted: (_) =>
+                                  _stockFocusNode.requestFocus(),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 150,
+                            child: TextFormField(
+                              controller: _stockController,
+                              focusNode: _stockFocusNode,
+                              decoration: const InputDecoration(
+                                labelText: 'Stock',
+                              ),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(),
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              textInputAction: TextInputAction.next,
+                              onTapOutside: (_) => _stockFocusNode.unfocus(),
+                              onFieldSubmitted: (_) =>
+                                  _minStockFocusNode.requestFocus(),
+                              validator: (value) =>
+                                  _intMin(value, 0, 'El stock'),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 150,
+                            child: TextFormField(
+                              controller: _minStockController,
+                              focusNode: _minStockFocusNode,
+                              decoration: const InputDecoration(
+                                labelText: 'Stock minimo',
+                              ),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(),
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              textInputAction: TextInputAction.next,
+                              onTapOutside: (_) => _minStockFocusNode.unfocus(),
+                              onFieldSubmitted: (_) =>
+                                  _costFocusNode.requestFocus(),
+                              validator: (value) =>
+                                  _intMin(value, 0, 'El stock minimo'),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 180,
+                            child: TextFormField(
+                              controller: _costController,
+                              focusNode: _costFocusNode,
+                              decoration: const InputDecoration(
+                                labelText: 'Costo',
+                              ),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(),
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              textInputAction: TextInputAction.next,
+                              onTapOutside: (_) => _costFocusNode.unfocus(),
+                              onFieldSubmitted: (_) =>
+                                  _priceFocusNode.requestFocus(),
+                              validator: (value) =>
+                                  _intMin(value, 1, 'El costo'),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 180,
+                            child: TextFormField(
+                              controller: _priceController,
+                              focusNode: _priceFocusNode,
+                              decoration: const InputDecoration(
+                                labelText: 'Precio',
+                              ),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(),
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              textInputAction: TextInputAction.done,
+                              onTapOutside: (_) => _priceFocusNode.unfocus(),
+                              onFieldSubmitted: (_) => _save(),
+                              validator: (value) =>
+                                  _intMin(value, 1, 'El precio'),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  IconButton(
-                    onPressed: _saving
-                        ? null
-                        : () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Vista previa: ${_nameController.text.isEmpty ? 'sin nombre' : _nameController.text} / ${formatMoney(_parseInt(_priceController.text))}',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: scheme.outline),
+                  ),
+                  const SizedBox(height: 16),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compact = constraints.maxWidth < 520;
+                      final cancelButton = TextButton(
+                        onPressed: _saving
+                            ? null
+                            : () => Navigator.of(context).pop(),
+                        child: const Text('Cancelar'),
+                      );
+                      final saveButton = FilledButton(
+                        onPressed: _saving ? null : _save,
+                        child: _saving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('Guardar'),
+                      );
+
+                      if (compact) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            saveButton,
+                            const SizedBox(height: 10),
+                            cancelButton,
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        children: [
+                          const Spacer(),
+                          cancelButton,
+                          const SizedBox(width: 10),
+                          saveButton,
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: SingleChildScrollView(
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  child: Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      SizedBox(
-                        width: 320,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            TextFormField(
-                              controller: _nameController,
-                              autofocus: true,
-                              decoration: InputDecoration(
-                                labelText: 'Nombre',
-                                suffixIcon: SpeechDictationActionButton(
-                                  controller: _nameDictation,
-                                  textController: _nameController,
-                                  tooltip: 'Dictar nombre',
-                                ),
-                              ),
-                              validator: _required,
-                              onChanged: (_) => setState(() {}),
-                            ),
-                            SpeechDictationHint(controller: _nameDictation),
-                          ],
-                        ),
-                      ),
-                      SizedBox(
-                        width: 220,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            TextFormField(
-                              controller: _categoryController,
-                              focusNode: _categoryFocusNode,
-                              decoration: InputDecoration(
-                                labelText: 'Categoria (opcional)',
-                                suffixIcon: SpeechDictationActionButton(
-                                  controller: _categoryDictation,
-                                  textController: _categoryController,
-                                  tooltip: 'Dictar categoria',
-                                ),
-                              ),
-                              onChanged: (_) => setState(() {}),
-                            ),
-                            SpeechDictationHint(controller: _categoryDictation),
-                          ],
-                        ),
-                      ),
-                      SizedBox(
-                        width: 220,
-                        child: TextFormField(
-                          controller: _barcodeController,
-                          focusNode: _barcodeFocusNode,
-                          decoration: const InputDecoration(
-                            labelText: 'Codigo de barras (opcional)',
-                          ),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 150,
-                        child: TextFormField(
-                          controller: _stockController,
-                          focusNode: _stockFocusNode,
-                          decoration: const InputDecoration(labelText: 'Stock'),
-                          keyboardType: TextInputType.number,
-                          validator: (value) => _intMin(value, 0, 'El stock'),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 150,
-                        child: TextFormField(
-                          controller: _minStockController,
-                          focusNode: _minStockFocusNode,
-                          decoration: const InputDecoration(
-                            labelText: 'Stock minimo',
-                          ),
-                          keyboardType: TextInputType.number,
-                          validator: (value) =>
-                              _intMin(value, 0, 'El stock minimo'),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 180,
-                        child: TextFormField(
-                          controller: _costController,
-                          focusNode: _costFocusNode,
-                          decoration: const InputDecoration(labelText: 'Costo'),
-                          keyboardType: TextInputType.number,
-                          validator: (value) => _intMin(value, 1, 'El costo'),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 180,
-                        child: TextFormField(
-                          controller: _priceController,
-                          focusNode: _priceFocusNode,
-                          decoration: const InputDecoration(
-                            labelText: 'Precio',
-                          ),
-                          keyboardType: TextInputType.number,
-                          validator: (value) => _intMin(value, 1, 'El precio'),
-                          onChanged: (_) => setState(() {}),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'Vista previa: ${_nameController.text.isEmpty ? 'sin nombre' : _nameController.text} / ${formatMoney(_parseInt(_priceController.text))}',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: scheme.outline),
-              ),
-              const SizedBox(height: 16),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 520;
-                  final cancelButton = TextButton(
-                    onPressed: _saving
-                        ? null
-                        : () => Navigator.of(context).pop(),
-                    child: const Text('Cancelar'),
-                  );
-                  final saveButton = FilledButton(
-                    onPressed: _saving ? null : _save,
-                    child: _saving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Guardar'),
-                  );
-
-                  if (compact) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        saveButton,
-                        const SizedBox(height: 10),
-                        cancelButton,
-                      ],
-                    );
-                  }
-
-                  return Row(
-                    children: [
-                      const Spacer(),
-                      cancelButton,
-                      const SizedBox(width: 10),
-                      saveButton,
-                    ],
-                  );
-                },
-              ),
-            ],
+            ),
           ),
         ),
       ),
