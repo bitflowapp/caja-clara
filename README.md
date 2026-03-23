@@ -158,6 +158,20 @@ Salida esperada:
 build/web/
 ```
 
+### Marca de build
+
+La web publicada expone tambien `version.json` en la raiz del sitio:
+
+```text
+https://bitflowapp.github.io/caja-clara/version.json
+```
+
+La app muestra una huella discreta de build en el footer para debug real:
+
+```text
+Build <short-sha> • <branch> • <utc>
+```
+
 ## GitHub Pages
 
 Workflow activo:

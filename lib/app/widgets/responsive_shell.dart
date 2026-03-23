@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 
 import '../screens/expense_screen.dart';
@@ -7,6 +8,7 @@ import '../screens/barcode_scan_screen.dart';
 import '../screens/sale_screen.dart';
 import '../screens/summary_screen.dart';
 import '../services/backup_service.dart';
+import '../services/build_info.dart';
 import '../services/excel_export_service.dart';
 import '../theme/bpc_colors.dart';
 import '../utils/user_facing_errors.dart';
@@ -643,6 +645,11 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                             ),
                           ),
                         ),
+                        const SizedBox(height: 10),
+                        const Padding(
+                          padding: EdgeInsets.fromLTRB(14, 0, 14, 14),
+                          child: _BuildInfoStrip(),
+                        ),
                       ],
                     ),
                   ),
@@ -704,6 +711,8 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                     ),
                   ),
                   const SizedBox(height: 6),
+                  const _BuildInfoStrip(),
+                  const SizedBox(height: 8),
                   Expanded(child: page),
                 ],
               ),
@@ -846,6 +855,61 @@ class _SaveErrorBanner extends StatelessWidget {
             child: Text(retrying ? 'Reintentando' : 'Reintentar'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _BuildInfoStrip extends StatelessWidget {
+  const _BuildInfoStrip();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final text = BuildInfo.footerText;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () async {
+          await Clipboard.setData(ClipboardData(text: text));
+          if (!context.mounted) {
+            return;
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Build copiado: $text'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        },
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHighest.withValues(alpha: 0.58),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.34)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.fingerprint_rounded, size: 16, color: scheme.outline),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  text,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.outline,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.copy_rounded, size: 16, color: scheme.outline),
+            ],
+          ),
+        ),
       ),
     );
   }

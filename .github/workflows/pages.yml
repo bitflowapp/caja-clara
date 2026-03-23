@@ -34,6 +34,14 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
+      - name: Prepare build metadata
+        run: |
+          echo "CAJA_CLARA_BUILD_SHA=$GITHUB_SHA" >> $GITHUB_ENV
+          echo "CAJA_CLARA_BUILD_SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+          echo "CAJA_CLARA_BUILD_BRANCH=${GITHUB_REF_NAME}" >> $GITHUB_ENV
+          echo "CAJA_CLARA_BUILD_TIME_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_ENV
+          echo "CAJA_CLARA_BUILD_SOURCE=github-actions" >> $GITHUB_ENV
+
       - name: Analyze
         run: flutter analyze
 
@@ -44,7 +52,25 @@ jobs:
         run: |
           flutter build web --release \
             --base-href "${{ env.BASE_HREF }}" \
-            --pwa-strategy offline-first
+            --pwa-strategy offline-first \
+            --dart-define=CAJA_CLARA_BUILD_SHA=${{ env.CAJA_CLARA_BUILD_SHA }} \
+            --dart-define=CAJA_CLARA_BUILD_SHORT_SHA=${{ env.CAJA_CLARA_BUILD_SHORT_SHA }} \
+            --dart-define=CAJA_CLARA_BUILD_BRANCH=${{ env.CAJA_CLARA_BUILD_BRANCH }} \
+            --dart-define=CAJA_CLARA_BUILD_TIME_UTC=${{ env.CAJA_CLARA_BUILD_TIME_UTC }} \
+            --dart-define=CAJA_CLARA_BUILD_SOURCE=${{ env.CAJA_CLARA_BUILD_SOURCE }}
+
+      - name: Write version marker
+        run: |
+          cat > build/web/version.json <<EOF
+          {
+            "commitSha": "${{ env.CAJA_CLARA_BUILD_SHA }}",
+            "shortCommitSha": "${{ env.CAJA_CLARA_BUILD_SHORT_SHA }}",
+            "branch": "${{ env.CAJA_CLARA_BUILD_BRANCH }}",
+            "builtAtUtc": "${{ env.CAJA_CLARA_BUILD_TIME_UTC }}",
+            "source": "${{ env.CAJA_CLARA_BUILD_SOURCE }}",
+            "baseHref": "${{ env.BASE_HREF }}"
+          }
+          EOF
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
