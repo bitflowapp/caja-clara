@@ -9,7 +9,15 @@ void main() {
     WidgetTester tester,
     CommerceStore store, {
     ProductEditorSeed? seed,
+    Size size = const Size(390, 844),
   }) async {
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
     await tester.pumpWidget(
       CommerceScope(
         store: store,
@@ -34,7 +42,7 @@ void main() {
 
     await tester.tap(find.text('Abrir producto'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 450));
   }
 
   testWidgets(
@@ -91,6 +99,31 @@ void main() {
       expect(store.products.single.name, 'Cable lightning');
       expect(find.text('Agregar producto'), findsNothing);
       expect(find.byType(SnackBar), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'uses fullscreen form on narrow screens and dialog on wide screens',
+    (tester) async {
+      final mobileStore = CommerceStore.emptyForTest();
+      await pumpProductDialog(tester, mobileStore);
+
+      expect(find.byType(Dialog), findsNothing);
+      expect(find.byType(AppBar), findsOneWidget);
+      expect(find.text('Agregar producto'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.close_rounded).first);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 450));
+
+      final desktopStore = CommerceStore.emptyForTest();
+      await pumpProductDialog(
+        tester,
+        desktopStore,
+        size: const Size(1100, 900),
+      );
+
+      expect(find.byType(Dialog), findsOneWidget);
     },
   );
 }

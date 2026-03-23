@@ -1,5 +1,14 @@
 import 'package:flutter/material.dart';
 
+const double kMobileFormBreakpoint = 720;
+
+bool useFullscreenFormLayout(
+  BuildContext context, {
+  double breakpoint = kMobileFormBreakpoint,
+}) {
+  return MediaQuery.sizeOf(context).width < breakpoint;
+}
+
 class KeyboardAwarePageBody extends StatelessWidget {
   const KeyboardAwarePageBody({
     super.key,
@@ -107,6 +116,42 @@ class _EnsureVisibleWhenFocusedState extends State<EnsureVisibleWhenFocused> {
   @override
   Widget build(BuildContext context) {
     return widget.child;
+  }
+}
+
+class KeyboardAwareFormScaffold extends StatelessWidget {
+  const KeyboardAwareFormScaffold({
+    super.key,
+    required this.title,
+    required this.child,
+    this.actions,
+    this.maxWidth = 760,
+    this.padding = const EdgeInsets.fromLTRB(16, 12, 16, 16),
+  });
+
+  final String title;
+  final Widget child;
+  final List<Widget>? actions;
+  final double maxWidth;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).maybePop(),
+          icon: const Icon(Icons.close_rounded),
+        ),
+        title: Text(title),
+        actions: actions,
+      ),
+      body: KeyboardAwarePageBody(
+        maxWidth: maxWidth,
+        padding: padding,
+        child: child,
+      ),
+    );
   }
 }
 

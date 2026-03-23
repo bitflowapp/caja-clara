@@ -6,6 +6,7 @@ import '../services/commerce_store.dart';
 import '../utils/formatters.dart';
 import '../utils/user_facing_errors.dart';
 import '../utils/text_field_selection.dart';
+import 'commerce_components.dart';
 import 'input_shortcuts.dart';
 import 'keyboard_aware_form.dart';
 import 'speech_dictation.dart';
@@ -44,6 +45,22 @@ Future<ProductEditorResult?> showProductEditor(
   String? initialBarcode,
   ProductEditorSeed? seed,
 }) async {
+  if (useFullscreenFormLayout(context)) {
+    return Navigator.of(context).push<ProductEditorResult>(
+      MaterialPageRoute<ProductEditorResult>(
+        fullscreenDialog: true,
+        builder: (pageContext) {
+          return _ProductFormPage(
+            store: store,
+            product: product,
+            initialBarcode: initialBarcode,
+            seed: seed,
+          );
+        },
+      ),
+    );
+  }
+
   return showDialog<ProductEditorResult>(
     context: context,
     barrierDismissible: false,
@@ -58,6 +75,7 @@ Future<ProductEditorResult?> showProductEditor(
               product: product,
               initialBarcode: initialBarcode,
               seed: seed,
+              fullscreen: false,
             ),
           ),
         ),
@@ -66,8 +84,8 @@ Future<ProductEditorResult?> showProductEditor(
   );
 }
 
-class _ProductFormDialog extends StatefulWidget {
-  const _ProductFormDialog({
+class _ProductFormPage extends StatelessWidget {
+  const _ProductFormPage({
     required this.store,
     this.product,
     this.initialBarcode,
@@ -78,6 +96,39 @@ class _ProductFormDialog extends StatefulWidget {
   final Product? product;
   final String? initialBarcode;
   final ProductEditorSeed? seed;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = product == null ? 'Agregar producto' : 'Editar producto';
+    return KeyboardAwareFormScaffold(
+      title: title,
+      child: BpcPanel(
+        child: _ProductFormDialog(
+          store: store,
+          product: product,
+          initialBarcode: initialBarcode,
+          seed: seed,
+          fullscreen: true,
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductFormDialog extends StatefulWidget {
+  const _ProductFormDialog({
+    required this.store,
+    this.product,
+    this.initialBarcode,
+    this.seed,
+    required this.fullscreen,
+  });
+
+  final CommerceStore store;
+  final Product? product;
+  final String? initialBarcode;
+  final ProductEditorSeed? seed;
+  final bool fullscreen;
 
   @override
   State<_ProductFormDialog> createState() => _ProductFormDialogState();
@@ -163,7 +214,16 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    if (widget.fullscreen) {
+      return _buildFullscreenContent(context);
+    }
+    return _buildDialogContent(context);
+  }
+
+  String get _title =>
+      widget.product == null ? 'Agregar producto' : 'Editar producto';
+
+  Widget _buildDialogContent(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final dialogHeight =
         (mediaQuery.size.height - mediaQuery.viewInsets.bottom - 80)
@@ -183,308 +243,305 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.product == null
-                                  ? 'Agregar producto'
-                                  : 'Editar producto',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Completa lo basico y guarda. Si todavia no definiste costo o precio, puedes dejarlo en 0 y ajustarlo despues.',
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(color: scheme.outline),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: _saving
-                            ? null
-                            : () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ],
-                  ),
+                  _buildDialogHeader(context),
                   const SizedBox(height: 16),
                   Expanded(
                     child: SingleChildScrollView(
                       keyboardDismissBehavior:
                           ScrollViewKeyboardDismissBehavior.onDrag,
-                      child: Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          SizedBox(
-                            width: 320,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                EnsureVisibleWhenFocused(
-                                  focusNode: _nameFocusNode,
-                                  child: TextFormField(
-                                    controller: _nameController,
-                                    focusNode: _nameFocusNode,
-                                    autofocus: true,
-                                    keyboardType: TextInputType.text,
-                                    textInputAction: TextInputAction.next,
-                                    textCapitalization:
-                                        TextCapitalization.words,
-                                    decoration: InputDecoration(
-                                      labelText: 'Nombre',
-                                      suffixIcon: SpeechDictationActionButton(
-                                        controller: _nameDictation,
-                                        textController: _nameController,
-                                        tooltip: 'Dictar nombre',
-                                      ),
-                                    ),
-                                    onTapOutside: (_) =>
-                                        _nameFocusNode.unfocus(),
-                                    onFieldSubmitted: (_) => _moveFocusTo(
-                                      _categoryFocusNode,
-                                      controller: _categoryController,
-                                    ),
-                                    validator: _required,
-                                    onChanged: (_) => setState(() {}),
-                                  ),
-                                ),
-                                SpeechDictationHint(controller: _nameDictation),
-                              ],
-                            ),
-                          ),
-                          SizedBox(
-                            width: 220,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                EnsureVisibleWhenFocused(
-                                  focusNode: _categoryFocusNode,
-                                  child: TextFormField(
-                                    controller: _categoryController,
-                                    focusNode: _categoryFocusNode,
-                                    keyboardType: TextInputType.text,
-                                    textInputAction: TextInputAction.next,
-                                    textCapitalization:
-                                        TextCapitalization.words,
-                                    decoration: InputDecoration(
-                                      labelText: 'Categoria (opcional)',
-                                      suffixIcon: SpeechDictationActionButton(
-                                        controller: _categoryDictation,
-                                        textController: _categoryController,
-                                        tooltip: 'Dictar categoria',
-                                      ),
-                                    ),
-                                    onTapOutside: (_) =>
-                                        _categoryFocusNode.unfocus(),
-                                    onFieldSubmitted: (_) => _moveFocusTo(
-                                      _barcodeFocusNode,
-                                      controller: _barcodeController,
-                                    ),
-                                    onChanged: (_) => setState(() {}),
-                                  ),
-                                ),
-                                SpeechDictationHint(
-                                  controller: _categoryDictation,
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(
-                            width: 220,
-                            child: EnsureVisibleWhenFocused(
-                              focusNode: _barcodeFocusNode,
-                              child: TextFormField(
-                                controller: _barcodeController,
-                                focusNode: _barcodeFocusNode,
-                                keyboardType: TextInputType.number,
-                                textInputAction: TextInputAction.next,
-                                decoration: const InputDecoration(
-                                  labelText: 'Codigo de barras (opcional)',
-                                ),
-                                onTapOutside: (_) =>
-                                    _barcodeFocusNode.unfocus(),
-                                onFieldSubmitted: (_) => _moveFocusTo(
-                                  _stockFocusNode,
-                                  controller: _stockController,
-                                ),
-                              ),
-                            ),
-                          ),
-                          SizedBox(
-                            width: 150,
-                            child: EnsureVisibleWhenFocused(
-                              focusNode: _stockFocusNode,
-                              child: TextFormField(
-                                controller: _stockController,
-                                focusNode: _stockFocusNode,
-                                decoration: const InputDecoration(
-                                  labelText: 'Stock',
-                                ),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                ],
-                                textInputAction: TextInputAction.next,
-                                onTapOutside: (_) => _stockFocusNode.unfocus(),
-                                onFieldSubmitted: (_) => _moveFocusTo(
-                                  _minStockFocusNode,
-                                  controller: _minStockController,
-                                ),
-                                validator: (value) =>
-                                    _intMin(value, 0, 'El stock'),
-                              ),
-                            ),
-                          ),
-                          SizedBox(
-                            width: 150,
-                            child: EnsureVisibleWhenFocused(
-                              focusNode: _minStockFocusNode,
-                              child: TextFormField(
-                                controller: _minStockController,
-                                focusNode: _minStockFocusNode,
-                                decoration: const InputDecoration(
-                                  labelText: 'Stock minimo',
-                                ),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                ],
-                                textInputAction: TextInputAction.next,
-                                onTapOutside: (_) =>
-                                    _minStockFocusNode.unfocus(),
-                                onFieldSubmitted: (_) => _moveFocusTo(
-                                  _costFocusNode,
-                                  controller: _costController,
-                                ),
-                                validator: (value) =>
-                                    _intMin(value, 0, 'El stock minimo'),
-                              ),
-                            ),
-                          ),
-                          SizedBox(
-                            width: 180,
-                            child: EnsureVisibleWhenFocused(
-                              focusNode: _costFocusNode,
-                              child: TextFormField(
-                                controller: _costController,
-                                focusNode: _costFocusNode,
-                                decoration: const InputDecoration(
-                                  labelText: 'Costo',
-                                ),
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                      decimal: true,
-                                    ),
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                ],
-                                textInputAction: TextInputAction.next,
-                                onTapOutside: (_) => _costFocusNode.unfocus(),
-                                onFieldSubmitted: (_) => _moveFocusTo(
-                                  _priceFocusNode,
-                                  controller: _priceController,
-                                ),
-                                validator: (value) =>
-                                    _intMin(value, 0, 'El costo'),
-                              ),
-                            ),
-                          ),
-                          SizedBox(
-                            width: 180,
-                            child: EnsureVisibleWhenFocused(
-                              focusNode: _priceFocusNode,
-                              child: TextFormField(
-                                controller: _priceController,
-                                focusNode: _priceFocusNode,
-                                decoration: const InputDecoration(
-                                  labelText: 'Precio',
-                                ),
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                      decimal: true,
-                                    ),
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                ],
-                                textInputAction: TextInputAction.done,
-                                onTapOutside: (_) => _priceFocusNode.unfocus(),
-                                onFieldSubmitted: (_) {
-                                  _dismissKeyboard();
-                                  _save();
-                                },
-                                validator: (value) =>
-                                    _intMin(value, 0, 'El precio'),
-                                onChanged: (_) => setState(() {}),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                      child: _buildFields(context),
                     ),
                   ),
                   const SizedBox(height: 18),
-                  Text(
-                    'Vista previa: ${_nameController.text.isEmpty ? 'sin nombre' : _nameController.text} / ${formatMoney(_parseInt(_priceController.text))}',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyMedium?.copyWith(color: scheme.outline),
-                  ),
+                  _buildPreview(context),
                   const SizedBox(height: 16),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final compact = constraints.maxWidth < 520;
-                      final cancelButton = TextButton(
-                        onPressed: _saving
-                            ? null
-                            : () => Navigator.of(context).pop(),
-                        child: const Text('Cancelar'),
-                      );
-                      final saveButton = FilledButton(
-                        onPressed: _saving ? null : _save,
-                        child: _saving
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text('Guardar'),
-                      );
-
-                      if (compact) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            saveButton,
-                            const SizedBox(height: 10),
-                            cancelButton,
-                          ],
-                        );
-                      }
-
-                      return Row(
-                        children: [
-                          const Spacer(),
-                          cancelButton,
-                          const SizedBox(width: 10),
-                          saveButton,
-                        ],
-                      );
-                    },
-                  ),
+                  _buildActions(context),
                 ],
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildFullscreenContent(BuildContext context) {
+    return InputShortcutScope(
+      onSave: _saving ? null : _save,
+      onCancel: _saving ? null : () => Navigator.of(context).pop(),
+      child: FocusTraversalGroup(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Completa lo basico y guarda. Si todavia no definiste costo o precio, puedes dejarlo en 0 y ajustarlo despues.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+              ),
+              const SizedBox(height: 18),
+              _buildFields(context),
+              const SizedBox(height: 18),
+              _buildPreview(context),
+              const SizedBox(height: 16),
+              _buildActions(context),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDialogHeader(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(_title, style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 6),
+              Text(
+                'Completa lo basico y guarda. Si todavia no definiste costo o precio, puedes dejarlo en 0 y ajustarlo despues.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: scheme.outline),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.close_rounded),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFields(BuildContext context) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: [
+        SizedBox(
+          width: 320,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              EnsureVisibleWhenFocused(
+                focusNode: _nameFocusNode,
+                child: TextFormField(
+                  controller: _nameController,
+                  focusNode: _nameFocusNode,
+                  autofocus: true,
+                  keyboardType: TextInputType.text,
+                  textInputAction: TextInputAction.next,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: InputDecoration(
+                    labelText: 'Nombre',
+                    suffixIcon: SpeechDictationActionButton(
+                      controller: _nameDictation,
+                      textController: _nameController,
+                      tooltip: 'Dictar nombre',
+                    ),
+                  ),
+                  onTapOutside: (_) => _nameFocusNode.unfocus(),
+                  onFieldSubmitted: (_) => _moveFocusTo(
+                    _categoryFocusNode,
+                    controller: _categoryController,
+                  ),
+                  validator: _required,
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              SpeechDictationHint(controller: _nameDictation),
+            ],
+          ),
+        ),
+        SizedBox(
+          width: 220,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              EnsureVisibleWhenFocused(
+                focusNode: _categoryFocusNode,
+                child: TextFormField(
+                  controller: _categoryController,
+                  focusNode: _categoryFocusNode,
+                  keyboardType: TextInputType.text,
+                  textInputAction: TextInputAction.next,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: InputDecoration(
+                    labelText: 'Categoria (opcional)',
+                    suffixIcon: SpeechDictationActionButton(
+                      controller: _categoryDictation,
+                      textController: _categoryController,
+                      tooltip: 'Dictar categoria',
+                    ),
+                  ),
+                  onTapOutside: (_) => _categoryFocusNode.unfocus(),
+                  onFieldSubmitted: (_) => _moveFocusTo(
+                    _barcodeFocusNode,
+                    controller: _barcodeController,
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              SpeechDictationHint(controller: _categoryDictation),
+            ],
+          ),
+        ),
+        SizedBox(
+          width: 220,
+          child: EnsureVisibleWhenFocused(
+            focusNode: _barcodeFocusNode,
+            child: TextFormField(
+              controller: _barcodeController,
+              focusNode: _barcodeFocusNode,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'Codigo de barras (opcional)',
+              ),
+              onTapOutside: (_) => _barcodeFocusNode.unfocus(),
+              onFieldSubmitted: (_) =>
+                  _moveFocusTo(_stockFocusNode, controller: _stockController),
+            ),
+          ),
+        ),
+        SizedBox(
+          width: 150,
+          child: EnsureVisibleWhenFocused(
+            focusNode: _stockFocusNode,
+            child: TextFormField(
+              controller: _stockController,
+              focusNode: _stockFocusNode,
+              decoration: const InputDecoration(labelText: 'Stock'),
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              textInputAction: TextInputAction.next,
+              onTapOutside: (_) => _stockFocusNode.unfocus(),
+              onFieldSubmitted: (_) => _moveFocusTo(
+                _minStockFocusNode,
+                controller: _minStockController,
+              ),
+              validator: (value) => _intMin(value, 0, 'El stock'),
+            ),
+          ),
+        ),
+        SizedBox(
+          width: 150,
+          child: EnsureVisibleWhenFocused(
+            focusNode: _minStockFocusNode,
+            child: TextFormField(
+              controller: _minStockController,
+              focusNode: _minStockFocusNode,
+              decoration: const InputDecoration(labelText: 'Stock minimo'),
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              textInputAction: TextInputAction.next,
+              onTapOutside: (_) => _minStockFocusNode.unfocus(),
+              onFieldSubmitted: (_) =>
+                  _moveFocusTo(_costFocusNode, controller: _costController),
+              validator: (value) => _intMin(value, 0, 'El stock minimo'),
+            ),
+          ),
+        ),
+        SizedBox(
+          width: 180,
+          child: EnsureVisibleWhenFocused(
+            focusNode: _costFocusNode,
+            child: TextFormField(
+              controller: _costController,
+              focusNode: _costFocusNode,
+              decoration: const InputDecoration(labelText: 'Costo'),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              textInputAction: TextInputAction.next,
+              onTapOutside: (_) => _costFocusNode.unfocus(),
+              onFieldSubmitted: (_) =>
+                  _moveFocusTo(_priceFocusNode, controller: _priceController),
+              validator: (value) => _intMin(value, 0, 'El costo'),
+            ),
+          ),
+        ),
+        SizedBox(
+          width: 180,
+          child: EnsureVisibleWhenFocused(
+            focusNode: _priceFocusNode,
+            child: TextFormField(
+              controller: _priceController,
+              focusNode: _priceFocusNode,
+              decoration: const InputDecoration(labelText: 'Precio'),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              textInputAction: TextInputAction.done,
+              onTapOutside: (_) => _priceFocusNode.unfocus(),
+              onFieldSubmitted: (_) {
+                _dismissKeyboard();
+                _save();
+              },
+              validator: (value) => _intMin(value, 0, 'El precio'),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPreview(BuildContext context) {
+    return Text(
+      'Vista previa: ${_nameController.text.isEmpty ? 'sin nombre' : _nameController.text} / ${formatMoney(_parseInt(_priceController.text))}',
+      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+        color: Theme.of(context).colorScheme.outline,
+      ),
+    );
+  }
+
+  Widget _buildActions(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 520;
+        final cancelButton = TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        );
+        final saveButton = FilledButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Guardar'),
+        );
+
+        if (compact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [saveButton, const SizedBox(height: 10), cancelButton],
+          );
+        }
+
+        return Row(
+          children: [
+            const Spacer(),
+            cancelButton,
+            const SizedBox(width: 10),
+            saveButton,
+          ],
+        );
+      },
     );
   }
 
