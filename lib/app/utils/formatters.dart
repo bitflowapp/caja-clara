@@ -20,7 +20,10 @@ String formatDateTimeShort(DateTime value) {
 String formatMovementDate(DateTime value, {DateTime? now}) {
   final reference = now ?? DateTime.now();
   final sameDay = _isSameDay(value, reference);
-  final yesterday = _isSameDay(value, reference.subtract(const Duration(days: 1)));
+  final yesterday = _isSameDay(
+    value,
+    reference.subtract(const Duration(days: 1)),
+  );
 
   if (sameDay) {
     return 'Hoy, ${_twoDigits(value.hour)}:${_twoDigits(value.minute)}';
@@ -33,6 +36,30 @@ String formatMovementDate(DateTime value, {DateTime? now}) {
 
 String formatShortDate(DateTime value) {
   return '${_twoDigits(value.day)}/${_twoDigits(value.month)}/${value.year}';
+}
+
+String formatCompactDateLabel(DateTime value, {DateTime? now}) {
+  final reference = now ?? DateTime.now();
+  if (_isSameDay(value, reference)) {
+    return 'hoy';
+  }
+
+  const months = <String>[
+    'ene',
+    'feb',
+    'mar',
+    'abr',
+    'may',
+    'jun',
+    'jul',
+    'ago',
+    'sep',
+    'oct',
+    'nov',
+    'dic',
+  ];
+  final month = months[value.month - 1];
+  return '${value.day} $month ${value.year}';
 }
 
 bool _isSameDay(DateTime a, DateTime b) {

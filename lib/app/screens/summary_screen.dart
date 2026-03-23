@@ -38,9 +38,9 @@ class SummaryScreen extends StatelessWidget {
   final bool savingCashEvent;
   final Future<void> Function(Movement movement) onCreateProductFromFreeSale;
   final Future<void> Function(FreeSaleSuggestion suggestion)
-      onCreateProductFromSuggestion;
+  onCreateProductFromSuggestion;
   final Future<void> Function(FreeSaleSuggestion suggestion)
-      onDismissFreeSaleSuggestion;
+  onDismissFreeSaleSuggestion;
 
   @override
   Widget build(BuildContext context) {
@@ -280,51 +280,132 @@ class _FreeSaleSuggestionBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return BpcPanel(
       color: Theme.of(context).colorScheme.surfaceContainerLow,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.tips_and_updates_rounded,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 560;
+          final content = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Sugerencia de catalogo',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '"${suggestion.displayDescription}" se vendio varias veces como venta libre. Puedes crear un producto sin tocar esas ventas pasadas.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _SuggestionMetaChip(
+                    label: 'Se vendio',
+                    value:
+                        '${suggestion.repeatCount} ${suggestion.repeatCount == 1 ? 'vez' : 'veces'}',
+                  ),
+                  _SuggestionMetaChip(
+                    label: 'Ultima venta',
+                    value: formatCompactDateLabel(suggestion.latestSoldAt),
+                  ),
+                  _SuggestionMetaChip(
+                    label: 'Total vendido',
+                    value: formatMoney(suggestion.totalRevenuePesos),
+                  ),
+                  if (suggestion.latestUnitPricePesos != null)
+                    _SuggestionMetaChip(
+                      label: 'Ultimo precio',
+                      value: formatMoney(suggestion.latestUnitPricePesos!),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  FilledButton.icon(
+                    onPressed: onCreateProduct,
+                    icon: const Icon(Icons.add_box_rounded),
+                    label: const Text('Crear producto'),
+                  ),
+                  TextButton(
+                    onPressed: onDismiss,
+                    child: const Text('Mas tarde'),
+                  ),
+                ],
+              ),
+            ],
+          );
+
+          if (compact) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Sugerencia de catalogo',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
+                Icon(
+                  Icons.tips_and_updates_rounded,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '"${suggestion.description}" ya aparecio ${suggestion.count} veces como venta libre. Puedes crear un producto cuando quieras, sin tocar esas ventas pasadas.',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: onCreateProduct,
-                      icon: const Icon(Icons.add_box_rounded),
-                      label: const Text('Crear producto'),
-                    ),
-                    TextButton(
-                      onPressed: onDismiss,
-                      child: const Text('Mas tarde'),
-                    ),
-                  ],
-                ),
+                const SizedBox(height: 10),
+                content,
               ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.tips_and_updates_rounded,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: content),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SuggestionMetaChip extends StatelessWidget {
+  const _SuggestionMetaChip({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: scheme.outline,
+              fontWeight: FontWeight.w700,
             ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
           ),
         ],
       ),

@@ -104,13 +104,15 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     await _createProductFromSeed(store, seed);
   }
 
-  Future<void> _createProductFromSuggestion(FreeSaleSuggestion suggestion) async {
+  Future<void> _createProductFromSuggestion(
+    FreeSaleSuggestion suggestion,
+  ) async {
     final store = CommerceScope.of(context);
     await _createProductFromSeed(
       store,
       ProductEditorSeed(
-        name: suggestion.description,
-        pricePesos: suggestion.suggestedPricePesos,
+        name: suggestion.displayDescription,
+        pricePesos: suggestion.latestUnitPricePesos,
         stockUnits: 0,
         minStockUnits: 0,
       ),
@@ -977,7 +979,9 @@ class _BuildInfoStrip extends StatelessWidget {
           decoration: BoxDecoration(
             color: scheme.surfaceContainerHighest.withValues(alpha: 0.58),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.34)),
+            border: Border.all(
+              color: scheme.outlineVariant.withValues(alpha: 0.34),
+            ),
           ),
           child: Row(
             children: [

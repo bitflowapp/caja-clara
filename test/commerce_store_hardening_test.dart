@@ -39,115 +39,180 @@ void main() {
       );
     });
 
-    test('records free sale without touching stock and rejects invalid values', () async {
-      final store = CommerceStore.seededForTest();
-      final initialCash = store.cashBalancePesos;
-      final initialMovements = store.movements.length;
-      final initialStock = store.productById('p-1')!.stockUnits;
+    test(
+      'records free sale without touching stock and rejects invalid values',
+      () async {
+        final store = CommerceStore.seededForTest();
+        final initialCash = store.cashBalancePesos;
+        final initialMovements = store.movements.length;
+        final initialStock = store.productById('p-1')!.stockUnits;
 
-      await store.recordFreeSale(
-        description: 'Venta mostrador',
-        quantityUnits: 2,
-        unitPricePesos: 1800,
-        paymentMethod: 'Efectivo',
-      );
-
-      expect(store.cashBalancePesos, initialCash + 3600);
-      expect(store.movements.length, initialMovements + 1);
-      expect(store.productById('p-1')!.stockUnits, initialStock);
-      expect(store.movements.first.isFreeSale, isTrue);
-      expect(store.movements.first.subtitle, 'Venta mostrador');
-
-      await expectLater(
-        store.recordFreeSale(
-          description: '',
-          quantityUnits: 0,
-          unitPricePesos: 0,
-          paymentMethod: 'Efectivo',
-        ),
-        throwsA(isA<StateError>()),
-      );
-    });
-
-    test('creating product after free sale keeps historical movement untouched', () async {
-      final store = CommerceStore.emptyForTest();
-
-      await store.recordFreeSale(
-        description: 'Cable USB rapido',
-        quantityUnits: 1,
-        unitPricePesos: 4500,
-        paymentMethod: 'Transferencia',
-      );
-
-      final freeSale = store.movements.first;
-
-      await store.addProduct(
-        const Product(
-          id: 'p-cable',
-          name: 'Cable USB rapido',
-          stockUnits: 6,
-          minStockUnits: 1,
-          costPesos: 2200,
-          pricePesos: 4500,
-          category: 'Mostrador',
-        ),
-      );
-
-      expect(store.productById('p-cable'), isNotNull);
-      expect(store.productById('p-cable')!.stockUnits, 6);
-      expect(store.movements.first.id, freeSale.id);
-      expect(store.movements.first.isFreeSale, isTrue);
-      expect(store.movements.first.productId, isNull);
-      expect(store.movements.first.subtitle, 'Cable USB rapido');
-    });
-
-    test('suggests repeated free sale descriptions and allows dismiss', () async {
-      final store = CommerceStore.emptyForTest();
-
-      for (var i = 0; i < 3; i++) {
         await store.recordFreeSale(
-          description: 'Encendedor comun',
-          quantityUnits: 1,
-          unitPricePesos: 1200,
+          description: 'Venta mostrador',
+          quantityUnits: 2,
+          unitPricePesos: 1800,
           paymentMethod: 'Efectivo',
         );
-      }
 
-      expect(store.freeSaleSuggestions, hasLength(1));
-      expect(store.freeSaleSuggestions.first.description, 'Encendedor comun');
-      expect(store.freeSaleSuggestions.first.count, 3);
+        expect(store.cashBalancePesos, initialCash + 3600);
+        expect(store.movements.length, initialMovements + 1);
+        expect(store.productById('p-1')!.stockUnits, initialStock);
+        expect(store.movements.first.isFreeSale, isTrue);
+        expect(store.movements.first.subtitle, 'Venta mostrador');
 
-      await store.dismissFreeSaleSuggestion('Encendedor comun');
-
-      expect(store.freeSaleSuggestions, isEmpty);
-    });
-
-    test('does not suggest repeated free sale if a matching product already exists', () async {
-      final store = CommerceStore.emptyForTest();
-
-      await store.addProduct(
-        const Product(
-          id: 'p-existing',
-          name: 'Encendedor comun',
-          stockUnits: 4,
-          minStockUnits: 1,
-          costPesos: 600,
-          pricePesos: 1200,
-          category: 'Mostrador',
-        ),
-      );
-
-      for (var i = 0; i < 3; i++) {
-        await store.recordFreeSale(
-          description: '  encendedor   comun ',
-          quantityUnits: 1,
-          unitPricePesos: 1200,
-          paymentMethod: 'Efectivo',
+        await expectLater(
+          store.recordFreeSale(
+            description: '',
+            quantityUnits: 0,
+            unitPricePesos: 0,
+            paymentMethod: 'Efectivo',
+          ),
+          throwsA(isA<StateError>()),
         );
-      }
+      },
+    );
 
-      expect(store.freeSaleSuggestions, isEmpty);
-    });
+    test(
+      'creating product after free sale keeps historical movement untouched',
+      () async {
+        final store = CommerceStore.emptyForTest();
+
+        await store.recordFreeSale(
+          description: 'Cable USB rapido',
+          quantityUnits: 1,
+          unitPricePesos: 4500,
+          paymentMethod: 'Transferencia',
+        );
+
+        final freeSale = store.movements.first;
+
+        await store.addProduct(
+          const Product(
+            id: 'p-cable',
+            name: 'Cable USB rapido',
+            stockUnits: 6,
+            minStockUnits: 1,
+            costPesos: 2200,
+            pricePesos: 4500,
+            category: 'Mostrador',
+          ),
+        );
+
+        expect(store.productById('p-cable'), isNotNull);
+        expect(store.productById('p-cable')!.stockUnits, 6);
+        expect(store.movements.first.id, freeSale.id);
+        expect(store.movements.first.isFreeSale, isTrue);
+        expect(store.movements.first.productId, isNull);
+        expect(store.movements.first.subtitle, 'Cable USB rapido');
+      },
+    );
+
+    test(
+      'suggests repeated free sale descriptions and allows dismiss',
+      () async {
+        final store = CommerceStore.emptyForTest();
+        final soldAt = <DateTime>[
+          DateTime(2026, 3, 20, 9, 0),
+          DateTime(2026, 3, 21, 11, 30),
+          DateTime(2026, 3, 23, 8, 45),
+        ];
+        final prices = <int>[1200, 1500, 1700];
+        final quantities = <int>[1, 2, 1];
+
+        for (var i = 0; i < 3; i++) {
+          await store.recordFreeSale(
+            description: 'Encendedor comun',
+            quantityUnits: quantities[i],
+            unitPricePesos: prices[i],
+            paymentMethod: 'Efectivo',
+            createdAt: soldAt[i],
+          );
+        }
+
+        expect(store.freeSaleSuggestions, hasLength(1));
+        expect(
+          store.freeSaleSuggestions.first.normalizedDescription,
+          'encendedor comun',
+        );
+        expect(
+          store.freeSaleSuggestions.first.displayDescription,
+          'Encendedor comun',
+        );
+        expect(store.freeSaleSuggestions.first.repeatCount, 3);
+        expect(store.freeSaleSuggestions.first.latestSoldAt, soldAt.last);
+        expect(store.freeSaleSuggestions.first.totalRevenuePesos, 5900);
+        expect(store.freeSaleSuggestions.first.latestUnitPricePesos, 1700);
+
+        await store.dismissFreeSaleSuggestion('Encendedor comun');
+
+        expect(store.freeSaleSuggestions, isEmpty);
+      },
+    );
+
+    test(
+      'uses the newest free sale date and unit price even if inserts arrive out of order',
+      () async {
+        final store = CommerceStore.emptyForTest();
+        final newestSaleAt = DateTime(2026, 3, 23, 19, 15);
+
+        await store.recordFreeSale(
+          description: 'Cable USB rapido',
+          quantityUnits: 1,
+          unitPricePesos: 4200,
+          paymentMethod: 'Transferencia',
+          createdAt: newestSaleAt,
+        );
+        await store.recordFreeSale(
+          description: 'Cable USB rapido',
+          quantityUnits: 1,
+          unitPricePesos: 3900,
+          paymentMethod: 'Transferencia',
+          createdAt: DateTime(2026, 3, 21, 11, 0),
+        );
+        await store.recordFreeSale(
+          description: 'Cable USB rapido',
+          quantityUnits: 2,
+          unitPricePesos: 4000,
+          paymentMethod: 'Transferencia',
+          createdAt: DateTime(2026, 3, 22, 17, 0),
+        );
+
+        final suggestion = store.freeSaleSuggestions.single;
+        expect(suggestion.latestSoldAt, newestSaleAt);
+        expect(suggestion.latestUnitPricePesos, 4200);
+        expect(suggestion.totalRevenuePesos, 16100);
+      },
+    );
+
+    test(
+      'does not suggest repeated free sale if a matching product already exists',
+      () async {
+        final store = CommerceStore.emptyForTest();
+
+        await store.addProduct(
+          const Product(
+            id: 'p-existing',
+            name: 'Encendedor comun',
+            stockUnits: 4,
+            minStockUnits: 1,
+            costPesos: 600,
+            pricePesos: 1200,
+            category: 'Mostrador',
+          ),
+        );
+
+        for (var i = 0; i < 3; i++) {
+          await store.recordFreeSale(
+            description: '  encendedor   comun ',
+            quantityUnits: 1,
+            unitPricePesos: 1200,
+            paymentMethod: 'Efectivo',
+          );
+        }
+
+        expect(store.freeSaleSuggestions, isEmpty);
+      },
+    );
 
     test('undo last sale restores stock and movement count', () async {
       final store = CommerceStore.seededForTest();

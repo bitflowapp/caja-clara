@@ -149,10 +149,7 @@ class CommerceStore extends ChangeNotifier {
     return null;
   }
 
-  Product? productByNormalizedName(
-    String name, {
-    String? excludingProductId,
-  }) {
+  Product? productByNormalizedName(String name, {String? excludingProductId}) {
     final normalized = normalizeProductName(name);
     if (normalized == null) {
       return null;
@@ -180,10 +177,7 @@ class CommerceStore extends ChangeNotifier {
     if (raw == null) {
       return null;
     }
-    final normalized = raw
-        .trim()
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .toLowerCase();
+    final normalized = raw.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
     return normalized.isEmpty ? null : normalized;
   }
 
@@ -199,7 +193,8 @@ class CommerceStore extends ChangeNotifier {
       }
       final description = movement.subtitle ?? movement.title;
       final normalized = normalizeProductName(description);
-      if (normalized == null || _dismissedFreeSaleSuggestions.contains(normalized)) {
+      if (normalized == null ||
+          _dismissedFreeSaleSuggestions.contains(normalized)) {
         continue;
       }
       if (productByNormalizedName(description) != null) {
@@ -210,19 +205,19 @@ class CommerceStore extends ChangeNotifier {
         normalized,
         () => _FreeSaleAggregate(
           normalizedDescription: normalized,
-          description: description.trim(),
+          displayDescription: description.trim(),
         ),
       );
       aggregate.count += 1;
       aggregate.totalRevenuePesos += movement.amountPesos;
-      aggregate.lastPaymentMethod = movement.paymentMethod;
-      if (aggregate.latestSaleAt == null ||
-          movement.createdAt.isAfter(aggregate.latestSaleAt!)) {
-        aggregate.latestSaleAt = movement.createdAt;
-      }
-      final quantity = movement.quantityUnits ?? 0;
-      if (quantity > 0) {
-        aggregate.latestUnitPricePesos = movement.amountPesos ~/ quantity;
+      if (aggregate.latestSoldAt == null ||
+          movement.createdAt.isAfter(aggregate.latestSoldAt!)) {
+        aggregate.latestSoldAt = movement.createdAt;
+        aggregate.displayDescription = description.trim();
+        final quantity = movement.quantityUnits ?? 0;
+        aggregate.latestUnitPricePesos = quantity > 0
+            ? movement.amountPesos ~/ quantity
+            : null;
       }
     }
 
@@ -231,20 +226,20 @@ class CommerceStore extends ChangeNotifier {
         .map(
           (item) => FreeSaleSuggestion(
             normalizedDescription: item.normalizedDescription,
-            description: item.description,
-            count: item.count,
-            latestSaleAt: item.latestSaleAt ?? DateTime.now(),
-            suggestedPricePesos: item.latestUnitPricePesos,
-            lastPaymentMethod: item.lastPaymentMethod,
+            displayDescription: item.displayDescription,
+            repeatCount: item.count,
+            latestSoldAt: item.latestSoldAt ?? DateTime.now(),
+            totalRevenuePesos: item.totalRevenuePesos,
+            latestUnitPricePesos: item.latestUnitPricePesos,
           ),
         )
         .toList(growable: false)
       ..sort((a, b) {
-        final byCount = b.count.compareTo(a.count);
+        final byCount = b.repeatCount.compareTo(a.repeatCount);
         if (byCount != 0) {
           return byCount;
         }
-        return b.latestSaleAt.compareTo(a.latestSaleAt);
+        return b.latestSoldAt.compareTo(a.latestSoldAt);
       });
   }
 
@@ -592,7 +587,8 @@ class CommerceStore extends ChangeNotifier {
 
   Future<void> dismissFreeSaleSuggestion(String normalizedDescription) async {
     final normalized = normalizeProductName(normalizedDescription);
-    if (normalized == null || _dismissedFreeSaleSuggestions.contains(normalized)) {
+    if (normalized == null ||
+        _dismissedFreeSaleSuggestions.contains(normalized)) {
       return;
     }
     await _runPersistedMutation(() {
@@ -1262,32 +1258,31 @@ class _SnapshotData {
 class FreeSaleSuggestion {
   const FreeSaleSuggestion({
     required this.normalizedDescription,
-    required this.description,
-    required this.count,
-    required this.latestSaleAt,
-    this.suggestedPricePesos,
-    this.lastPaymentMethod,
+    required this.displayDescription,
+    required this.repeatCount,
+    required this.latestSoldAt,
+    required this.totalRevenuePesos,
+    this.latestUnitPricePesos,
   });
 
   final String normalizedDescription;
-  final String description;
-  final int count;
-  final DateTime latestSaleAt;
-  final int? suggestedPricePesos;
-  final String? lastPaymentMethod;
+  final String displayDescription;
+  final int repeatCount;
+  final DateTime latestSoldAt;
+  final int totalRevenuePesos;
+  final int? latestUnitPricePesos;
 }
 
 class _FreeSaleAggregate {
   _FreeSaleAggregate({
     required this.normalizedDescription,
-    required this.description,
+    required this.displayDescription,
   });
 
   final String normalizedDescription;
-  final String description;
+  String displayDescription;
   int count = 0;
   int totalRevenuePesos = 0;
   int? latestUnitPricePesos;
-  String? lastPaymentMethod;
-  DateTime? latestSaleAt;
+  DateTime? latestSoldAt;
 }

@@ -34,9 +34,9 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onApplyStarterTemplate;
   final Future<void> Function(Movement movement) onCreateProductFromFreeSale;
   final Future<void> Function(FreeSaleSuggestion suggestion)
-      onCreateProductFromSuggestion;
+  onCreateProductFromSuggestion;
   final Future<void> Function(FreeSaleSuggestion suggestion)
-      onDismissFreeSaleSuggestion;
+  onDismissFreeSaleSuggestion;
   final bool exportingExcel;
   final bool applyingStarterTemplate;
 
@@ -184,7 +184,7 @@ class _FreeSaleSuggestionCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '"${suggestion.description}" ya se registro ${suggestion.count} veces como venta libre. Si se vende seguido, conviene pasarlo al catalogo.',
+            '"${suggestion.displayDescription}" se viene vendiendo seguido. Si quieres, puedes pasarlo al catalogo sin tocar la historia.',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
@@ -194,15 +194,24 @@ class _FreeSaleSuggestionCard extends StatelessWidget {
             spacing: 10,
             runSpacing: 10,
             children: [
-              if (suggestion.suggestedPricePesos != null)
-                _SuggestionMeta(
-                  label: 'Precio sugerido',
-                  value: formatMoney(suggestion.suggestedPricePesos!),
-                ),
+              _SuggestionMeta(
+                label: 'Se vendio',
+                value:
+                    '${suggestion.repeatCount} ${suggestion.repeatCount == 1 ? 'vez' : 'veces'}',
+              ),
               _SuggestionMeta(
                 label: 'Ultima venta',
-                value: formatShortDate(suggestion.latestSaleAt),
+                value: formatCompactDateLabel(suggestion.latestSoldAt),
               ),
+              _SuggestionMeta(
+                label: 'Total vendido',
+                value: formatMoney(suggestion.totalRevenuePesos),
+              ),
+              if (suggestion.latestUnitPricePesos != null)
+                _SuggestionMeta(
+                  label: 'Ultimo precio',
+                  value: formatMoney(suggestion.latestUnitPricePesos!),
+                ),
             ],
           ),
           const SizedBox(height: 14),
@@ -215,10 +224,7 @@ class _FreeSaleSuggestionCard extends StatelessWidget {
                 icon: const Icon(Icons.add_box_rounded),
                 label: const Text('Crear producto'),
               ),
-              TextButton(
-                onPressed: onDismiss,
-                child: const Text('Mas tarde'),
-              ),
+              TextButton(onPressed: onDismiss, child: const Text('Mas tarde')),
             ],
           ),
         ],
@@ -255,9 +261,9 @@ class _SuggestionMeta extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             value,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
           ),
         ],
       ),
