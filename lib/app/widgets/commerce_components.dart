@@ -253,11 +253,13 @@ class MovementsListTile extends StatelessWidget {
     super.key,
     required this.movement,
     this.productName,
+    this.onCreateProductFromFreeSale,
     this.showDivider = true,
   });
 
   final Movement movement;
   final String? productName;
+  final VoidCallback? onCreateProductFromFreeSale;
   final bool showDivider;
 
   @override
@@ -329,6 +331,20 @@ class MovementsListTile extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+                if (movement.isFreeSale && onCreateProductFromFreeSale != null) ...[
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: onCreateProductFromFreeSale,
+                    icon: const Icon(Icons.add_box_rounded, size: 18),
+                    label: const Text('Crear producto desde esta venta'),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 0),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      alignment: Alignment.centerLeft,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

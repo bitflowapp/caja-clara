@@ -157,4 +157,39 @@ void main() {
       expect(find.text('Venta libre guardada. Caja al dia.'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'venta libre permite abrir alta de producto con descripcion y precio precargados',
+    (tester) async {
+      final store = CommerceStore.emptyForTest();
+
+      await pumpSaleScreen(tester, store);
+
+      await tester.ensureVisible(find.byKey(const Key('sale-mode-quick')));
+      await tester.tap(find.byKey(const Key('sale-mode-quick')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Descripcion'),
+        'Cable USB mostrador',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Precio unitario'),
+        '3900',
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('Crear producto con estos datos'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.text('Agregar producto'), findsOneWidget);
+      expect(find.text('Cable USB mostrador'), findsWidgets);
+      expect(
+        find.text('Vista previa: Cable USB mostrador / \$3.900'),
+        findsOneWidget,
+      );
+    },
+  );
 }

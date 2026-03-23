@@ -315,6 +315,14 @@ class _SaleScreenState extends State<SaleScreen> {
                               ],
                             ),
                           ),
+                          const SizedBox(height: 12),
+                          OutlinedButton.icon(
+                            onPressed: manualDescription.isEmpty || _saving
+                                ? null
+                                : () => _createProductFromFreeSale(store),
+                            icon: const Icon(Icons.add_box_rounded),
+                            label: const Text('Crear producto con estos datos'),
+                          ),
                         ],
                         const SizedBox(height: 14),
                         LayoutBuilder(
@@ -761,11 +769,49 @@ class _SaleScreenState extends State<SaleScreen> {
     );
   }
 
+  ProductEditorSeed _buildProductSeedFromFreeSale() {
+    return ProductEditorSeed(
+      name: _manualDescriptionController.text.trim(),
+      pricePesos: _parseInt(_manualUnitPriceController.text),
+      stockUnits: 0,
+      minStockUnits: 0,
+    );
+  }
+
+  Future<void> _createProductFromFreeSale(CommerceStore store) async {
+    final seed = _buildProductSeedFromFreeSale();
+    if ((seed.name ?? '').trim().isEmpty) {
+      _showBlockedFeedback('Escribe una descripcion antes de crear el producto.');
+      return;
+    }
+
+    final result = await showProductEditor(context, store, seed: seed);
+    if (!mounted || result == null) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          result.kind == ProductEditorResultKind.created
+              ? '"${result.product.name}" ya esta listo en el catalogo.'
+              : 'Usaras "${result.product.name}" que ya estaba en el catalogo.',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Future<void> _submitSale(CommerceStore store) async {
     if (_saving) {
       return;
     }
     final quantity = _parseInt(_quantityController.text);
+    final postSaveSeed = _saleMode == SaleEntryMode.quick
+        ? _buildProductSeedFromFreeSale()
+        : null;
     final resolvedProduct = _saleMode == SaleEntryMode.catalog &&
             _selectedProduct != null
         ? store.productById(_selectedProduct!.id)
@@ -826,6 +872,18 @@ class _SaleScreenState extends State<SaleScreen> {
                 ? 'Venta guardada. Caja y stock al dia.'
                 : 'Venta libre guardada. Caja al dia.',
           ),
+          action: _saleMode == SaleEntryMode.quick
+              ? SnackBarAction(
+                  label: 'Crear producto',
+                  onPressed: () {
+                    showProductEditor(
+                      navigator.context,
+                      store,
+                      seed: postSaveSeed,
+                    );
+                  },
+                )
+              : null,
         ),
       );
     } catch (error) {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/movement.dart';
 import '../services/commerce_store.dart';
 import '../services/starter_templates.dart';
 import '../theme/bpc_colors.dart';
@@ -18,6 +19,7 @@ class HomeScreen extends StatelessWidget {
     required this.onOpenProducts,
     required this.onExportExcel,
     required this.onApplyStarterTemplate,
+    required this.onCreateProductFromFreeSale,
     required this.exportingExcel,
     required this.applyingStarterTemplate,
   });
@@ -28,6 +30,7 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onOpenProducts;
   final VoidCallback onExportExcel;
   final VoidCallback onApplyStarterTemplate;
+  final Future<void> Function(Movement movement) onCreateProductFromFreeSale;
   final bool exportingExcel;
   final bool applyingStarterTemplate;
 
@@ -120,6 +123,9 @@ class HomeScreen extends StatelessWidget {
                           productName: store
                               .productById(recent[index].productId ?? '')
                               ?.name,
+                          onCreateProductFromFreeSale: recent[index].isFreeSale
+                              ? () => onCreateProductFromFreeSale(recent[index])
+                              : null,
                           showDivider: index != recent.length - 1,
                         ),
                     ],

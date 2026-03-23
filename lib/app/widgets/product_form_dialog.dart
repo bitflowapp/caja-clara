@@ -10,13 +10,41 @@ import 'input_shortcuts.dart';
 import 'keyboard_aware_form.dart';
 import 'speech_dictation.dart';
 
-Future<void> showProductEditor(
+class ProductEditorSeed {
+  const ProductEditorSeed({
+    this.name,
+    this.pricePesos,
+    this.stockUnits,
+    this.minStockUnits,
+    this.category,
+    this.barcode,
+  });
+
+  final String? name;
+  final int? pricePesos;
+  final int? stockUnits;
+  final int? minStockUnits;
+  final String? category;
+  final String? barcode;
+}
+
+enum ProductEditorResultKind { created, usedExisting }
+
+class ProductEditorResult {
+  const ProductEditorResult({required this.kind, required this.product});
+
+  final ProductEditorResultKind kind;
+  final Product product;
+}
+
+Future<ProductEditorResult?> showProductEditor(
   BuildContext context,
   CommerceStore store, {
   Product? product,
   String? initialBarcode,
+  ProductEditorSeed? seed,
 }) async {
-  await showDialog<void>(
+  return showDialog<ProductEditorResult>(
     context: context,
     barrierDismissible: false,
     builder: (dialogContext) {
@@ -29,6 +57,7 @@ Future<void> showProductEditor(
               store: store,
               product: product,
               initialBarcode: initialBarcode,
+              seed: seed,
             ),
           ),
         ),
@@ -42,11 +71,13 @@ class _ProductFormDialog extends StatefulWidget {
     required this.store,
     this.product,
     this.initialBarcode,
+    this.seed,
   });
 
   final CommerceStore store;
   final Product? product;
   final String? initialBarcode;
+  final ProductEditorSeed? seed;
 
   @override
   State<_ProductFormDialog> createState() => _ProductFormDialogState();
@@ -76,22 +107,27 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   void initState() {
     super.initState();
     final product = widget.product;
-    _nameController = TextEditingController(text: product?.name ?? '');
-    _categoryController = TextEditingController(text: product?.category ?? '');
+    final seed = widget.seed;
+    _nameController = TextEditingController(
+      text: product?.name ?? seed?.name ?? '',
+    );
+    _categoryController = TextEditingController(
+      text: product?.category ?? seed?.category ?? '',
+    );
     _stockController = TextEditingController(
-      text: (product?.stockUnits ?? 0).toString(),
+      text: (product?.stockUnits ?? seed?.stockUnits ?? 0).toString(),
     );
     _minStockController = TextEditingController(
-      text: (product?.minStockUnits ?? 5).toString(),
+      text: (product?.minStockUnits ?? seed?.minStockUnits ?? 5).toString(),
     );
     _costController = TextEditingController(
       text: (product?.costPesos ?? 0).toString(),
     );
     _priceController = TextEditingController(
-      text: (product?.pricePesos ?? 0).toString(),
+      text: (product?.pricePesos ?? seed?.pricePesos ?? 0).toString(),
     );
     _barcodeController = TextEditingController(
-      text: product?.barcode ?? widget.initialBarcode ?? '',
+      text: product?.barcode ?? seed?.barcode ?? widget.initialBarcode ?? '',
     );
     selectAllTextOnFocus(_nameFocusNode, _nameController);
     selectAllTextOnFocus(_categoryFocusNode, _categoryController);
@@ -450,13 +486,47 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       barcode: CommerceStore.normalizeBarcode(_barcodeController.text),
     );
 
+    if (widget.product == null) {
+      final existing = widget.store.productByNormalizedName(product.name);
+      if (existing != null) {
+        final resolution = await _showDuplicateNameDialog(existing);
+        if (!mounted) {
+          return;
+        }
+        if (resolution == _DuplicateProductResolution.cancel) {
+          return;
+        }
+        if (resolution == _DuplicateProductResolution.useExisting) {
+          Navigator.of(context).pop(
+            ProductEditorResult(
+              kind: ProductEditorResultKind.usedExisting,
+              product: existing,
+            ),
+          );
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Ya tenias "${existing.name}" en el catalogo.',
+              ),
+            ),
+          );
+          return;
+        }
+      }
+    }
+
     setState(() => _saving = true);
     try {
       await widget.store.addProduct(product);
       if (!mounted) {
         return;
       }
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(
+        ProductEditorResult(
+          kind: ProductEditorResultKind.created,
+          product: product,
+        ),
+      );
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Producto guardado')));
@@ -470,4 +540,42 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       ).showSnackBar(SnackBar(content: Text(userFacingErrorMessage(error))));
     }
   }
+
+  Future<_DuplicateProductResolution?> _showDuplicateNameDialog(
+    Product existing,
+  ) {
+    return showDialog<_DuplicateProductResolution>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Ya existe un producto con ese nombre'),
+          content: Text(
+            'Se encontro "${existing.name}" en el catalogo. Puedes usar ese producto, cancelar o crear otro igual si de verdad lo necesitas.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(
+                context,
+              ).pop(_DuplicateProductResolution.cancel),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(
+                context,
+              ).pop(_DuplicateProductResolution.useExisting),
+              child: const Text('Usar existente'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(
+                context,
+              ).pop(_DuplicateProductResolution.createDuplicate),
+              child: const Text('Crear igual'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
+
+enum _DuplicateProductResolution { cancel, useExisting, createDuplicate }

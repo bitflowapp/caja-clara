@@ -7,6 +7,7 @@ import '../screens/products_screen.dart';
 import '../screens/barcode_scan_screen.dart';
 import '../screens/sale_screen.dart';
 import '../screens/summary_screen.dart';
+import '../models/movement.dart';
 import '../services/backup_service.dart';
 import '../services/build_info.dart';
 import '../services/excel_export_service.dart';
@@ -16,6 +17,7 @@ import 'caja_clara_brand.dart';
 import 'commerce_components.dart';
 import 'commerce_scope.dart';
 import 'operation_dialogs.dart';
+import 'product_form_dialog.dart';
 import 'quick_help_dialog.dart';
 
 enum CommerceTab { home, products, summary }
@@ -61,6 +63,38 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
 
   Future<void> _openQuickHelp() async {
     await showQuickHelpDialog(context);
+  }
+
+  Future<void> _createProductFromFreeSale(Movement movement) async {
+    if (!movement.isFreeSale) {
+      return;
+    }
+
+    final store = CommerceScope.of(context);
+    final seed = ProductEditorSeed(
+      name: movement.subtitle ?? movement.title,
+      pricePesos: movement.quantityUnits == null || movement.quantityUnits == 0
+          ? movement.amountPesos
+          : movement.amountPesos ~/ movement.quantityUnits!,
+      stockUnits: 0,
+      minStockUnits: 0,
+    );
+
+    final result = await showProductEditor(context, store, seed: seed);
+    if (!mounted || result == null) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result.kind == ProductEditorResultKind.created
+              ? '"${result.product.name}" ya se sumo al catalogo.'
+              : 'Usaras "${result.product.name}" que ya existia en el catalogo.',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _retrySave() async {
@@ -512,6 +546,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         onOpenProducts: _openProducts,
         onExportExcel: _exportExcel,
         onApplyStarterTemplate: _applyStarterTemplate,
+        onCreateProductFromFreeSale: _createProductFromFreeSale,
         exportingExcel: _exportingExcel,
         applyingStarterTemplate: _applyingStarterTemplate,
       ),
@@ -531,6 +566,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         onRegisterCashOpening: _registerCashOpening,
         onRegisterCashClosing: _registerCashClosing,
         savingCashEvent: _savingCashEvent,
+        onCreateProductFromFreeSale: _createProductFromFreeSale,
       ),
     };
 

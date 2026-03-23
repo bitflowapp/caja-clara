@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/movement.dart';
 import '../utils/formatters.dart';
 import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
@@ -18,6 +19,7 @@ class SummaryScreen extends StatelessWidget {
     required this.onRegisterCashOpening,
     required this.onRegisterCashClosing,
     required this.savingCashEvent,
+    required this.onCreateProductFromFreeSale,
   });
 
   final VoidCallback onExportExcel;
@@ -31,6 +33,7 @@ class SummaryScreen extends StatelessWidget {
   final VoidCallback onRegisterCashOpening;
   final VoidCallback onRegisterCashClosing;
   final bool savingCashEvent;
+  final Future<void> Function(Movement movement) onCreateProductFromFreeSale;
 
   @override
   Widget build(BuildContext context) {
@@ -227,6 +230,9 @@ class SummaryScreen extends StatelessWidget {
                           productName: store
                               .productById(recent[index].productId ?? '')
                               ?.name,
+                          onCreateProductFromFreeSale: recent[index].isFreeSale
+                              ? () => onCreateProductFromFreeSale(recent[index])
+                              : null,
                           showDivider: index != recent.length - 1,
                         ),
                     ],

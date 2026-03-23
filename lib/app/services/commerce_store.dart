@@ -146,11 +146,41 @@ class CommerceStore extends ChangeNotifier {
     return null;
   }
 
+  Product? productByNormalizedName(
+    String name, {
+    String? excludingProductId,
+  }) {
+    final normalized = normalizeProductName(name);
+    if (normalized == null) {
+      return null;
+    }
+    for (final product in _products) {
+      if (excludingProductId != null && product.id == excludingProductId) {
+        continue;
+      }
+      if (normalizeProductName(product.name) == normalized) {
+        return product;
+      }
+    }
+    return null;
+  }
+
   static String? normalizeBarcode(String? raw) {
     if (raw == null) {
       return null;
     }
     final normalized = raw.replaceAll(RegExp(r'\s+'), '').trim();
+    return normalized.isEmpty ? null : normalized;
+  }
+
+  static String? normalizeProductName(String? raw) {
+    if (raw == null) {
+      return null;
+    }
+    final normalized = raw
+        .trim()
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .toLowerCase();
     return normalized.isEmpty ? null : normalized;
   }
 

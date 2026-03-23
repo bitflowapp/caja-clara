@@ -69,6 +69,38 @@ void main() {
       );
     });
 
+    test('creating product after free sale keeps historical movement untouched', () async {
+      final store = CommerceStore.emptyForTest();
+
+      await store.recordFreeSale(
+        description: 'Cable USB rapido',
+        quantityUnits: 1,
+        unitPricePesos: 4500,
+        paymentMethod: 'Transferencia',
+      );
+
+      final freeSale = store.movements.first;
+
+      await store.addProduct(
+        const Product(
+          id: 'p-cable',
+          name: 'Cable USB rapido',
+          stockUnits: 6,
+          minStockUnits: 1,
+          costPesos: 2200,
+          pricePesos: 4500,
+          category: 'Mostrador',
+        ),
+      );
+
+      expect(store.productById('p-cable'), isNotNull);
+      expect(store.productById('p-cable')!.stockUnits, 6);
+      expect(store.movements.first.id, freeSale.id);
+      expect(store.movements.first.isFreeSale, isTrue);
+      expect(store.movements.first.productId, isNull);
+      expect(store.movements.first.subtitle, 'Cable USB rapido');
+    });
+
     test('undo last sale restores stock and movement count', () async {
       final store = CommerceStore.seededForTest();
       final initialStock = store.productById('p-2')!.stockUnits;
