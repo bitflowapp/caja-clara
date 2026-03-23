@@ -101,6 +101,54 @@ void main() {
       expect(store.movements.first.subtitle, 'Cable USB rapido');
     });
 
+    test('suggests repeated free sale descriptions and allows dismiss', () async {
+      final store = CommerceStore.emptyForTest();
+
+      for (var i = 0; i < 3; i++) {
+        await store.recordFreeSale(
+          description: 'Encendedor comun',
+          quantityUnits: 1,
+          unitPricePesos: 1200,
+          paymentMethod: 'Efectivo',
+        );
+      }
+
+      expect(store.freeSaleSuggestions, hasLength(1));
+      expect(store.freeSaleSuggestions.first.description, 'Encendedor comun');
+      expect(store.freeSaleSuggestions.first.count, 3);
+
+      await store.dismissFreeSaleSuggestion('Encendedor comun');
+
+      expect(store.freeSaleSuggestions, isEmpty);
+    });
+
+    test('does not suggest repeated free sale if a matching product already exists', () async {
+      final store = CommerceStore.emptyForTest();
+
+      await store.addProduct(
+        const Product(
+          id: 'p-existing',
+          name: 'Encendedor comun',
+          stockUnits: 4,
+          minStockUnits: 1,
+          costPesos: 600,
+          pricePesos: 1200,
+          category: 'Mostrador',
+        ),
+      );
+
+      for (var i = 0; i < 3; i++) {
+        await store.recordFreeSale(
+          description: '  encendedor   comun ',
+          quantityUnits: 1,
+          unitPricePesos: 1200,
+          paymentMethod: 'Efectivo',
+        );
+      }
+
+      expect(store.freeSaleSuggestions, isEmpty);
+    });
+
     test('undo last sale restores stock and movement count', () async {
       final store = CommerceStore.seededForTest();
       final initialStock = store.productById('p-2')!.stockUnits;

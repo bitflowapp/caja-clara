@@ -9,6 +9,8 @@ import 'commerce_persistence.dart';
 import 'starter_templates.dart';
 
 class CommerceStore extends ChangeNotifier {
+  static const int freeSaleSuggestionThreshold = 3;
+
   CommerceStore._(this._persistence, {required bool persistenceEnabled})
     : _persistenceEnabled = persistenceEnabled;
 
@@ -63,6 +65,7 @@ class CommerceStore extends ChangeNotifier {
   final bool _persistenceEnabled;
   final List<Product> _products = <Product>[];
   final List<Movement> _movements = <Movement>[];
+  final Set<String> _dismissedFreeSaleSuggestions = <String>{};
 
   bool _ready = false;
   bool _saving = false;
@@ -186,6 +189,64 @@ class CommerceStore extends ChangeNotifier {
 
   List<Product> get lowStockProducts =>
       _products.where((product) => product.isLowStock).toList(growable: false);
+
+  List<FreeSaleSuggestion> get freeSaleSuggestions {
+    final grouped = <String, _FreeSaleAggregate>{};
+
+    for (final movement in _movements) {
+      if (!movement.isFreeSale) {
+        continue;
+      }
+      final description = movement.subtitle ?? movement.title;
+      final normalized = normalizeProductName(description);
+      if (normalized == null || _dismissedFreeSaleSuggestions.contains(normalized)) {
+        continue;
+      }
+      if (productByNormalizedName(description) != null) {
+        continue;
+      }
+
+      final aggregate = grouped.putIfAbsent(
+        normalized,
+        () => _FreeSaleAggregate(
+          normalizedDescription: normalized,
+          description: description.trim(),
+        ),
+      );
+      aggregate.count += 1;
+      aggregate.totalRevenuePesos += movement.amountPesos;
+      aggregate.lastPaymentMethod = movement.paymentMethod;
+      if (aggregate.latestSaleAt == null ||
+          movement.createdAt.isAfter(aggregate.latestSaleAt!)) {
+        aggregate.latestSaleAt = movement.createdAt;
+      }
+      final quantity = movement.quantityUnits ?? 0;
+      if (quantity > 0) {
+        aggregate.latestUnitPricePesos = movement.amountPesos ~/ quantity;
+      }
+    }
+
+    return grouped.values
+        .where((item) => item.count >= freeSaleSuggestionThreshold)
+        .map(
+          (item) => FreeSaleSuggestion(
+            normalizedDescription: item.normalizedDescription,
+            description: item.description,
+            count: item.count,
+            latestSaleAt: item.latestSaleAt ?? DateTime.now(),
+            suggestedPricePesos: item.latestUnitPricePesos,
+            lastPaymentMethod: item.lastPaymentMethod,
+          ),
+        )
+        .toList(growable: false)
+      ..sort((a, b) {
+        final byCount = b.count.compareTo(a.count);
+        if (byCount != 0) {
+          return byCount;
+        }
+        return b.latestSaleAt.compareTo(a.latestSaleAt);
+      });
+  }
 
   List<Movement> recentMovements([int limit = 8]) =>
       _movements.take(limit).toList(growable: false);
@@ -529,6 +590,16 @@ class CommerceStore extends ChangeNotifier {
     });
   }
 
+  Future<void> dismissFreeSaleSuggestion(String normalizedDescription) async {
+    final normalized = normalizeProductName(normalizedDescription);
+    if (normalized == null || _dismissedFreeSaleSuggestions.contains(normalized)) {
+      return;
+    }
+    await _runPersistedMutation(() {
+      _dismissedFreeSaleSuggestions.add(normalized);
+    });
+  }
+
   Future<void> recordSale({
     required String productId,
     required int quantityUnits,
@@ -802,6 +873,7 @@ class CommerceStore extends ChangeNotifier {
       'savedAt': (generatedAt ?? DateTime.now()).toIso8601String(),
       'products': _products.map((product) => product.toJson()).toList(),
       'movements': _movements.map((movement) => movement.toJson()).toList(),
+      'dismissedFreeSaleSuggestions': _dismissedFreeSaleSuggestions.toList(),
       'cashOpeningAt': _cashOpeningAt?.toIso8601String(),
       'cashOpeningBalancePesos': _cashOpeningBalancePesos,
       'cashClosingAt': _cashClosingAt?.toIso8601String(),
@@ -873,6 +945,9 @@ class CommerceStore extends ChangeNotifier {
     return _SnapshotData(
       products: validatedProducts,
       movements: movements,
+      dismissedFreeSaleSuggestions: _readStringSet(
+        snapshot['dismissedFreeSaleSuggestions'],
+      ),
       cashOpeningAt: _readDate(snapshot['cashOpeningAt']),
       cashOpeningBalancePesos: (snapshot['cashOpeningBalancePesos'] as num?)
           ?.toInt(),
@@ -900,6 +975,17 @@ class CommerceStore extends ChangeNotifier {
         .whereType<Map>()
         .map((raw) => Movement.fromJson(raw.cast<String, dynamic>()))
         .toList(growable: false);
+  }
+
+  Set<String> _readStringSet(dynamic value) {
+    if (value is! List) {
+      return <String>{};
+    }
+    return value
+        .whereType<String>()
+        .map(normalizeProductName)
+        .whereType<String>()
+        .toSet();
   }
 
   Product _validateProduct(
@@ -986,6 +1072,9 @@ class CommerceStore extends ChangeNotifier {
     _movements
       ..clear()
       ..addAll(snapshot.movements);
+    _dismissedFreeSaleSuggestions
+      ..clear()
+      ..addAll(snapshot.dismissedFreeSaleSuggestions);
     _cashOpeningAt = snapshot.cashOpeningAt;
     _cashOpeningBalancePesos = snapshot.cashOpeningBalancePesos;
     _cashClosingAt = snapshot.cashClosingAt;
@@ -1055,6 +1144,9 @@ class CommerceStore extends ChangeNotifier {
     return _MutableStoreState(
       products: List<Product>.of(_products, growable: false),
       movements: List<Movement>.of(_movements, growable: false),
+      dismissedFreeSaleSuggestions: Set<String>.of(
+        _dismissedFreeSaleSuggestions,
+      ),
       cashOpeningAt: _cashOpeningAt,
       cashOpeningBalancePesos: _cashOpeningBalancePesos,
       cashClosingAt: _cashClosingAt,
@@ -1069,6 +1161,9 @@ class CommerceStore extends ChangeNotifier {
     _movements
       ..clear()
       ..addAll(state.movements);
+    _dismissedFreeSaleSuggestions
+      ..clear()
+      ..addAll(state.dismissedFreeSaleSuggestions);
     _cashOpeningAt = state.cashOpeningAt;
     _cashOpeningBalancePesos = state.cashOpeningBalancePesos;
     _cashClosingAt = state.cashClosingAt;
@@ -1119,6 +1214,7 @@ class _MutableStoreState {
   const _MutableStoreState({
     required this.products,
     required this.movements,
+    required this.dismissedFreeSaleSuggestions,
     required this.cashOpeningAt,
     required this.cashOpeningBalancePesos,
     required this.cashClosingAt,
@@ -1127,6 +1223,7 @@ class _MutableStoreState {
 
   final List<Product> products;
   final List<Movement> movements;
+  final Set<String> dismissedFreeSaleSuggestions;
   final DateTime? cashOpeningAt;
   final int? cashOpeningBalancePesos;
   final DateTime? cashClosingAt;
@@ -1137,6 +1234,7 @@ class _SnapshotData {
   _SnapshotData({
     required this.products,
     required this.movements,
+    required this.dismissedFreeSaleSuggestions,
     required this.cashOpeningAt,
     required this.cashOpeningBalancePesos,
     required this.cashClosingAt,
@@ -1145,6 +1243,7 @@ class _SnapshotData {
 
   final List<Product> products;
   final List<Movement> movements;
+  final Set<String> dismissedFreeSaleSuggestions;
   final DateTime? cashOpeningAt;
   final int? cashOpeningBalancePesos;
   final DateTime? cashClosingAt;
@@ -1158,4 +1257,37 @@ class _SnapshotData {
       throw StateError('El cierre del backup es invalido.');
     }
   }
+}
+
+class FreeSaleSuggestion {
+  const FreeSaleSuggestion({
+    required this.normalizedDescription,
+    required this.description,
+    required this.count,
+    required this.latestSaleAt,
+    this.suggestedPricePesos,
+    this.lastPaymentMethod,
+  });
+
+  final String normalizedDescription;
+  final String description;
+  final int count;
+  final DateTime latestSaleAt;
+  final int? suggestedPricePesos;
+  final String? lastPaymentMethod;
+}
+
+class _FreeSaleAggregate {
+  _FreeSaleAggregate({
+    required this.normalizedDescription,
+    required this.description,
+  });
+
+  final String normalizedDescription;
+  final String description;
+  int count = 0;
+  int totalRevenuePesos = 0;
+  int? latestUnitPricePesos;
+  String? lastPaymentMethod;
+  DateTime? latestSaleAt;
 }

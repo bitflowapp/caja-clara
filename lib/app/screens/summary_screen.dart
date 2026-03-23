@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/movement.dart';
+import '../services/commerce_store.dart';
 import '../utils/formatters.dart';
 import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
@@ -20,6 +21,8 @@ class SummaryScreen extends StatelessWidget {
     required this.onRegisterCashClosing,
     required this.savingCashEvent,
     required this.onCreateProductFromFreeSale,
+    required this.onCreateProductFromSuggestion,
+    required this.onDismissFreeSaleSuggestion,
   });
 
   final VoidCallback onExportExcel;
@@ -34,6 +37,10 @@ class SummaryScreen extends StatelessWidget {
   final VoidCallback onRegisterCashClosing;
   final bool savingCashEvent;
   final Future<void> Function(Movement movement) onCreateProductFromFreeSale;
+  final Future<void> Function(FreeSaleSuggestion suggestion)
+      onCreateProductFromSuggestion;
+  final Future<void> Function(FreeSaleSuggestion suggestion)
+      onDismissFreeSaleSuggestion;
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +49,7 @@ class SummaryScreen extends StatelessWidget {
       animation: store,
       builder: (context, _) {
         final recent = store.recentMovements(10);
+        final suggestions = store.freeSaleSuggestions;
         return SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -205,6 +213,16 @@ class SummaryScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 18),
+              if (suggestions.isNotEmpty) ...[
+                _FreeSaleSuggestionBanner(
+                  suggestion: suggestions.first,
+                  onCreateProduct: () =>
+                      onCreateProductFromSuggestion(suggestions.first),
+                  onDismiss: () =>
+                      onDismissFreeSaleSuggestion(suggestions.first),
+                ),
+                const SizedBox(height: 18),
+              ],
               const SectionHeader(
                 title: 'Movimientos recientes',
                 subtitle: 'Todo lo que impacta en caja y stock',
@@ -243,6 +261,73 @@ class SummaryScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _FreeSaleSuggestionBanner extends StatelessWidget {
+  const _FreeSaleSuggestionBanner({
+    required this.suggestion,
+    required this.onCreateProduct,
+    required this.onDismiss,
+  });
+
+  final FreeSaleSuggestion suggestion;
+  final VoidCallback onCreateProduct;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    return BpcPanel(
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.tips_and_updates_rounded,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Sugerencia de catalogo',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '"${suggestion.description}" ya aparecio ${suggestion.count} veces como venta libre. Puedes crear un producto cuando quieras, sin tocar esas ventas pasadas.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: onCreateProduct,
+                      icon: const Icon(Icons.add_box_rounded),
+                      label: const Text('Crear producto'),
+                    ),
+                    TextButton(
+                      onPressed: onDismiss,
+                      child: const Text('Mas tarde'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

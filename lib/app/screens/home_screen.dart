@@ -20,6 +20,8 @@ class HomeScreen extends StatelessWidget {
     required this.onExportExcel,
     required this.onApplyStarterTemplate,
     required this.onCreateProductFromFreeSale,
+    required this.onCreateProductFromSuggestion,
+    required this.onDismissFreeSaleSuggestion,
     required this.exportingExcel,
     required this.applyingStarterTemplate,
   });
@@ -31,6 +33,10 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onExportExcel;
   final VoidCallback onApplyStarterTemplate;
   final Future<void> Function(Movement movement) onCreateProductFromFreeSale;
+  final Future<void> Function(FreeSaleSuggestion suggestion)
+      onCreateProductFromSuggestion;
+  final Future<void> Function(FreeSaleSuggestion suggestion)
+      onDismissFreeSaleSuggestion;
   final bool exportingExcel;
   final bool applyingStarterTemplate;
 
@@ -42,6 +48,7 @@ class HomeScreen extends StatelessWidget {
       builder: (context, _) {
         final now = DateTime.now();
         final recent = store.recentMovements();
+        final suggestions = store.freeSaleSuggestions;
 
         return SingleChildScrollView(
           child: Column(
@@ -71,6 +78,16 @@ class HomeScreen extends StatelessWidget {
                 exportingExcel: exportingExcel,
                 hasProducts: store.hasProducts,
               ),
+              if (suggestions.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _FreeSaleSuggestionCard(
+                  suggestion: suggestions.first,
+                  onCreateProduct: () =>
+                      onCreateProductFromSuggestion(suggestions.first),
+                  onDismiss: () =>
+                      onDismissFreeSaleSuggestion(suggestions.first),
+                ),
+              ],
               const SizedBox(height: 16),
               const SectionHeader(
                 title: 'Ultimos movimientos',
@@ -136,6 +153,114 @@ class HomeScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _FreeSaleSuggestionCard extends StatelessWidget {
+  const _FreeSaleSuggestionCard({
+    required this.suggestion,
+    required this.onCreateProduct,
+    required this.onDismiss,
+  });
+
+  final FreeSaleSuggestion suggestion;
+  final VoidCallback onCreateProduct;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    return BpcPanel(
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Venta libre repetida',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: BpcColors.ink,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '"${suggestion.description}" ya se registro ${suggestion.count} veces como venta libre. Si se vende seguido, conviene pasarlo al catalogo.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              if (suggestion.suggestedPricePesos != null)
+                _SuggestionMeta(
+                  label: 'Precio sugerido',
+                  value: formatMoney(suggestion.suggestedPricePesos!),
+                ),
+              _SuggestionMeta(
+                label: 'Ultima venta',
+                value: formatShortDate(suggestion.latestSaleAt),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              FilledButton.icon(
+                onPressed: onCreateProduct,
+                icon: const Icon(Icons.add_box_rounded),
+                label: const Text('Crear producto'),
+              ),
+              TextButton(
+                onPressed: onDismiss,
+                child: const Text('Mas tarde'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SuggestionMeta extends StatelessWidget {
+  const _SuggestionMeta({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: BpcColors.subtleInk,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

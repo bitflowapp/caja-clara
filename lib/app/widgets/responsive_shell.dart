@@ -8,6 +8,7 @@ import '../screens/barcode_scan_screen.dart';
 import '../screens/sale_screen.dart';
 import '../screens/summary_screen.dart';
 import '../models/movement.dart';
+import '../services/commerce_store.dart';
 import '../services/backup_service.dart';
 import '../services/build_info.dart';
 import '../services/excel_export_service.dart';
@@ -65,21 +66,10 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     await showQuickHelpDialog(context);
   }
 
-  Future<void> _createProductFromFreeSale(Movement movement) async {
-    if (!movement.isFreeSale) {
-      return;
-    }
-
-    final store = CommerceScope.of(context);
-    final seed = ProductEditorSeed(
-      name: movement.subtitle ?? movement.title,
-      pricePesos: movement.quantityUnits == null || movement.quantityUnits == 0
-          ? movement.amountPesos
-          : movement.amountPesos ~/ movement.quantityUnits!,
-      stockUnits: 0,
-      minStockUnits: 0,
-    );
-
+  Future<void> _createProductFromSeed(
+    CommerceStore store,
+    ProductEditorSeed seed,
+  ) async {
     final result = await showProductEditor(context, store, seed: seed);
     if (!mounted || result == null) {
       return;
@@ -95,6 +85,63 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  Future<void> _createProductFromFreeSale(Movement movement) async {
+    if (!movement.isFreeSale) {
+      return;
+    }
+
+    final store = CommerceScope.of(context);
+    final seed = ProductEditorSeed(
+      name: movement.subtitle ?? movement.title,
+      pricePesos: movement.quantityUnits == null || movement.quantityUnits == 0
+          ? movement.amountPesos
+          : movement.amountPesos ~/ movement.quantityUnits!,
+      stockUnits: 0,
+      minStockUnits: 0,
+    );
+    await _createProductFromSeed(store, seed);
+  }
+
+  Future<void> _createProductFromSuggestion(FreeSaleSuggestion suggestion) async {
+    final store = CommerceScope.of(context);
+    await _createProductFromSeed(
+      store,
+      ProductEditorSeed(
+        name: suggestion.description,
+        pricePesos: suggestion.suggestedPricePesos,
+        stockUnits: 0,
+        minStockUnits: 0,
+      ),
+    );
+  }
+
+  Future<void> _dismissFreeSaleSuggestion(FreeSaleSuggestion suggestion) async {
+    final store = CommerceScope.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await store.dismissFreeSaleSuggestion(suggestion.normalizedDescription);
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Sugerencia ocultada por ahora.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(userFacingErrorMessage(error)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> _retrySave() async {
@@ -547,6 +594,8 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         onExportExcel: _exportExcel,
         onApplyStarterTemplate: _applyStarterTemplate,
         onCreateProductFromFreeSale: _createProductFromFreeSale,
+        onCreateProductFromSuggestion: _createProductFromSuggestion,
+        onDismissFreeSaleSuggestion: _dismissFreeSaleSuggestion,
         exportingExcel: _exportingExcel,
         applyingStarterTemplate: _applyingStarterTemplate,
       ),
@@ -567,6 +616,8 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         onRegisterCashClosing: _registerCashClosing,
         savingCashEvent: _savingCashEvent,
         onCreateProductFromFreeSale: _createProductFromFreeSale,
+        onCreateProductFromSuggestion: _createProductFromSuggestion,
+        onDismissFreeSaleSuggestion: _dismissFreeSaleSuggestion,
       ),
     };
 
