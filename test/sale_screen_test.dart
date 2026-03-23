@@ -5,10 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  Future<void> pumpSaleScreen(
-    WidgetTester tester,
-    CommerceStore store,
-  ) async {
+  Future<void> pumpSaleScreen(WidgetTester tester, CommerceStore store) async {
     await tester.pumpWidget(
       CommerceScope(
         store: store,
@@ -63,10 +60,14 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.text('8 u.'), findsOneWidget);
-      expect(find.text('Debes seleccionar un producto.'), findsOneWidget);
+      expect(
+        find.text('Toca un resultado para confirmar el producto.'),
+        findsOneWidget,
+      );
       expect(find.text('Sin seleccionar'), findsOneWidget);
       expect(saveButton(tester).onPressed, isNull);
 
+      await tester.ensureVisible(find.text('8 u.'));
       await tester.tap(find.text('8 u.'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
@@ -87,7 +88,7 @@ void main() {
   );
 
   testWidgets(
-    'editar el texto despues de seleccionar invalida la venta y muestra que no hay coincidencias',
+    'editar el texto despues de seleccionar invalida la venta y deja el feedback solo inline',
     (tester) async {
       final store = CommerceStore.seededForTest();
 
@@ -96,6 +97,7 @@ void main() {
       final searchField = find.widgetWithText(TextFormField, 'Buscar producto');
       await tester.enterText(searchField, 'Yerba premium');
       await tester.pump();
+      await tester.ensureVisible(find.text('8 u.'));
       await tester.tap(find.text('8 u.'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
@@ -108,9 +110,38 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.text('Sin seleccionar'), findsOneWidget);
-      expect(find.text('No se encontraron productos.'), findsOneWidget);
       expect(find.text('No se encontraron productos'), findsOneWidget);
+      expect(
+        find.text('Prueba con otro nombre, categoria o codigo.'),
+        findsOneWidget,
+      );
+      expect(find.byType(SnackBar), findsNothing);
       expect(saveButton(tester).onPressed, isNull);
+    },
+  );
+
+  testWidgets(
+    'cambiar entre catalogo y venta libre limpia el feedback anterior del buscador',
+    (tester) async {
+      final store = CommerceStore.seededForTest();
+
+      await pumpSaleScreen(tester, store);
+
+      final searchField = find.widgetWithText(TextFormField, 'Buscar producto');
+      await tester.enterText(searchField, 'zzzz');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('No se encontraron productos'), findsOneWidget);
+
+      await tester.ensureVisible(find.byKey(const Key('sale-mode-quick')));
+      await tester.tap(find.byKey(const Key('sale-mode-quick')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.widgetWithText(TextFormField, 'Descripcion'), findsOneWidget);
+      expect(find.text('No se encontraron productos'), findsNothing);
+      expect(find.byType(SnackBar), findsNothing);
     },
   );
 
@@ -180,6 +211,7 @@ void main() {
       );
       await tester.pump();
 
+      await tester.ensureVisible(find.text('Crear producto con estos datos'));
       await tester.tap(find.text('Crear producto con estos datos'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
