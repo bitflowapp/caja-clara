@@ -39,6 +39,36 @@ void main() {
       );
     });
 
+    test('records free sale without touching stock and rejects invalid values', () async {
+      final store = CommerceStore.seededForTest();
+      final initialCash = store.cashBalancePesos;
+      final initialMovements = store.movements.length;
+      final initialStock = store.productById('p-1')!.stockUnits;
+
+      await store.recordFreeSale(
+        description: 'Venta mostrador',
+        quantityUnits: 2,
+        unitPricePesos: 1800,
+        paymentMethod: 'Efectivo',
+      );
+
+      expect(store.cashBalancePesos, initialCash + 3600);
+      expect(store.movements.length, initialMovements + 1);
+      expect(store.productById('p-1')!.stockUnits, initialStock);
+      expect(store.movements.first.isFreeSale, isTrue);
+      expect(store.movements.first.subtitle, 'Venta mostrador');
+
+      await expectLater(
+        store.recordFreeSale(
+          description: '',
+          quantityUnits: 0,
+          unitPricePesos: 0,
+          paymentMethod: 'Efectivo',
+        ),
+        throwsA(isA<StateError>()),
+      );
+    });
+
     test('undo last sale restores stock and movement count', () async {
       final store = CommerceStore.seededForTest();
       final initialStock = store.productById('p-2')!.stockUnits;

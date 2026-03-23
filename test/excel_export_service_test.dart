@@ -45,4 +45,25 @@ void main() {
       'Importe',
     );
   });
+
+  test('exports free sale using manual description when there is no product', () async {
+    final store = CommerceStore.emptyForTest();
+    await store.recordFreeSale(
+      description: 'Venta libre mostrador',
+      quantityUnits: 2,
+      unitPricePesos: 1300,
+      paymentMethod: 'Efectivo',
+    );
+
+    final service = ExcelExportService();
+    final bytes = service.buildWorkbookBytes(
+      store,
+      exportAt: DateTime(2026, 3, 20, 10, 30),
+    );
+    final workbook = Excel.decodeBytes(bytes);
+    final salesRows = workbook.tables['Ventas']!.rows;
+
+    expect(salesRows[1][1]!.value.toString(), 'Venta libre mostrador');
+    expect(salesRows[1][4]!.value.toString(), '2600');
+  });
 }

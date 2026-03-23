@@ -149,8 +149,7 @@ class ExcelExportService {
 
     for (var i = 0; i < sales.length; i++) {
       final sale = sales[i];
-      final productName =
-          store.productById(sale.productId ?? '')?.name ?? sale.subtitle ?? '';
+      final productName = _saleLabel(store, sale);
       _writeRow(sheet, i + 1, <CellValue>[
         TextCellValue(_formatDateTime(sale.createdAt)),
         TextCellValue(productName),
@@ -234,8 +233,7 @@ class ExcelExportService {
 
   String _movementDetail(CommerceStore store, Movement movement) {
     if (movement.kind == MovementKind.sale) {
-      final productName =
-          store.productById(movement.productId ?? '')?.name ?? movement.subtitle ?? '';
+      final productName = _saleLabel(store, movement);
       final paymentMethod = movement.paymentMethod ?? 'Sin dato';
       return '$productName / $paymentMethod';
     }
@@ -246,6 +244,12 @@ class ExcelExportService {
 
     final category = movement.category ?? movement.subtitle ?? 'General';
     return '${movement.title} / $category';
+  }
+
+  String _saleLabel(CommerceStore store, Movement movement) {
+    return store.productById(movement.productId ?? '')?.name ??
+        movement.subtitle ??
+        movement.title;
   }
 
   String _formatDateTime(DateTime value) {

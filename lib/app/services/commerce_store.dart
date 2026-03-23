@@ -201,6 +201,23 @@ class CommerceStore extends ChangeNotifier {
     return null;
   }
 
+  String? freeSaleReadinessMessage({
+    required String description,
+    required int quantityUnits,
+    required int unitPricePesos,
+  }) {
+    if (description.trim().isEmpty) {
+      return 'Escribe una descripcion para la venta.';
+    }
+    if (quantityUnits <= 0) {
+      return 'Ingresa una cantidad mayor a 0.';
+    }
+    if (unitPricePesos <= 0) {
+      return 'Ingresa un precio unitario mayor a 0.';
+    }
+    return null;
+  }
+
   int _sumToday(int Function(Movement movement) selector) {
     return _movements
         .where(_isTodayMovement)
@@ -534,6 +551,46 @@ class CommerceStore extends ChangeNotifier {
     });
   }
 
+  Future<void> recordFreeSale({
+    required String description,
+    required int quantityUnits,
+    required int unitPricePesos,
+    required String paymentMethod,
+    DateTime? createdAt,
+  }) async {
+    final cleanDescription = description.trim();
+    final readinessMessage = freeSaleReadinessMessage(
+      description: cleanDescription,
+      quantityUnits: quantityUnits,
+      unitPricePesos: unitPricePesos,
+    );
+    if (readinessMessage != null) {
+      throw StateError(readinessMessage);
+    }
+
+    final revenue = unitPricePesos * quantityUnits;
+    await _runPersistedMutation(() {
+      _movements.insert(
+        0,
+        Movement(
+          id: _buildId('sale-free'),
+          kind: MovementKind.sale,
+          saleKind: SaleKind.free,
+          origin: MovementOrigin.sale,
+          amountPesos: revenue,
+          costOfSalePesos: 0,
+          createdAt: createdAt ?? DateTime.now(),
+          title: 'Venta libre',
+          subtitle: cleanDescription,
+          quantityUnits: quantityUnits,
+          paymentMethod: paymentMethod.trim().isEmpty
+              ? 'Sin dato'
+              : paymentMethod,
+        ),
+      );
+    });
+  }
+
   Future<void> recordExpense({
     required String concept,
     required int amountPesos,
@@ -659,6 +716,10 @@ class CommerceStore extends ChangeNotifier {
       if (movement.kind == MovementKind.sale) {
         final productId = movement.productId;
         final quantity = movement.quantityUnits ?? 0;
+        if (movement.resolvedSaleKind == SaleKind.free) {
+          _movements.removeAt(0);
+          return;
+        }
         if (productId == null || quantity <= 0) {
           throw StateError('La venta no se puede deshacer de forma segura.');
         }
@@ -866,9 +927,13 @@ class CommerceStore extends ChangeNotifier {
       if ((movement.quantityUnits ?? 0) <= 0) {
         throw StateError('Hay una venta con cantidad invalida.');
       }
-      final productId = movement.productId;
-      if (productId == null || !productIds.contains(productId)) {
-        throw StateError('Hay una venta asociada a un producto inexistente.');
+      if (movement.resolvedSaleKind == SaleKind.catalog) {
+        final productId = movement.productId;
+        if (productId == null || !productIds.contains(productId)) {
+          throw StateError('Hay una venta asociada a un producto inexistente.');
+        }
+      } else if ((movement.subtitle ?? '').trim().isEmpty) {
+        throw StateError('Hay una venta libre sin descripcion.');
       }
     }
     if (movement.kind == MovementKind.expense &&

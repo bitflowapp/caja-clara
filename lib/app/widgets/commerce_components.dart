@@ -271,13 +271,11 @@ class MovementsListTile extends StatelessWidget {
         : movement.isIncome
         ? formatMoney(movement.amountPesos)
         : '-${formatMoney(movement.amountPesos)}';
-    final subtitle =
-        movement.subtitle ??
-        (movement.kind == MovementKind.sale
-            ? '${movement.originLabel} / ${movement.quantityUnits ?? 0} u. / ${movement.paymentMethod ?? 'Caja'}'
-            : movement.kind == MovementKind.expense
-            ? '${movement.originLabel} / ${movement.category ?? 'Gasto'}'
-            : movement.originLabel);
+    final subtitle = movement.kind == MovementKind.sale
+        ? '${movement.subtitle ?? productName ?? movement.title} / ${movement.quantityUnits ?? 0} u. / ${movement.paymentMethod ?? 'Caja'}'
+        : movement.kind == MovementKind.expense
+        ? '${movement.originLabel} / ${movement.category ?? 'Gasto'}'
+        : movement.subtitle ?? movement.originLabel;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -323,7 +321,7 @@ class MovementsListTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '$subtitle${productName == null ? '' : ' / $productName'}',
+                  subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(

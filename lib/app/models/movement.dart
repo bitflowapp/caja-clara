@@ -1,5 +1,7 @@
 enum MovementKind { sale, expense, adjustment }
 
+enum SaleKind { catalog, free }
+
 enum MovementOrigin {
   sale,
   expense,
@@ -17,6 +19,7 @@ class Movement {
     required this.amountPesos,
     required this.createdAt,
     required this.title,
+    this.saleKind,
     this.origin,
     this.subtitle,
     this.productId,
@@ -33,6 +36,7 @@ class Movement {
   final int amountPesos;
   final DateTime createdAt;
   final String title;
+  final SaleKind? saleKind;
   final MovementOrigin? origin;
   final String? subtitle;
   final String? productId;
@@ -56,6 +60,19 @@ class Movement {
         return MovementOrigin.adjustment;
     }
   }
+
+  SaleKind get resolvedSaleKind {
+    if (kind != MovementKind.sale) {
+      return SaleKind.catalog;
+    }
+    if (saleKind != null) {
+      return saleKind!;
+    }
+    return productId == null ? SaleKind.free : SaleKind.catalog;
+  }
+
+  bool get isFreeSale =>
+      kind == MovementKind.sale && resolvedSaleKind == SaleKind.free;
 
   String get originLabel {
     switch (resolvedOrigin) {
@@ -114,6 +131,7 @@ class Movement {
         'amountPesos': amountPesos,
         'createdAt': createdAt.toIso8601String(),
         'title': title,
+        'saleKind': kind == MovementKind.sale ? resolvedSaleKind.name : null,
         'subtitle': subtitle,
         'productId': productId,
         'quantityUnits': quantityUnits,
@@ -131,6 +149,7 @@ class Movement {
       (value) => value.name == kindRaw,
       orElse: () => MovementKind.sale,
     );
+    final saleKindRaw = json['saleKind'] as String?;
     final originRaw = json['origin'] as String?;
     final createdAtRaw = json['createdAt'] as String?;
 
@@ -145,6 +164,7 @@ class Movement {
           ? DateTime.now()
           : DateTime.tryParse(createdAtRaw) ?? DateTime.now(),
       title: (json['title'] as String?) ?? '',
+      saleKind: _readSaleKind(saleKindRaw, kind, json['productId'] as String?),
       subtitle: json['subtitle'] as String?,
       productId: json['productId'] as String?,
       quantityUnits: (json['quantityUnits'] as num?)?.toInt(),
@@ -156,6 +176,24 @@ class Movement {
       estimatedProfitImpactOverridePesos:
           (json['estimatedProfitImpactOverridePesos'] as num?)?.toInt(),
     );
+  }
+
+  static SaleKind? _readSaleKind(
+    String? raw,
+    MovementKind kind,
+    String? productId,
+  ) {
+    if (kind != MovementKind.sale) {
+      return null;
+    }
+    if (raw != null) {
+      for (final value in SaleKind.values) {
+        if (value.name == raw) {
+          return value;
+        }
+      }
+    }
+    return productId == null ? SaleKind.free : SaleKind.catalog;
   }
 
   static MovementOrigin _readOrigin(String? raw, MovementKind kind) {

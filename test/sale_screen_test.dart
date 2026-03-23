@@ -113,4 +113,48 @@ void main() {
       expect(saveButton(tester).onPressed, isNull);
     },
   );
+
+  testWidgets(
+    'venta libre guarda sin producto seleccionado y no necesita catalogo',
+    (tester) async {
+      final store = CommerceStore.emptyForTest();
+      final initialCash = store.cashBalancePesos;
+      final initialMovements = store.movements.length;
+
+      await pumpSaleScreen(tester, store);
+
+      await tester.ensureVisible(find.byKey(const Key('sale-mode-quick')));
+      await tester.tap(find.byKey(const Key('sale-mode-quick')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('Todavia no hay productos cargados'), findsNothing);
+      expect(saveButton(tester).onPressed, isNull);
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Descripcion'),
+        'Preservativos mostrador',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Precio unitario'),
+        '2500',
+      );
+      await tester.pump();
+
+      expect(find.text('Venta libre'), findsWidgets);
+      expect(find.text('No aplica'), findsOneWidget);
+      expect(saveButton(tester).onPressed, isNotNull);
+
+      await tester.ensureVisible(find.text('Guardar venta'));
+      await tester.tap(find.text('Guardar venta'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(store.movements.length, initialMovements + 1);
+      expect(store.cashBalancePesos, initialCash + 2500);
+      expect(store.movements.first.isFreeSale, isTrue);
+      expect(store.movements.first.subtitle, 'Preservativos mostrador');
+      expect(find.text('Venta libre guardada. Caja al dia.'), findsOneWidget);
+    },
+  );
 }
