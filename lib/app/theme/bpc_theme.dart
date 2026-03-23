@@ -102,12 +102,19 @@ class BpcTheme {
         ),
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: BpcColors.ink,
+        backgroundColor: BpcColors.surface,
         contentTextStyle: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w700,
+          color: BpcColors.ink,
+          fontWeight: FontWeight.w800,
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        actionTextColor: BpcColors.greenDark,
+        disabledActionTextColor: BpcColors.subtleInk,
+        elevation: 0,
+        insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: BpcColors.line),
+        ),
         behavior: SnackBarBehavior.floating,
       ),
       dividerColor: BpcColors.line,
@@ -130,7 +137,10 @@ class BpcTheme {
           color: BpcColors.mutedInk,
           fontWeight: FontWeight.w700,
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: BpcColors.line),
@@ -150,38 +160,37 @@ class BpcTheme {
     );
 
     return base.copyWith(
-      textTheme: base.textTheme.apply(
-        bodyColor: BpcColors.ink,
-        displayColor: BpcColors.ink,
-      ).copyWith(
-        headlineMedium: base.textTheme.headlineMedium?.copyWith(
-          fontWeight: FontWeight.w900,
-          letterSpacing: -0.8,
-          color: BpcColors.ink,
-        ),
-        titleLarge: base.textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.w900,
-          letterSpacing: -0.45,
-          color: BpcColors.ink,
-        ),
-        titleMedium: base.textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.w800,
-          letterSpacing: -0.2,
-          color: BpcColors.ink,
-        ),
-        bodyMedium: base.textTheme.bodyMedium?.copyWith(
-          color: BpcColors.mutedInk,
-          height: 1.28,
-        ),
-        bodySmall: base.textTheme.bodySmall?.copyWith(
-          color: BpcColors.subtleInk,
-        ),
-        labelLarge: base.textTheme.labelLarge?.copyWith(
-          color: BpcColors.mutedInk,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.1,
-        ),
-      ),
+      textTheme: base.textTheme
+          .apply(bodyColor: BpcColors.ink, displayColor: BpcColors.ink)
+          .copyWith(
+            headlineMedium: base.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.8,
+              color: BpcColors.ink,
+            ),
+            titleLarge: base.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.45,
+              color: BpcColors.ink,
+            ),
+            titleMedium: base.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.2,
+              color: BpcColors.ink,
+            ),
+            bodyMedium: base.textTheme.bodyMedium?.copyWith(
+              color: BpcColors.mutedInk,
+              height: 1.28,
+            ),
+            bodySmall: base.textTheme.bodySmall?.copyWith(
+              color: BpcColors.subtleInk,
+            ),
+            labelLarge: base.textTheme.labelLarge?.copyWith(
+              color: BpcColors.mutedInk,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.1,
+            ),
+          ),
     );
   }
 }

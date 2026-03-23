@@ -37,32 +37,60 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
   }
 
-  testWidgets('warns when a product with the same normalized name already exists', (
-    tester,
-  ) async {
-    final store = CommerceStore.seededForTest();
-    final initialCount = store.products.length;
+  testWidgets(
+    'warns when a product with the same normalized name already exists',
+    (tester) async {
+      final store = CommerceStore.seededForTest();
+      final initialCount = store.products.length;
 
-    await pumpProductDialog(
-      tester,
-      store,
-      seed: const ProductEditorSeed(
-        name: '  yerba   premium  ',
-        pricePesos: 4100,
-      ),
-    );
+      await pumpProductDialog(
+        tester,
+        store,
+        seed: const ProductEditorSeed(
+          name: '  yerba   premium  ',
+          pricePesos: 4100,
+        ),
+      );
 
-    await tester.ensureVisible(find.text('Guardar'));
-    await tester.tap(find.text('Guardar'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+      await tester.ensureVisible(find.text('Guardar'));
+      await tester.tap(find.text('Guardar'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text('Ya existe un producto con ese nombre'), findsOneWidget);
+      expect(find.text('Ya existe un producto con ese nombre'), findsOneWidget);
 
-    await tester.tap(find.text('Usar existente'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(find.text('Usar existente'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
 
-    expect(store.products.length, initialCount);
-  });
+      expect(store.products.length, initialCount);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'saving a new product closes the dialog without an extra snackbar',
+    (tester) async {
+      final store = CommerceStore.emptyForTest();
+
+      await pumpProductDialog(
+        tester,
+        store,
+        seed: const ProductEditorSeed(
+          name: 'Cable lightning',
+          pricePesos: 8900,
+        ),
+      );
+
+      await tester.ensureVisible(find.text('Guardar'));
+      await tester.tap(find.text('Guardar'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(store.products, hasLength(1));
+      expect(store.products.single.name, 'Cable lightning');
+      expect(find.text('Agregar producto'), findsNothing);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
 }
