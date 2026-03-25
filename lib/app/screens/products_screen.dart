@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/product.dart';
@@ -28,10 +30,21 @@ class ProductsScreen extends StatefulWidget {
 class _ProductsScreenState extends State<ProductsScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  Timer? _searchDebounce;
+  String _searchQuery = '';
+  String _debouncedQuery = '';
   bool _onlyLowStock = false;
 
   @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_handleSearchChanged);
+  }
+
+  @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.removeListener(_handleSearchChanged);
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -48,8 +61,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
         final filteredEmpty = products.isEmpty && !emptyCatalog;
         return InputShortcutScope(
           onCancel: () {
-            if (_searchController.text.isNotEmpty) {
-              setState(() => _searchController.clear());
+            if (_searchController.text.isNotEmpty || _onlyLowStock) {
+              _clearFilters();
             }
             _searchFocusNode.unfocus();
           },
@@ -108,7 +121,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                             child: TextField(
                               controller: _searchController,
                               focusNode: _searchFocusNode,
-                              onChanged: (_) => setState(() {}),
                               textInputAction: TextInputAction.search,
                               onTapOutside: (_) => _searchFocusNode.unfocus(),
                               decoration: const InputDecoration(
@@ -130,6 +142,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       );
                     },
                   ),
+                  if (_hasActiveFilters) ...[
+                    const SizedBox(height: 10),
+                    _ActiveFilterCard(
+                      message: _activeFilterLabel,
+                      onClear: _clearFilters,
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   if (products.isEmpty)
                     EmptyCard(
@@ -157,10 +176,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                             ),
                           if (filteredEmpty)
                             FilledButton(
-                              onPressed: () => setState(() {
-                                _searchController.clear();
-                                _onlyLowStock = false;
-                              }),
+                              onPressed: _clearFilters,
                               child: const Text('Limpiar filtros'),
                             ),
                           TextButton(
@@ -183,6 +199,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                 store,
                                 product: product,
                               ),
+                              onAdjustStock: () => _addStock(store, product),
                               onDelete: () => _deleteProduct(store, product),
                             ),
                           ),
@@ -198,8 +215,49 @@ class _ProductsScreenState extends State<ProductsScreen> {
     );
   }
 
+  bool get _hasActiveFilters => _searchQuery.trim().isNotEmpty || _onlyLowStock;
+
+  String get _activeFilterLabel {
+    final parts = <String>[];
+    if (_searchQuery.trim().isNotEmpty) {
+      parts.add('busqueda: "${_searchQuery.trim()}"');
+    }
+    if (_onlyLowStock) {
+      parts.add('solo bajo stock');
+    }
+    return 'Filtro activo: ${parts.join(' + ')}';
+  }
+
+  void _handleSearchChanged() {
+    _searchDebounce?.cancel();
+    final query = _searchController.text;
+    if (_searchQuery != query) {
+      setState(() => _searchQuery = query);
+    }
+    _searchDebounce = Timer(const Duration(milliseconds: 220), () {
+      if (!mounted) {
+        return;
+      }
+      if (_debouncedQuery != query) {
+        setState(() => _debouncedQuery = query);
+      }
+    });
+  }
+
+  void _clearFilters() {
+    _searchDebounce?.cancel();
+    _searchController.removeListener(_handleSearchChanged);
+    _searchController.clear();
+    _searchController.addListener(_handleSearchChanged);
+    setState(() {
+      _searchQuery = '';
+      _debouncedQuery = '';
+      _onlyLowStock = false;
+    });
+  }
+
   List<Product> _filteredProducts(List<Product> products) {
-    final query = _searchController.text.trim().toLowerCase();
+    final query = _debouncedQuery.trim().toLowerCase();
     return products
         .where((product) {
           final matchesQuery =
@@ -211,6 +269,47 @@ class _ProductsScreenState extends State<ProductsScreen> {
           return matchesQuery && matchesLowStock;
         })
         .toList(growable: false);
+  }
+
+  Future<void> _addStock(CommerceStore store, Product product) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final amount = await showAmountEntryDialog(
+      context,
+      title: 'Ajustar stock',
+      label: 'Cantidad a sumar',
+      confirmLabel: 'Guardar',
+      helper: 'Se registra un ajuste de stock sobre ${product.name}.',
+    );
+    if (amount == null || !mounted) {
+      return;
+    }
+
+    try {
+      await store.addStockToProduct(
+        productId: product.id,
+        quantityUnits: amount,
+        note: 'Productos',
+      );
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Stock actualizado para ${product.name}.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(userFacingErrorMessage(error)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> _deleteProduct(CommerceStore store, Product product) async {
@@ -255,11 +354,13 @@ class _ProductTile extends StatelessWidget {
   const _ProductTile({
     required this.product,
     required this.onTap,
+    required this.onAdjustStock,
     required this.onDelete,
   });
 
   final Product product;
   final VoidCallback onTap;
+  final VoidCallback onAdjustStock;
   final VoidCallback onDelete;
 
   @override
@@ -371,6 +472,23 @@ class _ProductTile extends StatelessWidget {
                   );
                 },
               ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  FilledButton.tonalIcon(
+                    onPressed: onTap,
+                    icon: const Icon(Icons.edit_rounded),
+                    label: const Text('Editar'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: onAdjustStock,
+                    icon: const Icon(Icons.add_box_rounded),
+                    label: const Text('Ajustar stock'),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -380,6 +498,36 @@ class _ProductTile extends StatelessWidget {
 }
 
 enum _ProductTileAction { edit, delete }
+
+class _ActiveFilterCard extends StatelessWidget {
+  const _ActiveFilterCard({required this.message, required this.onClear});
+
+  final String message;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return BpcPanel(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.outline,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          TextButton(onPressed: onClear, child: const Text('Limpiar')),
+        ],
+      ),
+    );
+  }
+}
 
 class _InfoChip extends StatelessWidget {
   const _InfoChip({required this.label, required this.value});
