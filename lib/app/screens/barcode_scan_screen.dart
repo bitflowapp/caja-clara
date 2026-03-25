@@ -25,7 +25,9 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
   late final MobileScannerController _cameraController;
   String? _currentBarcode;
   bool _cameraRunning = false;
+  bool _cameraStarting = false;
   bool _savingStock = false;
+  String? _cameraIssue;
 
   bool get _supportsCamera {
     if (kIsWeb) {
@@ -61,7 +63,14 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
         BarcodeFormat.itf14,
       ],
     );
-    _cameraRunning = _supportsCamera;
+    if (_supportsCamera) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        _startCamera();
+      });
+    }
   }
 
   @override
@@ -87,25 +96,59 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
 
     if (_supportsCamera && _cameraRunning) {
       await _cameraController.stop();
-      _cameraRunning = false;
     }
 
     if (!mounted) {
       return;
     }
-    setState(() => _currentBarcode = normalized);
+    setState(() {
+      _currentBarcode = normalized;
+      _cameraRunning = false;
+      _cameraStarting = false;
+      _cameraIssue = null;
+    });
+  }
+
+  Future<void> _startCamera({bool clearSelection = false}) async {
+    if (!_supportsCamera) {
+      setState(() {
+        if (clearSelection) {
+          _currentBarcode = null;
+        }
+      });
+      return;
+    }
+    setState(() {
+      if (clearSelection) {
+        _currentBarcode = null;
+      }
+      _cameraStarting = true;
+      _cameraRunning = false;
+      _cameraIssue = null;
+    });
+    try {
+      await _cameraController.start();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _cameraRunning = true;
+        _cameraStarting = false;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _cameraRunning = false;
+        _cameraStarting = false;
+        _cameraIssue = userFacingErrorMessage(error);
+      });
+    }
   }
 
   Future<void> _restartCamera() async {
-    if (!_supportsCamera) {
-      setState(() => _currentBarcode = null);
-      return;
-    }
-    setState(() => _currentBarcode = null);
-    await _cameraController.start();
-    if (mounted) {
-      setState(() => _cameraRunning = true);
-    }
+    await _startCamera(clearSelection: true);
   }
 
   Future<void> _openManualInput() async {
@@ -246,26 +289,27 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                               children: [
                                 Expanded(
                                   child: _CameraStatusBlock(
-                                    title: _currentBarcode == null
-                                        ? 'Listo para leer'
-                                        : 'Codigo leido',
-                                    subtitle: _currentBarcode == null
-                                        ? 'Apunta al codigo del producto.'
-                                        : 'Elige la accion y sigue.',
-                                    active: _currentBarcode == null,
+                                    title: _cameraStatusTitle,
+                                    subtitle: _cameraStatusSubtitle,
+                                    active:
+                                        _currentBarcode == null &&
+                                        _cameraRunning &&
+                                        _cameraIssue == null,
                                   ),
                                 ),
                                 TextButton.icon(
-                                  onPressed: _currentBarcode == null
+                                  onPressed:
+                                      _currentBarcode == null &&
+                                          !_cameraStarting
                                       ? _openManualInput
                                       : _restartCamera,
                                   icon: Icon(
-                                    _currentBarcode == null
+                                    _currentBarcode == null && !_cameraStarting
                                         ? Icons.keyboard_alt_rounded
                                         : Icons.restart_alt_rounded,
                                   ),
                                   label: Text(
-                                    _currentBarcode == null
+                                    _currentBarcode == null && !_cameraStarting
                                         ? 'Ingresar codigo'
                                         : 'Leer otro',
                                   ),
@@ -278,18 +322,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                               child: AspectRatio(
                                 aspectRatio: 4 / 3,
                                 child: _currentBarcode == null
-                                    ? MobileScanner(
-                                        controller: _cameraController,
-                                        fit: BoxFit.cover,
-                                        onDetect: (capture) {
-                                          final barcode = _firstReadableBarcode(
-                                            capture,
-                                          );
-                                          if (barcode != null) {
-                                            _applyBarcode(barcode);
-                                          }
-                                        },
-                                      )
+                                    ? _buildCameraViewport(context)
                                     : Container(
                                         color: BpcColors.greenDeep,
                                         padding: const EdgeInsets.all(20),
@@ -344,11 +377,40 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                       ),
                     const SizedBox(height: 16),
                     if (_currentBarcode == null)
-                      const EmptyCard(
-                        title: 'Esperando codigo',
-                        message:
-                            'Lee o escribe un codigo para encontrar el producto al instante.',
-                        icon: Icons.qr_code_scanner_rounded,
+                      EmptyCard(
+                        title: _cameraIssue != null
+                            ? 'Camara no disponible'
+                            : 'Esperando codigo',
+                        message: _cameraIssue != null
+                            ? 'Puedes reintentar la camara o seguir con ingreso manual sin frenar la venta.'
+                            : 'Lee o escribe un codigo para encontrar el producto al instante.',
+                        icon: _cameraIssue != null
+                            ? Icons.warning_amber_rounded
+                            : Icons.qr_code_scanner_rounded,
+                        action: Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          alignment: WrapAlignment.center,
+                          children: [
+                            FilledButton.icon(
+                              onPressed: _openManualInput,
+                              icon: const Icon(Icons.keyboard_alt_rounded),
+                              label: const Text('Ingresar codigo'),
+                            ),
+                            if (_supportsCamera)
+                              TextButton.icon(
+                                onPressed: _cameraStarting
+                                    ? null
+                                    : _restartCamera,
+                                icon: const Icon(Icons.restart_alt_rounded),
+                                label: Text(
+                                  _cameraIssue != null
+                                      ? 'Reintentar camara'
+                                      : 'Reiniciar lector',
+                                ),
+                              ),
+                          ],
+                        ),
                       )
                     else if (foundProduct == null)
                       _BarcodeNotFoundCard(
@@ -376,6 +438,78 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
             ),
           ),
         );
+      },
+    );
+  }
+
+  String get _cameraStatusTitle {
+    if (_currentBarcode != null) {
+      return 'Codigo leido';
+    }
+    if (_cameraStarting) {
+      return 'Preparando camara';
+    }
+    if (_cameraIssue != null) {
+      return _cameraIssue!.toLowerCase().contains('permiso')
+          ? 'Sin permiso de camara'
+          : 'Camara con problemas';
+    }
+    if (_cameraRunning) {
+      return 'Listo para leer';
+    }
+    return 'Camara pausada';
+  }
+
+  String get _cameraStatusSubtitle {
+    if (_currentBarcode != null) {
+      return 'Elige la accion y sigue.';
+    }
+    if (_cameraStarting) {
+      return 'Estamos iniciando la camara para leer el codigo.';
+    }
+    if (_cameraIssue != null) {
+      return _cameraIssue!;
+    }
+    if (_cameraRunning) {
+      return 'Apunta al codigo del producto o usa ingreso manual.';
+    }
+    return 'Puedes seguir con ingreso manual si la camara no responde.';
+  }
+
+  Widget _buildCameraViewport(BuildContext context) {
+    if (_cameraStarting) {
+      return _CameraPlaceholderState(
+        icon: Icons.videocam_rounded,
+        title: 'Cargando camara',
+        message: 'Dando acceso al lector para empezar a escanear.',
+      );
+    }
+    if (_cameraIssue != null) {
+      return _CameraPlaceholderState(
+        icon: _cameraIssue!.toLowerCase().contains('permiso')
+            ? Icons.no_photography_rounded
+            : Icons.videocam_off_rounded,
+        title: _cameraIssue!.toLowerCase().contains('permiso')
+            ? 'Permiso denegado'
+            : 'No se pudo iniciar la camara',
+        message: _cameraIssue!,
+      );
+    }
+    if (!_cameraRunning) {
+      return const _CameraPlaceholderState(
+        icon: Icons.qr_code_scanner_rounded,
+        title: 'Listo para reintentar',
+        message: 'Toca "Leer otro" o usa ingreso manual para seguir.',
+      );
+    }
+    return MobileScanner(
+      controller: _cameraController,
+      fit: BoxFit.cover,
+      onDetect: (capture) {
+        final barcode = _firstReadableBarcode(capture);
+        if (barcode != null) {
+          _applyBarcode(barcode);
+        }
       },
     );
   }
@@ -743,6 +877,51 @@ class _LookupInfo extends StatelessWidget {
                         color: BpcColors.ink,
                         fontWeight: FontWeight.w900,
                       ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CameraPlaceholderState extends StatelessWidget {
+  const _CameraPlaceholderState({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: BpcColors.greenDeep,
+      padding: const EdgeInsets.all(20),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white.withValues(alpha: 0.88), size: 32),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.white.withValues(alpha: 0.82),
+              ),
             ),
           ],
         ),
