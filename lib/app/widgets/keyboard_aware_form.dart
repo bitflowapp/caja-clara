@@ -35,16 +35,21 @@ class KeyboardAwarePageBody extends StatelessWidget {
             duration: const Duration(milliseconds: 180),
             curve: Curves.easeOut,
             padding: EdgeInsets.only(bottom: bottomInset > 0 ? 8 : 0),
-            child: SingleChildScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: padding.add(EdgeInsets.only(bottom: bottomSpacing)),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxWidth),
-                    child: child,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+              child: SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: padding.add(EdgeInsets.only(bottom: bottomSpacing)),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: maxWidth),
+                      child: child,
+                    ),
                   ),
                 ),
               ),
