@@ -170,8 +170,23 @@ class CommerceStore extends ChangeNotifier {
     if (raw == null) {
       return null;
     }
-    final normalized = raw.replaceAll(RegExp(r'\s+'), '').trim().toUpperCase();
+    final normalized = raw
+        .trim()
+        .replaceAll(RegExp(r'[\s\-_]+'), '')
+        .toUpperCase();
     return normalized.isEmpty ? null : normalized;
+  }
+
+  static bool barcodeMatchesQuery(String? barcode, String rawQuery) {
+    final normalizedBarcode = normalizeBarcode(barcode);
+    if (normalizedBarcode == null) {
+      return false;
+    }
+    final normalizedQuery = normalizeBarcode(rawQuery);
+    if (normalizedQuery == null) {
+      return false;
+    }
+    return normalizedBarcode.contains(normalizedQuery);
   }
 
   static String? normalizeProductName(String? raw) {

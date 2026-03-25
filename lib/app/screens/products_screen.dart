@@ -307,7 +307,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
               query.isEmpty ||
               product.name.toLowerCase().contains(query) ||
               (product.category ?? '').toLowerCase().contains(query) ||
-              (product.barcode ?? '').toLowerCase().contains(query);
+              CommerceStore.barcodeMatchesQuery(product.barcode, query);
           final matchesLowStock = !_onlyLowStock || product.isLowStock;
           return matchesQuery && matchesLowStock;
         })

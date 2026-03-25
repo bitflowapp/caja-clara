@@ -20,6 +20,9 @@ class ProductEditorSeed {
     this.minStockUnits,
     this.category,
     this.barcode,
+    this.lookupSourceLabel,
+    this.suggestedBrand,
+    this.lookupMessage,
   });
 
   final String? name;
@@ -28,6 +31,14 @@ class ProductEditorSeed {
   final int? minStockUnits;
   final String? category;
   final String? barcode;
+  final String? lookupSourceLabel;
+  final String? suggestedBrand;
+  final String? lookupMessage;
+
+  bool get hasLookupAssistance =>
+      (lookupSourceLabel ?? '').trim().isNotEmpty ||
+      (suggestedBrand ?? '').trim().isNotEmpty ||
+      (lookupMessage ?? '').trim().isNotEmpty;
 }
 
 enum ProductEditorResultKind { created, usedExisting }
@@ -290,6 +301,10 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                   color: Theme.of(context).colorScheme.outline,
                 ),
               ),
+              if (_buildAssistCard(context) case final assistCard?) ...[
+                const SizedBox(height: 16),
+                assistCard,
+              ],
               const SizedBox(height: 18),
               _buildFields(context),
               const SizedBox(height: 18),
@@ -319,6 +334,10 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                   context,
                 ).textTheme.bodyMedium?.copyWith(color: scheme.outline),
               ),
+              if (_buildAssistCard(context) case final assistCard?) ...[
+                const SizedBox(height: 14),
+                assistCard,
+              ],
             ],
           ),
         ),
@@ -627,6 +646,96 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                 ),
         ),
       ],
+    );
+  }
+
+  Widget? _buildAssistCard(BuildContext context) {
+    final seed = widget.seed;
+    final barcode = CommerceStore.normalizeBarcode(
+      widget.product?.barcode ?? seed?.barcode ?? widget.initialBarcode,
+    );
+    final hasLookupAssistance = seed?.hasLookupAssistance ?? false;
+    if (!hasLookupAssistance && barcode == null) {
+      return null;
+    }
+
+    final title = hasLookupAssistance
+        ? 'Datos sugeridos por ${seed!.lookupSourceLabel ?? 'catalogo externo'}'
+        : 'Codigo listo para guardar';
+    final message = hasLookupAssistance
+        ? (seed!.lookupMessage ??
+              'Revisa el nombre, la categoria y el codigo antes de guardar. Si algo no coincide, ajustalo manualmente.')
+        : 'El codigo ya queda cargado. Completa nombre y datos basicos para resolverlo una sola vez.';
+    final chips = <Widget>[
+      if (barcode != null)
+        _buildAssistChip(context, Icons.qr_code_rounded, barcode),
+      if ((seed?.suggestedBrand ?? '').trim().isNotEmpty)
+        _buildAssistChip(
+          context,
+          Icons.sell_rounded,
+          'Marca: ${seed!.suggestedBrand!.trim()}',
+        ),
+      if ((seed?.category ?? '').trim().isNotEmpty)
+        _buildAssistChip(
+          context,
+          Icons.category_rounded,
+          'Categoria sugerida: ${seed!.category!.trim()}',
+        ),
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.outline,
+            ),
+          ),
+          if (chips.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(spacing: 8, runSpacing: 8, children: chips),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAssistChip(BuildContext context, IconData icon, String label) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: scheme.surface.withValues(alpha: 0.88),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: scheme.primary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
     );
   }
 

@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../models/product.dart';
+import '../services/barcode_lookup_service.dart';
 import '../services/commerce_store.dart';
 import '../theme/bpc_colors.dart';
 import '../utils/formatters.dart';
 import '../utils/user_facing_errors.dart';
 import '../widgets/barcode_input_dialog.dart';
 import '../widgets/commerce_components.dart';
+import '../widgets/barcode_lookup_scope.dart';
 import '../widgets/commerce_scope.dart';
 import '../widgets/operation_dialogs.dart';
 import '../widgets/product_form_dialog.dart';
@@ -28,6 +30,9 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
   bool _cameraStarting = false;
   bool _savingStock = false;
   String? _cameraIssue;
+  bool _lookupInProgress = false;
+  int _lookupRequestId = 0;
+  BarcodeLookupResult? _lookupResult;
 
   bool get _supportsCamera {
     if (kIsWeb) {
@@ -94,9 +99,14 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
       return;
     }
 
+    _lookupRequestId += 1;
+    final store = CommerceScope.of(context);
+    final lookupService = BarcodeLookupScope.of(context);
+
     if (_supportsCamera && _cameraRunning) {
       await _cameraController.stop();
     }
+    final localProduct = store.productByBarcode(normalized);
 
     if (!mounted) {
       return;
@@ -106,14 +116,40 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
       _cameraRunning = false;
       _cameraStarting = false;
       _cameraIssue = null;
+      _lookupInProgress = false;
+      _lookupResult = null;
+    });
+
+    if (localProduct != null) {
+      return;
+    }
+
+    final lookupId = _lookupRequestId;
+    setState(() => _lookupInProgress = true);
+
+    final lookupResult = await lookupService.lookup(normalized);
+    if (!mounted ||
+        lookupId != _lookupRequestId ||
+        _currentBarcode != normalized) {
+      return;
+    }
+
+    setState(() {
+      _lookupInProgress = false;
+      _lookupResult = lookupResult;
     });
   }
 
   Future<void> _startCamera({bool clearSelection = false}) async {
+    if (clearSelection) {
+      _lookupRequestId += 1;
+    }
     if (!_supportsCamera) {
       setState(() {
         if (clearSelection) {
           _currentBarcode = null;
+          _lookupInProgress = false;
+          _lookupResult = null;
         }
       });
       return;
@@ -121,6 +157,8 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
     setState(() {
       if (clearSelection) {
         _currentBarcode = null;
+        _lookupInProgress = false;
+        _lookupResult = null;
       }
       _cameraStarting = true;
       _cameraRunning = false;
@@ -160,15 +198,71 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
   }
 
   Future<void> _openCreateProduct(CommerceStore store) async {
+    await _openProductEditor(store);
+  }
+
+  Future<void> _openProductEditor(
+    CommerceStore store, {
+    Product? product,
+    ProductEditorSeed? seed,
+  }) async {
     final barcode = _currentBarcode;
-    if (barcode == null) {
+    if (product == null && barcode == null) {
       return;
     }
-    await showProductEditor(context, store, initialBarcode: barcode);
+    _lookupRequestId += 1;
+    final result = await showProductEditor(
+      context,
+      store,
+      product: product,
+      initialBarcode: barcode,
+      seed: seed,
+    );
     if (!mounted) {
       return;
     }
+    if (result != null) {
+      _currentBarcode = result.product.barcode ?? _currentBarcode;
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            result.kind == ProductEditorResultKind.usedExisting
+                ? 'Usaras "${result.product.name}", que ya estaba en el catalogo.'
+                : product != null
+                ? 'Producto actualizado.'
+                : 'Producto guardado. Ese codigo ya queda listo para futuras busquedas.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
     setState(() {});
+  }
+
+  Future<void> _openAssistedCreateProduct(CommerceStore store) async {
+    final match = _lookupResult?.match;
+    final barcode = _currentBarcode;
+    if (match == null || barcode == null) {
+      return;
+    }
+    await _openProductEditor(
+      store,
+      seed: ProductEditorSeed(
+        name: match.seededName,
+        category: match.suggestedCategory,
+        barcode: barcode,
+        lookupSourceLabel: match.sourceLabel,
+        suggestedBrand: match.brand,
+        lookupMessage:
+            'Revisa los datos sugeridos antes de guardar. Si algo no coincide, ajustalo manualmente.',
+      ),
+    );
+  }
+
+  Future<void> _openEditProduct(CommerceStore store, Product product) async {
+    await _openProductEditor(store, product: product);
   }
 
   Future<void> _openSale(Product product) async {
@@ -258,6 +352,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
         final foundProduct = _currentBarcode == null
             ? null
             : store.productByBarcode(_currentBarcode!);
+        final externalMatch = _lookupResult?.match;
         final saleWarning = foundProduct == null
             ? null
             : store.saleReadinessMessage(foundProduct.id, quantityUnits: 1);
@@ -420,14 +515,45 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                           ],
                         ),
                       )
-                    else if (foundProduct == null)
-                      _BarcodeNotFoundCard(
+                    else if (_lookupInProgress)
+                      _BarcodeLookupLoadingCard(
                         barcode: _currentBarcode!,
                         onCreateProduct: () => _openCreateProduct(store),
                         onTryAnother: _supportsCamera
                             ? _restartCamera
                             : _openManualInput,
                       )
+                    else if (foundProduct == null)
+                      externalMatch != null
+                          ? _BarcodeExternalMatchCard(
+                              barcode: _currentBarcode!,
+                              match: externalMatch,
+                              onCreateProduct: () =>
+                                  _openAssistedCreateProduct(store),
+                              onCreateManual: () => _openCreateProduct(store),
+                              onTryAnother: _supportsCamera
+                                  ? _restartCamera
+                                  : _openManualInput,
+                            )
+                          : _BarcodeNotFoundCard(
+                              barcode: _currentBarcode!,
+                              title:
+                                  _lookupResult?.status ==
+                                      BarcodeLookupStatus.disabled
+                                  ? 'Lookup externo desactivado'
+                                  : _lookupResult?.status ==
+                                        BarcodeLookupStatus.failed
+                                  ? 'No pudimos completar la busqueda externa'
+                                  : 'No esta en catalogo',
+                              message:
+                                  _lookupResult?.message ??
+                                  'El codigo se leyo bien. Puedes dar de alta el producto con este codigo cargado.',
+                              createButtonLabel: 'Crear producto',
+                              onCreateProduct: () => _openCreateProduct(store),
+                              onTryAnother: _supportsCamera
+                                  ? _restartCamera
+                                  : _openManualInput,
+                            )
                     else
                       _BarcodeProductCard(
                         barcode: _currentBarcode!,
@@ -436,6 +562,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                         savingStock: _savingStock,
                         onSale: () => _openSale(foundProduct),
                         onAddStock: () => _addStock(store, foundProduct),
+                        onEdit: () => _openEditProduct(store, foundProduct),
                         onScanAnother: _supportsCamera
                             ? _restartCamera
                             : _openManualInput,
@@ -531,6 +658,7 @@ class _BarcodeProductCard extends StatelessWidget {
     required this.savingStock,
     required this.onSale,
     required this.onAddStock,
+    required this.onEdit,
     required this.onScanAnother,
   });
 
@@ -540,6 +668,7 @@ class _BarcodeProductCard extends StatelessWidget {
   final bool savingStock;
   final VoidCallback onSale;
   final VoidCallback onAddStock;
+  final VoidCallback onEdit;
   final VoidCallback onScanAnother;
 
   @override
@@ -565,7 +694,7 @@ class _BarcodeProductCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Producto encontrado',
+                      'Ya existe en catalogo',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: BpcColors.mutedInk,
                         fontWeight: FontWeight.w800,
@@ -593,6 +722,13 @@ class _BarcodeProductCard extends StatelessWidget {
               color: BpcColors.mutedInk,
               fontWeight: FontWeight.w800,
             ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Puedes venderlo, ajustar stock o editar la ficha sin crear duplicados.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
           ),
           const SizedBox(height: 14),
           LayoutBuilder(
@@ -665,6 +801,11 @@ class _BarcodeProductCard extends StatelessWidget {
                     : const Icon(Icons.add_box_rounded),
                 label: Text(savingStock ? 'Guardando' : 'Agregar stock'),
               );
+              final editButton = TextButton.icon(
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_rounded),
+                label: const Text('Editar ficha'),
+              );
 
               if (compact) {
                 return Column(
@@ -674,10 +815,274 @@ class _BarcodeProductCard extends StatelessWidget {
                     const SizedBox(height: 10),
                     stockButton,
                     const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        editButton,
+                        TextButton.icon(
+                          onPressed: onScanAnother,
+                          icon: const Icon(Icons.restart_alt_rounded),
+                          label: const Text('Buscar otro'),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              }
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  saleButton,
+                  stockButton,
+                  editButton,
+                  TextButton.icon(
+                    onPressed: onScanAnother,
+                    icon: const Icon(Icons.restart_alt_rounded),
+                    label: const Text('Buscar otro'),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BarcodeLookupLoadingCard extends StatelessWidget {
+  const _BarcodeLookupLoadingCard({
+    required this.barcode,
+    required this.onCreateProduct,
+    required this.onTryAnother,
+  });
+
+  final String barcode;
+  final VoidCallback onCreateProduct;
+  final VoidCallback onTryAnother;
+
+  @override
+  Widget build(BuildContext context) {
+    return BpcPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const SizedBox(
+                width: 42,
+                height: 42,
+                child: CircularProgressIndicator(strokeWidth: 3),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Codigo leido',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: BpcColors.mutedInk,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Buscando datos para acelerar el alta',
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
+                            color: BpcColors.ink,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.4,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Text(
+              'Cod. $barcode',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: BpcColors.ink,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Primero revisamos tu catalogo local. Como no estaba, ahora consultamos un catalogo externo para no pedirte que cargues todo a mano.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              FilledButton.icon(
+                onPressed: onCreateProduct,
+                icon: const Icon(Icons.add_box_rounded),
+                label: const Text('Cargar manual igual'),
+              ),
+              TextButton.icon(
+                onPressed: onTryAnother,
+                icon: const Icon(Icons.restart_alt_rounded),
+                label: const Text('Buscar otro'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BarcodeExternalMatchCard extends StatelessWidget {
+  const _BarcodeExternalMatchCard({
+    required this.barcode,
+    required this.match,
+    required this.onCreateProduct,
+    required this.onCreateManual,
+    required this.onTryAnother,
+  });
+
+  final String barcode;
+  final BarcodeLookupMatch match;
+  final VoidCallback onCreateProduct;
+  final VoidCallback onCreateManual;
+  final VoidCallback onTryAnother;
+
+  @override
+  Widget build(BuildContext context) {
+    return BpcPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: BpcColors.income.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.auto_fix_high_rounded,
+                  color: BpcColors.income,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Datos encontrados afuera',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: BpcColors.mutedInk,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      match.seededName,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
+                            color: BpcColors.ink,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.4,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Fuente: ${match.sourceLabel}',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: BpcColors.mutedInk,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _LookupInfo(label: 'Codigo', value: barcode, emphasized: true),
+              if ((match.brand ?? '').trim().isNotEmpty)
+                _LookupInfo(
+                  label: 'Marca',
+                  value: match.brand!,
+                  emphasized: true,
+                ),
+              if ((match.suggestedCategory ?? '').trim().isNotEmpty)
+                _LookupInfo(
+                  label: 'Categoria sugerida',
+                  value: match.suggestedCategory!,
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Revísalos antes de guardar. Si algo no coincide, puedes corregirlo o pasar a alta manual sin perder el codigo.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
+          ),
+          const SizedBox(height: 16),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 560;
+              final assistedButton = FilledButton.icon(
+                onPressed: onCreateProduct,
+                style: compact
+                    ? FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                      )
+                    : null,
+                icon: const Icon(Icons.add_box_rounded),
+                label: const Text('Crear con datos sugeridos'),
+              );
+              final manualButton = OutlinedButton.icon(
+                onPressed: onCreateManual,
+                style: compact
+                    ? OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                      )
+                    : null,
+                icon: const Icon(Icons.edit_note_rounded),
+                label: const Text('Cargar manualmente'),
+              );
+
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    assistedButton,
+                    const SizedBox(height: 10),
+                    manualButton,
+                    const SizedBox(height: 4),
                     Align(
                       alignment: Alignment.centerLeft,
                       child: TextButton.icon(
-                        onPressed: onScanAnother,
+                        onPressed: onTryAnother,
                         icon: const Icon(Icons.restart_alt_rounded),
                         label: const Text('Buscar otro'),
                       ),
@@ -690,10 +1095,10 @@ class _BarcodeProductCard extends StatelessWidget {
                 spacing: 12,
                 runSpacing: 12,
                 children: [
-                  saleButton,
-                  stockButton,
+                  assistedButton,
+                  manualButton,
                   TextButton.icon(
-                    onPressed: onScanAnother,
+                    onPressed: onTryAnother,
                     icon: const Icon(Icons.restart_alt_rounded),
                     label: const Text('Buscar otro'),
                   ),
@@ -710,11 +1115,17 @@ class _BarcodeProductCard extends StatelessWidget {
 class _BarcodeNotFoundCard extends StatelessWidget {
   const _BarcodeNotFoundCard({
     required this.barcode,
+    required this.title,
+    required this.message,
+    this.createButtonLabel = 'Crear producto',
     required this.onCreateProduct,
     required this.onTryAnother,
   });
 
   final String barcode;
+  final String title;
+  final String message;
+  final String createButtonLabel;
   final VoidCallback onCreateProduct;
   final VoidCallback onTryAnother;
 
@@ -753,7 +1164,7 @@ class _BarcodeNotFoundCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'No esta en catalogo',
+                      title,
                       style: Theme.of(context).textTheme.headlineSmall
                           ?.copyWith(
                             color: BpcColors.ink,
@@ -783,7 +1194,7 @@ class _BarcodeNotFoundCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'El codigo se leyo bien. Puedes dar de alta el producto con este codigo cargado.',
+            message,
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
@@ -800,7 +1211,7 @@ class _BarcodeNotFoundCard extends StatelessWidget {
                       )
                     : null,
                 icon: const Icon(Icons.add_box_rounded),
-                label: const Text('Crear producto'),
+                label: Text(createButtonLabel),
               );
 
               if (compact) {

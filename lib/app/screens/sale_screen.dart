@@ -897,7 +897,7 @@ class _SaleScreenState extends State<SaleScreen> {
     return store.products
         .where((product) {
           return product.name.toLowerCase().contains(query) ||
-              (product.barcode ?? '').toLowerCase().contains(query) ||
+              CommerceStore.barcodeMatchesQuery(product.barcode, query) ||
               (product.category ?? '').toLowerCase().contains(query);
         })
         .toList(growable: false);

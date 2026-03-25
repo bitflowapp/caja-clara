@@ -54,12 +54,12 @@ void main() {
           minStockUnits: 1,
           costPesos: 2100,
           pricePesos: 3900,
-          barcode: ' abC123 ',
+          barcode: ' ab-C_123 ',
         ),
       );
 
       expect(store.productByBarcode('ABC123')?.id, 'p-alpha');
-      expect(store.productByBarcode('abc123')?.id, 'p-alpha');
+      expect(store.productByBarcode('abc-123')?.id, 'p-alpha');
       expect(store.productByBarcode('  aBc123  ')?.barcode, 'ABC123');
     });
 

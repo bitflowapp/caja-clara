@@ -1,4 +1,5 @@
 import 'package:b_plus_commerce/app/b_plus_commerce_app.dart';
+import 'package:b_plus_commerce/app/services/barcode_lookup_service.dart';
 import 'package:b_plus_commerce/app/services/commerce_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -7,7 +8,12 @@ void main() {
 
   testWidgets('Home renders branding and primary actions', (tester) async {
     final store = CommerceStore.seededForTest();
-    await tester.pumpWidget(BPlusCommerceApp(store: store));
+    await tester.pumpWidget(
+      BPlusCommerceApp(
+        store: store,
+        barcodeLookupService: const DisabledBarcodeLookupService(),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Caja Clara'), findsWidgets);
@@ -21,7 +27,12 @@ void main() {
 
   testWidgets('Home guides first use with kiosk template', (tester) async {
     final store = CommerceStore.emptyForTest();
-    await tester.pumpWidget(BPlusCommerceApp(store: store));
+    await tester.pumpWidget(
+      BPlusCommerceApp(
+        store: store,
+        barcodeLookupService: const DisabledBarcodeLookupService(),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Lista para demo o primer uso'), findsOneWidget);

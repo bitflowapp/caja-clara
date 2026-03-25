@@ -114,7 +114,7 @@ void main() {
       seed: const ProductEditorSeed(
         name: 'Yerba mostrador',
         pricePesos: 4100,
-        barcode: '7791234500011',
+        barcode: ' 7791-2345_00011 ',
       ),
     );
 
