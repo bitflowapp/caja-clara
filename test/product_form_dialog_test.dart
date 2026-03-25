@@ -102,6 +102,37 @@ void main() {
     },
   );
 
+  testWidgets('warns when a product with the same barcode already exists', (
+    tester,
+  ) async {
+    final store = CommerceStore.seededForTest();
+    final initialCount = store.products.length;
+
+    await pumpProductDialog(
+      tester,
+      store,
+      seed: const ProductEditorSeed(
+        name: 'Yerba mostrador',
+        pricePesos: 4100,
+        barcode: '7791234500011',
+      ),
+    );
+
+    await tester.ensureVisible(find.text('Guardar'));
+    await tester.tap(find.text('Guardar'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('Ese codigo ya existe'), findsOneWidget);
+
+    await tester.tap(find.text('Usar existente'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(store.products.length, initialCount);
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
   testWidgets(
     'uses fullscreen form on narrow screens and dialog on wide screens',
     (tester) async {
@@ -111,6 +142,8 @@ void main() {
       expect(find.byType(Dialog), findsNothing);
       expect(find.byType(AppBar), findsOneWidget);
       expect(find.text('Agregar producto'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'Nombre'), findsNothing);
+      expect(find.text('Toca para cargar el nombre'), findsOneWidget);
 
       await tester.tap(find.byIcon(Icons.close_rounded).first);
       await tester.pump();
@@ -124,6 +157,7 @@ void main() {
       );
 
       expect(find.byType(Dialog), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'Nombre'), findsOneWidget);
     },
   );
 }

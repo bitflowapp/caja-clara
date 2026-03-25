@@ -9,6 +9,7 @@ import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
 import '../widgets/input_shortcuts.dart';
 import '../widgets/keyboard_aware_form.dart';
+import '../widgets/mobile_field_editor.dart';
 import '../widgets/speech_dictation.dart';
 
 class ExpenseScreen extends StatefulWidget {
@@ -26,6 +27,9 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
   final _conceptFocusNode = FocusNode();
   final _amountFocusNode = FocusNode();
   final _categoryFocusNode = FocusNode();
+  final _conceptEditorController = MobileFieldEditorController();
+  final _amountEditorController = MobileFieldEditorController();
+  final _categoryEditorController = MobileFieldEditorController();
   final _conceptDictation = SpeechDictationController();
   final _categoryDictation = SpeechDictationController();
   DateTime _dateTime = DateTime.now();
@@ -57,6 +61,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
   @override
   Widget build(BuildContext context) {
     final store = CommerceScope.of(context);
+    final useMobileSensitiveFieldEditor = useMobileFieldEditor(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Registrar gasto')),
       body: KeyboardAwarePageBody(
@@ -82,37 +87,65 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    EnsureVisibleWhenFocused(
-                      focusNode: _conceptFocusNode,
-                      child: TextFormField(
+                    if (useMobileSensitiveFieldEditor)
+                      MobileFieldEditorFormField(
                         controller: _conceptController,
-                        focusNode: _conceptFocusNode,
-                        autofocus: true,
+                        editorController: _conceptEditorController,
+                        nextEditorController: _amountEditorController,
+                        nextFieldLabel: 'Monto',
+                        labelText: 'Concepto',
+                        editorContext: 'Registrar gasto',
+                        emptyDisplayText: 'Toca para cargar el concepto',
                         keyboardType: TextInputType.text,
-                        textInputAction: TextInputAction.next,
                         textCapitalization: TextCapitalization.sentences,
-                        decoration: InputDecoration(
-                          labelText: 'Concepto',
-                          suffixIcon: SpeechDictationActionButton(
-                            controller: _conceptDictation,
-                            textController: _conceptController,
-                            tooltip: 'Dictar concepto',
-                          ),
-                        ),
-                        onTapOutside: (_) => _conceptFocusNode.unfocus(),
-                        onFieldSubmitted: (_) => _moveFocusTo(
-                          _amountFocusNode,
-                          controller: _amountController,
-                        ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'Escribi un concepto';
                           }
                           return null;
                         },
+                        suffixBuilder: (controller) =>
+                            SpeechDictationActionButton(
+                              controller: _conceptDictation,
+                              textController: controller,
+                              tooltip: 'Dictar concepto',
+                            ),
+                        supportingBuilder: () =>
+                            SpeechDictationHint(controller: _conceptDictation),
+                      )
+                    else ...[
+                      EnsureVisibleWhenFocused(
+                        focusNode: _conceptFocusNode,
+                        child: TextFormField(
+                          controller: _conceptController,
+                          focusNode: _conceptFocusNode,
+                          autofocus: true,
+                          keyboardType: TextInputType.text,
+                          textInputAction: TextInputAction.next,
+                          textCapitalization: TextCapitalization.sentences,
+                          decoration: InputDecoration(
+                            labelText: 'Concepto',
+                            suffixIcon: SpeechDictationActionButton(
+                              controller: _conceptDictation,
+                              textController: _conceptController,
+                              tooltip: 'Dictar concepto',
+                            ),
+                          ),
+                          onTapOutside: (_) => _conceptFocusNode.unfocus(),
+                          onFieldSubmitted: (_) => _moveFocusTo(
+                            _amountFocusNode,
+                            controller: _amountController,
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Escribi un concepto';
+                            }
+                            return null;
+                          },
+                        ),
                       ),
-                    ),
-                    SpeechDictationHint(controller: _conceptDictation),
+                      SpeechDictationHint(controller: _conceptDictation),
+                    ],
                     const SizedBox(height: 12),
                     LayoutBuilder(
                       builder: (context, constraints) {
@@ -129,25 +162,28 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  EnsureVisibleWhenFocused(
-                                    focusNode: _amountFocusNode,
-                                    child: TextFormField(
+                                  if (useMobileSensitiveFieldEditor)
+                                    MobileFieldEditorFormField(
                                       controller: _amountController,
-                                      focusNode: _amountFocusNode,
-                                      keyboardType: TextInputType.number,
+                                      editorController: _amountEditorController,
+                                      labelText: 'Monto',
+                                      editorContext: 'Registrar gasto',
+                                      emptyDisplayText:
+                                          'Toca para cargar el monto',
+                                      prefixText: '\$ ',
+                                      keyboardType:
+                                          const TextInputType.numberWithOptions(
+                                            decimal: true,
+                                          ),
                                       inputFormatters: [
                                         FilteringTextInputFormatter.digitsOnly,
                                       ],
-                                      textInputAction: TextInputAction.next,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Monto',
-                                      ),
-                                      onTapOutside: (_) =>
-                                          _amountFocusNode.unfocus(),
-                                      onFieldSubmitted: (_) => _moveFocusTo(
-                                        _categoryFocusNode,
-                                        controller: _categoryController,
-                                      ),
+                                      displayValueBuilder: (value) {
+                                        final parsed = _parseInt(value);
+                                        return parsed <= 0
+                                            ? 'Toca para cargar el monto'
+                                            : formatMoney(parsed);
+                                      },
                                       validator: (value) {
                                         final parsed = _parseInt(value);
                                         if (parsed <= 0) {
@@ -155,8 +191,37 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                                         }
                                         return null;
                                       },
+                                    )
+                                  else
+                                    EnsureVisibleWhenFocused(
+                                      focusNode: _amountFocusNode,
+                                      child: TextFormField(
+                                        controller: _amountController,
+                                        focusNode: _amountFocusNode,
+                                        keyboardType: TextInputType.number,
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter
+                                              .digitsOnly,
+                                        ],
+                                        textInputAction: TextInputAction.next,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Monto',
+                                        ),
+                                        onTapOutside: (_) =>
+                                            _amountFocusNode.unfocus(),
+                                        onFieldSubmitted: (_) => _moveFocusTo(
+                                          _categoryFocusNode,
+                                          controller: _categoryController,
+                                        ),
+                                        validator: (value) {
+                                          final parsed = _parseInt(value);
+                                          if (parsed <= 0) {
+                                            return 'Ingresa un monto valido';
+                                          }
+                                          return null;
+                                        },
+                                      ),
                                     ),
-                                  ),
                                 ],
                               ),
                             ),
@@ -165,34 +230,61 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  EnsureVisibleWhenFocused(
-                                    focusNode: _categoryFocusNode,
-                                    child: TextFormField(
+                                  if (useMobileSensitiveFieldEditor)
+                                    MobileFieldEditorFormField(
                                       controller: _categoryController,
-                                      focusNode: _categoryFocusNode,
+                                      editorController:
+                                          _categoryEditorController,
+                                      labelText: 'Categoria (opcional)',
+                                      editorContext: 'Registrar gasto',
+                                      emptyDisplayText:
+                                          'Toca para cargar la categoria',
                                       keyboardType: TextInputType.text,
-                                      textInputAction: TextInputAction.done,
                                       textCapitalization:
                                           TextCapitalization.words,
-                                      decoration: InputDecoration(
-                                        labelText: 'Categoria (opcional)',
-                                        suffixIcon: SpeechDictationActionButton(
-                                          controller: _categoryDictation,
-                                          textController: _categoryController,
-                                          tooltip: 'Dictar categoria',
+                                      suffixBuilder: (controller) =>
+                                          SpeechDictationActionButton(
+                                            controller: _categoryDictation,
+                                            textController: controller,
+                                            tooltip: 'Dictar categoria',
+                                          ),
+                                      supportingBuilder: () =>
+                                          SpeechDictationHint(
+                                            controller: _categoryDictation,
+                                          ),
+                                    )
+                                  else ...[
+                                    EnsureVisibleWhenFocused(
+                                      focusNode: _categoryFocusNode,
+                                      child: TextFormField(
+                                        controller: _categoryController,
+                                        focusNode: _categoryFocusNode,
+                                        keyboardType: TextInputType.text,
+                                        textInputAction: TextInputAction.done,
+                                        textCapitalization:
+                                            TextCapitalization.words,
+                                        decoration: InputDecoration(
+                                          labelText: 'Categoria (opcional)',
+                                          suffixIcon:
+                                              SpeechDictationActionButton(
+                                                controller: _categoryDictation,
+                                                textController:
+                                                    _categoryController,
+                                                tooltip: 'Dictar categoria',
+                                              ),
                                         ),
+                                        onTapOutside: (_) =>
+                                            _categoryFocusNode.unfocus(),
+                                        onFieldSubmitted: (_) {
+                                          _dismissKeyboard();
+                                          _save(store);
+                                        },
                                       ),
-                                      onTapOutside: (_) =>
-                                          _categoryFocusNode.unfocus(),
-                                      onFieldSubmitted: (_) {
-                                        _dismissKeyboard();
-                                        _save(store);
-                                      },
                                     ),
-                                  ),
-                                  SpeechDictationHint(
-                                    controller: _categoryDictation,
-                                  ),
+                                    SpeechDictationHint(
+                                      controller: _categoryDictation,
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -334,8 +426,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
         return;
       }
       messenger.hideCurrentSnackBar();
-      navigator.pop();
-      messenger.showSnackBar(const SnackBar(content: Text('Gasto guardado.')));
+      navigator.pop('Gasto guardado.');
     } catch (error) {
       if (!mounted) {
         return;

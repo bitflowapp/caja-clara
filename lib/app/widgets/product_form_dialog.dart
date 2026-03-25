@@ -9,6 +9,7 @@ import '../utils/text_field_selection.dart';
 import 'commerce_components.dart';
 import 'input_shortcuts.dart';
 import 'keyboard_aware_form.dart';
+import 'mobile_field_editor.dart';
 import 'speech_dictation.dart';
 
 class ProductEditorSeed {
@@ -150,6 +151,13 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   final _minStockFocusNode = FocusNode();
   final _costFocusNode = FocusNode();
   final _priceFocusNode = FocusNode();
+  final _nameEditorController = MobileFieldEditorController();
+  final _categoryEditorController = MobileFieldEditorController();
+  final _barcodeEditorController = MobileFieldEditorController();
+  final _stockEditorController = MobileFieldEditorController();
+  final _minStockEditorController = MobileFieldEditorController();
+  final _costEditorController = MobileFieldEditorController();
+  final _priceEditorController = MobileFieldEditorController();
   final _nameDictation = SpeechDictationController();
   final _categoryDictation = SpeechDictationController();
   bool _saving = false;
@@ -323,6 +331,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   }
 
   Widget _buildFields(BuildContext context) {
+    final useMobileSensitiveFieldEditor = useMobileFieldEditor(context);
     return Wrap(
       spacing: 12,
       runSpacing: 12,
@@ -332,33 +341,52 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              EnsureVisibleWhenFocused(
-                focusNode: _nameFocusNode,
-                child: TextFormField(
+              if (useMobileSensitiveFieldEditor)
+                MobileFieldEditorFormField(
                   controller: _nameController,
-                  focusNode: _nameFocusNode,
-                  autofocus: true,
+                  editorController: _nameEditorController,
+                  labelText: 'Nombre',
+                  editorContext: _title,
+                  emptyDisplayText: 'Toca para cargar el nombre',
                   keyboardType: TextInputType.text,
-                  textInputAction: TextInputAction.next,
                   textCapitalization: TextCapitalization.words,
-                  decoration: InputDecoration(
-                    labelText: 'Nombre',
-                    suffixIcon: SpeechDictationActionButton(
-                      controller: _nameDictation,
-                      textController: _nameController,
-                      tooltip: 'Dictar nombre',
-                    ),
-                  ),
-                  onTapOutside: (_) => _nameFocusNode.unfocus(),
-                  onFieldSubmitted: (_) => _moveFocusTo(
-                    _categoryFocusNode,
-                    controller: _categoryController,
-                  ),
                   validator: _required,
-                  onChanged: (_) => setState(() {}),
+                  suffixBuilder: (controller) => SpeechDictationActionButton(
+                    controller: _nameDictation,
+                    textController: controller,
+                    tooltip: 'Dictar nombre',
+                  ),
+                  supportingBuilder: () =>
+                      SpeechDictationHint(controller: _nameDictation),
+                )
+              else ...[
+                EnsureVisibleWhenFocused(
+                  focusNode: _nameFocusNode,
+                  child: TextFormField(
+                    controller: _nameController,
+                    focusNode: _nameFocusNode,
+                    autofocus: true,
+                    keyboardType: TextInputType.text,
+                    textInputAction: TextInputAction.next,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: InputDecoration(
+                      labelText: 'Nombre',
+                      suffixIcon: SpeechDictationActionButton(
+                        controller: _nameDictation,
+                        textController: _nameController,
+                        tooltip: 'Dictar nombre',
+                      ),
+                    ),
+                    onTapOutside: (_) => _nameFocusNode.unfocus(),
+                    onFieldSubmitted: (_) => _moveFocusTo(
+                      _categoryFocusNode,
+                      controller: _categoryController,
+                    ),
+                    validator: _required,
+                  ),
                 ),
-              ),
-              SpeechDictationHint(controller: _nameDictation),
+                SpeechDictationHint(controller: _nameDictation),
+              ],
             ],
           ),
         ),
@@ -367,143 +395,250 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              EnsureVisibleWhenFocused(
-                focusNode: _categoryFocusNode,
-                child: TextFormField(
+              if (useMobileSensitiveFieldEditor)
+                MobileFieldEditorFormField(
                   controller: _categoryController,
-                  focusNode: _categoryFocusNode,
+                  editorController: _categoryEditorController,
+                  labelText: 'Categoria (opcional)',
+                  editorContext: _title,
+                  emptyDisplayText: 'Toca para cargar la categoria',
                   keyboardType: TextInputType.text,
-                  textInputAction: TextInputAction.next,
                   textCapitalization: TextCapitalization.words,
-                  decoration: InputDecoration(
-                    labelText: 'Categoria (opcional)',
-                    suffixIcon: SpeechDictationActionButton(
-                      controller: _categoryDictation,
-                      textController: _categoryController,
-                      tooltip: 'Dictar categoria',
+                  suffixBuilder: (controller) => SpeechDictationActionButton(
+                    controller: _categoryDictation,
+                    textController: controller,
+                    tooltip: 'Dictar categoria',
+                  ),
+                  supportingBuilder: () =>
+                      SpeechDictationHint(controller: _categoryDictation),
+                )
+              else ...[
+                EnsureVisibleWhenFocused(
+                  focusNode: _categoryFocusNode,
+                  child: TextFormField(
+                    controller: _categoryController,
+                    focusNode: _categoryFocusNode,
+                    keyboardType: TextInputType.text,
+                    textInputAction: TextInputAction.next,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: InputDecoration(
+                      labelText: 'Categoria (opcional)',
+                      suffixIcon: SpeechDictationActionButton(
+                        controller: _categoryDictation,
+                        textController: _categoryController,
+                        tooltip: 'Dictar categoria',
+                      ),
+                    ),
+                    onTapOutside: (_) => _categoryFocusNode.unfocus(),
+                    onFieldSubmitted: (_) => _moveFocusTo(
+                      _barcodeFocusNode,
+                      controller: _barcodeController,
                     ),
                   ),
-                  onTapOutside: (_) => _categoryFocusNode.unfocus(),
-                  onFieldSubmitted: (_) => _moveFocusTo(
-                    _barcodeFocusNode,
-                    controller: _barcodeController,
-                  ),
-                  onChanged: (_) => setState(() {}),
                 ),
-              ),
-              SpeechDictationHint(controller: _categoryDictation),
+                SpeechDictationHint(controller: _categoryDictation),
+              ],
             ],
           ),
         ),
         SizedBox(
           width: 220,
-          child: EnsureVisibleWhenFocused(
-            focusNode: _barcodeFocusNode,
-            child: TextFormField(
-              controller: _barcodeController,
-              focusNode: _barcodeFocusNode,
-              keyboardType: TextInputType.number,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'Codigo de barras (opcional)',
-              ),
-              onTapOutside: (_) => _barcodeFocusNode.unfocus(),
-              onFieldSubmitted: (_) =>
-                  _moveFocusTo(_stockFocusNode, controller: _stockController),
-            ),
-          ),
+          child: useMobileSensitiveFieldEditor
+              ? MobileFieldEditorFormField(
+                  controller: _barcodeController,
+                  editorController: _barcodeEditorController,
+                  labelText: 'Codigo de barras (opcional)',
+                  editorContext: _title,
+                  emptyDisplayText: 'Toca para cargar el codigo',
+                  keyboardType: TextInputType.number,
+                )
+              : EnsureVisibleWhenFocused(
+                  focusNode: _barcodeFocusNode,
+                  child: TextFormField(
+                    controller: _barcodeController,
+                    focusNode: _barcodeFocusNode,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Codigo de barras (opcional)',
+                    ),
+                    onTapOutside: (_) => _barcodeFocusNode.unfocus(),
+                    onFieldSubmitted: (_) => _moveFocusTo(
+                      _stockFocusNode,
+                      controller: _stockController,
+                    ),
+                  ),
+                ),
         ),
         SizedBox(
           width: 150,
-          child: EnsureVisibleWhenFocused(
-            focusNode: _stockFocusNode,
-            child: TextFormField(
-              controller: _stockController,
-              focusNode: _stockFocusNode,
-              decoration: const InputDecoration(labelText: 'Stock'),
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              textInputAction: TextInputAction.next,
-              onTapOutside: (_) => _stockFocusNode.unfocus(),
-              onFieldSubmitted: (_) => _moveFocusTo(
-                _minStockFocusNode,
-                controller: _minStockController,
-              ),
-              validator: (value) => _intMin(value, 0, 'El stock'),
-            ),
-          ),
+          child: useMobileSensitiveFieldEditor
+              ? MobileFieldEditorFormField(
+                  controller: _stockController,
+                  editorController: _stockEditorController,
+                  nextEditorController: _minStockEditorController,
+                  nextFieldLabel: 'Stock minimo',
+                  labelText: 'Stock',
+                  editorContext: _title,
+                  emptyDisplayText: 'Toca para cargar el stock',
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (value) => _intMin(value, 0, 'El stock'),
+                )
+              : EnsureVisibleWhenFocused(
+                  focusNode: _stockFocusNode,
+                  child: TextFormField(
+                    controller: _stockController,
+                    focusNode: _stockFocusNode,
+                    decoration: const InputDecoration(labelText: 'Stock'),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    textInputAction: TextInputAction.next,
+                    onTapOutside: (_) => _stockFocusNode.unfocus(),
+                    onFieldSubmitted: (_) => _moveFocusTo(
+                      _minStockFocusNode,
+                      controller: _minStockController,
+                    ),
+                    validator: (value) => _intMin(value, 0, 'El stock'),
+                  ),
+                ),
         ),
         SizedBox(
           width: 150,
-          child: EnsureVisibleWhenFocused(
-            focusNode: _minStockFocusNode,
-            child: TextFormField(
-              controller: _minStockController,
-              focusNode: _minStockFocusNode,
-              decoration: const InputDecoration(labelText: 'Stock minimo'),
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              textInputAction: TextInputAction.next,
-              onTapOutside: (_) => _minStockFocusNode.unfocus(),
-              onFieldSubmitted: (_) =>
-                  _moveFocusTo(_costFocusNode, controller: _costController),
-              validator: (value) => _intMin(value, 0, 'El stock minimo'),
-            ),
-          ),
+          child: useMobileSensitiveFieldEditor
+              ? MobileFieldEditorFormField(
+                  controller: _minStockController,
+                  editorController: _minStockEditorController,
+                  nextEditorController: _costEditorController,
+                  nextFieldLabel: 'Costo',
+                  labelText: 'Stock minimo',
+                  editorContext: _title,
+                  emptyDisplayText: 'Toca para cargar el minimo',
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (value) => _intMin(value, 0, 'El stock minimo'),
+                )
+              : EnsureVisibleWhenFocused(
+                  focusNode: _minStockFocusNode,
+                  child: TextFormField(
+                    controller: _minStockController,
+                    focusNode: _minStockFocusNode,
+                    decoration: const InputDecoration(
+                      labelText: 'Stock minimo',
+                    ),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    textInputAction: TextInputAction.next,
+                    onTapOutside: (_) => _minStockFocusNode.unfocus(),
+                    onFieldSubmitted: (_) => _moveFocusTo(
+                      _costFocusNode,
+                      controller: _costController,
+                    ),
+                    validator: (value) => _intMin(value, 0, 'El stock minimo'),
+                  ),
+                ),
         ),
         SizedBox(
           width: 180,
-          child: EnsureVisibleWhenFocused(
-            focusNode: _costFocusNode,
-            child: TextFormField(
-              controller: _costController,
-              focusNode: _costFocusNode,
-              decoration: const InputDecoration(labelText: 'Costo'),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              textInputAction: TextInputAction.next,
-              onTapOutside: (_) => _costFocusNode.unfocus(),
-              onFieldSubmitted: (_) =>
-                  _moveFocusTo(_priceFocusNode, controller: _priceController),
-              validator: (value) => _intMin(value, 0, 'El costo'),
-            ),
-          ),
+          child: useMobileSensitiveFieldEditor
+              ? MobileFieldEditorFormField(
+                  controller: _costController,
+                  editorController: _costEditorController,
+                  nextEditorController: _priceEditorController,
+                  nextFieldLabel: 'Precio',
+                  labelText: 'Costo',
+                  editorContext: _title,
+                  emptyDisplayText: 'Toca para cargar el costo',
+                  prefixText: '\$ ',
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  displayValueBuilder: (value) {
+                    final parsed = _parseInt(value);
+                    return parsed <= 0
+                        ? 'Toca para cargar el costo'
+                        : formatMoney(parsed);
+                  },
+                  validator: (value) => _intMin(value, 0, 'El costo'),
+                )
+              : EnsureVisibleWhenFocused(
+                  focusNode: _costFocusNode,
+                  child: TextFormField(
+                    controller: _costController,
+                    focusNode: _costFocusNode,
+                    decoration: const InputDecoration(labelText: 'Costo'),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    textInputAction: TextInputAction.next,
+                    onTapOutside: (_) => _costFocusNode.unfocus(),
+                    onFieldSubmitted: (_) => _moveFocusTo(
+                      _priceFocusNode,
+                      controller: _priceController,
+                    ),
+                    validator: (value) => _intMin(value, 0, 'El costo'),
+                  ),
+                ),
         ),
         SizedBox(
           width: 180,
-          child: EnsureVisibleWhenFocused(
-            focusNode: _priceFocusNode,
-            child: TextFormField(
-              controller: _priceController,
-              focusNode: _priceFocusNode,
-              decoration: const InputDecoration(labelText: 'Precio'),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              textInputAction: TextInputAction.done,
-              onTapOutside: (_) => _priceFocusNode.unfocus(),
-              onFieldSubmitted: (_) {
-                _dismissKeyboard();
-                _save();
-              },
-              validator: (value) => _intMin(value, 0, 'El precio'),
-              onChanged: (_) => setState(() {}),
-            ),
-          ),
+          child: useMobileSensitiveFieldEditor
+              ? MobileFieldEditorFormField(
+                  controller: _priceController,
+                  editorController: _priceEditorController,
+                  labelText: 'Precio',
+                  editorContext: _title,
+                  emptyDisplayText: 'Toca para cargar el precio',
+                  prefixText: '\$ ',
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  displayValueBuilder: (value) {
+                    final parsed = _parseInt(value);
+                    return parsed <= 0
+                        ? 'Toca para cargar el precio'
+                        : formatMoney(parsed);
+                  },
+                  validator: (value) => _intMin(value, 0, 'El precio'),
+                )
+              : EnsureVisibleWhenFocused(
+                  focusNode: _priceFocusNode,
+                  child: TextFormField(
+                    controller: _priceController,
+                    focusNode: _priceFocusNode,
+                    decoration: const InputDecoration(labelText: 'Precio'),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    textInputAction: TextInputAction.done,
+                    onTapOutside: (_) => _priceFocusNode.unfocus(),
+                    onFieldSubmitted: (_) {
+                      _dismissKeyboard();
+                      _save();
+                    },
+                    validator: (value) => _intMin(value, 0, 'El precio'),
+                  ),
+                ),
         ),
       ],
     );
   }
 
   Widget _buildPreview(BuildContext context) {
-    return Text(
-      'Vista previa: ${_nameController.text.isEmpty ? 'sin nombre' : _nameController.text} / ${formatMoney(_parseInt(_priceController.text))}',
-      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-        color: Theme.of(context).colorScheme.outline,
-      ),
+    return AnimatedBuilder(
+      animation: Listenable.merge([_nameController, _priceController]),
+      builder: (context, _) {
+        return Text(
+          'Vista previa: ${_nameController.text.isEmpty ? 'sin nombre' : _nameController.text} / ${formatMoney(_parseInt(_priceController.text))}',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: Theme.of(context).colorScheme.outline,
+          ),
+        );
+      },
     );
   }
 
@@ -612,6 +747,23 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       }
     }
 
+    final existingByBarcode = _findConflictingBarcodeProduct(product.barcode);
+    if (existingByBarcode != null) {
+      final resolution = await _showDuplicateBarcodeDialog(existingByBarcode);
+      if (!mounted) {
+        return;
+      }
+      if (resolution == _DuplicateProductResolution.useExisting) {
+        Navigator.of(context).pop(
+          ProductEditorResult(
+            kind: ProductEditorResultKind.usedExisting,
+            product: existingByBarcode,
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() => _saving = true);
     try {
       await widget.store.addProduct(product);
@@ -653,6 +805,21 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     });
   }
 
+  Product? _findConflictingBarcodeProduct(String? barcode) {
+    final normalizedBarcode = CommerceStore.normalizeBarcode(barcode);
+    if (normalizedBarcode == null) {
+      return null;
+    }
+    final existing = widget.store.productByBarcode(normalizedBarcode);
+    if (existing == null) {
+      return null;
+    }
+    if (widget.product != null && existing.id == widget.product!.id) {
+      return null;
+    }
+    return existing;
+  }
+
   Future<_DuplicateProductResolution?> _showDuplicateNameDialog(
     Product existing,
   ) {
@@ -681,6 +848,35 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                 context,
               ).pop(_DuplicateProductResolution.createDuplicate),
               child: const Text('Crear igual'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<_DuplicateProductResolution?> _showDuplicateBarcodeDialog(
+    Product existing,
+  ) {
+    return showDialog<_DuplicateProductResolution>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Ese codigo ya existe'),
+          content: Text(
+            'El codigo de barras ya pertenece a "${existing.name}". Conviene usar ese producto para no duplicar catalogo ni stock.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.of(context).pop(_DuplicateProductResolution.cancel),
+              child: const Text('Volver'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(
+                context,
+              ).pop(_DuplicateProductResolution.useExisting),
+              child: const Text('Usar existente'),
             ),
           ],
         );

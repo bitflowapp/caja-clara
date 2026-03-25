@@ -10,6 +10,7 @@ import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
 import '../widgets/input_shortcuts.dart';
 import '../widgets/keyboard_aware_form.dart';
+import '../widgets/mobile_field_editor.dart';
 import '../widgets/product_form_dialog.dart';
 import '../widgets/speech_dictation.dart';
 
@@ -35,11 +36,15 @@ class _SaleScreenState extends State<SaleScreen> {
   final _quantityFocusNode = FocusNode();
   final _manualUnitPriceFocusNode = FocusNode();
   final _paymentFocusNode = FocusNode();
+  final _manualDescriptionEditorController = MobileFieldEditorController();
+  final _quantityEditorController = MobileFieldEditorController();
+  final _manualUnitPriceEditorController = MobileFieldEditorController();
   final _productSearchDictation = SpeechDictationController();
   Product? _selectedProduct;
   SaleEntryMode _saleMode = SaleEntryMode.catalog;
   String _paymentMethod = 'Efectivo';
   AutovalidateMode _autoValidateMode = AutovalidateMode.disabled;
+  bool _didSeedDefaults = false;
   bool _saving = false;
 
   @override
@@ -48,12 +53,24 @@ class _SaleScreenState extends State<SaleScreen> {
     _selectedProduct = widget.initialProduct;
     _productSearchController.text = widget.initialProduct?.name ?? '';
     _productSearchController.addListener(_handleProductSearchChanged);
-    _manualDescriptionController.addListener(_handleManualFieldsChanged);
-    _manualUnitPriceController.addListener(_handleManualFieldsChanged);
+    _manualDescriptionController.addListener(_handleSaleDraftChanged);
+    _manualUnitPriceController.addListener(_handleSaleDraftChanged);
+    _quantityController.addListener(_handleSaleDraftChanged);
     _productFocusNode.addListener(_handleProductFocusChanged);
     selectAllTextOnFocus(_quantityFocusNode, _quantityController);
     selectAllTextOnFocus(_manualUnitPriceFocusNode, _manualUnitPriceController);
     _productSearchDictation.initialize();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_didSeedDefaults) {
+      return;
+    }
+    final store = CommerceScope.of(context);
+    _paymentMethod = store.lastSalePaymentMethod ?? 'Efectivo';
+    _didSeedDefaults = true;
   }
 
   @override
@@ -62,11 +79,13 @@ class _SaleScreenState extends State<SaleScreen> {
       ..removeListener(_handleProductSearchChanged)
       ..dispose();
     _manualDescriptionController
-      ..removeListener(_handleManualFieldsChanged)
+      ..removeListener(_handleSaleDraftChanged)
       ..dispose();
-    _quantityController.dispose();
+    _quantityController
+      ..removeListener(_handleSaleDraftChanged)
+      ..dispose();
     _manualUnitPriceController
-      ..removeListener(_handleManualFieldsChanged)
+      ..removeListener(_handleSaleDraftChanged)
       ..dispose();
     _productFocusNode.removeListener(_handleProductFocusChanged);
     _productFocusNode.dispose();
@@ -81,6 +100,7 @@ class _SaleScreenState extends State<SaleScreen> {
   @override
   Widget build(BuildContext context) {
     final store = CommerceScope.of(context);
+    final useMobileSensitiveFieldEditor = useMobileFieldEditor(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Nueva venta')),
       body: AnimatedBuilder(
@@ -107,6 +127,9 @@ class _SaleScreenState extends State<SaleScreen> {
           final quantity = _parseInt(_quantityController.text);
           final manualDescription = _manualDescriptionController.text.trim();
           final manualUnitPrice = _parseInt(_manualUnitPriceController.text);
+          final exactQuickMatch = _saleMode == SaleEntryMode.quick
+              ? _exactQuickMatchProduct(store)
+              : null;
           final filteredProducts = _filteredProducts(store);
           final productFieldError = _saleMode == SaleEntryMode.catalog
               ? _productFieldErrorText(filteredProducts)
@@ -270,27 +293,22 @@ class _SaleScreenState extends State<SaleScreen> {
                             ),
                           ],
                         ] else ...[
-                          EnsureVisibleWhenFocused(
-                            focusNode: _manualDescriptionFocusNode,
-                            child: TextFormField(
+                          if (useMobileSensitiveFieldEditor)
+                            MobileFieldEditorFormField(
                               controller: _manualDescriptionController,
-                              focusNode: _manualDescriptionFocusNode,
-                              autofocus: widget.initialProduct == null,
+                              editorController:
+                                  _manualDescriptionEditorController,
+                              nextEditorController: _quantityEditorController,
+                              nextFieldLabel: 'Cantidad',
+                              labelText: 'Descripcion',
+                              editorContext: 'Venta libre',
+                              hintText: 'Ej. Preservativos Durex x3',
+                              helperText:
+                                  'Usalo para ventas no cargadas en el catalogo.',
+                              emptyDisplayText:
+                                  'Toca para cargar la descripcion',
                               keyboardType: TextInputType.text,
-                              textInputAction: TextInputAction.next,
                               textCapitalization: TextCapitalization.sentences,
-                              onTapOutside: (_) =>
-                                  _manualDescriptionFocusNode.unfocus(),
-                              onFieldSubmitted: (_) => _moveFocusTo(
-                                _quantityFocusNode,
-                                controller: _quantityController,
-                              ),
-                              decoration: const InputDecoration(
-                                labelText: 'Descripcion',
-                                hintText: 'Ej. Preservativos Durex x3',
-                                helperText:
-                                    'Usalo para ventas no cargadas en el catalogo.',
-                              ),
                               validator: (value) {
                                 if (_saleMode != SaleEntryMode.quick) {
                                   return null;
@@ -299,8 +317,40 @@ class _SaleScreenState extends State<SaleScreen> {
                                     ? 'Escribe una descripcion.'
                                     : null;
                               },
+                            )
+                          else
+                            EnsureVisibleWhenFocused(
+                              focusNode: _manualDescriptionFocusNode,
+                              child: TextFormField(
+                                controller: _manualDescriptionController,
+                                focusNode: _manualDescriptionFocusNode,
+                                autofocus: widget.initialProduct == null,
+                                keyboardType: TextInputType.text,
+                                textInputAction: TextInputAction.next,
+                                textCapitalization:
+                                    TextCapitalization.sentences,
+                                onTapOutside: (_) =>
+                                    _manualDescriptionFocusNode.unfocus(),
+                                onFieldSubmitted: (_) => _moveFocusTo(
+                                  _quantityFocusNode,
+                                  controller: _quantityController,
+                                ),
+                                decoration: const InputDecoration(
+                                  labelText: 'Descripcion',
+                                  hintText: 'Ej. Preservativos Durex x3',
+                                  helperText:
+                                      'Usalo para ventas no cargadas en el catalogo.',
+                                ),
+                                validator: (value) {
+                                  if (_saleMode != SaleEntryMode.quick) {
+                                    return null;
+                                  }
+                                  return (value ?? '').trim().isEmpty
+                                      ? 'Escribe una descripcion.'
+                                      : null;
+                                },
+                              ),
                             ),
-                          ),
                           const SizedBox(height: 12),
                           BpcPanel(
                             color: Theme.of(
@@ -331,12 +381,34 @@ class _SaleScreenState extends State<SaleScreen> {
                             ),
                           ),
                           const SizedBox(height: 12),
+                          if (exactQuickMatch != null) ...[
+                            _ExactProductSuggestionCard(
+                              product: exactQuickMatch,
+                              onUseProduct: () =>
+                                  _useExistingProductFromQuickSale(
+                                    exactQuickMatch,
+                                  ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
                           OutlinedButton.icon(
                             onPressed: manualDescription.isEmpty || _saving
                                 ? null
-                                : () => _createProductFromFreeSale(store),
+                                : () {
+                                    if (exactQuickMatch != null) {
+                                      _useExistingProductFromQuickSale(
+                                        exactQuickMatch,
+                                      );
+                                      return;
+                                    }
+                                    _createProductFromFreeSale(store);
+                                  },
                             icon: const Icon(Icons.add_box_rounded),
-                            label: const Text('Crear producto con estos datos'),
+                            label: Text(
+                              exactQuickMatch == null
+                                  ? 'Crear producto con estos datos'
+                                  : 'Usar producto existente',
+                            ),
                           ),
                         ],
                         const SizedBox(height: 14),
@@ -361,94 +433,184 @@ class _SaleScreenState extends State<SaleScreen> {
                               children: [
                                 SizedBox(
                                   width: fieldWidth,
-                                  child: EnsureVisibleWhenFocused(
-                                    focusNode: _quantityFocusNode,
-                                    child: TextFormField(
-                                      controller: _quantityController,
-                                      focusNode: _quantityFocusNode,
-                                      autofocus:
-                                          widget.initialProduct != null &&
-                                          _saleMode == SaleEntryMode.catalog,
-                                      keyboardType: TextInputType.number,
-                                      inputFormatters: [
-                                        FilteringTextInputFormatter.digitsOnly,
-                                      ],
-                                      textInputAction: TextInputAction.next,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Cantidad',
-                                      ),
-                                      onTapOutside: (_) =>
-                                          _quantityFocusNode.unfocus(),
-                                      onChanged: (_) => setState(() {}),
-                                      onFieldSubmitted: (_) {
-                                        if (_saleMode == SaleEntryMode.quick) {
-                                          _moveFocusTo(
-                                            _manualUnitPriceFocusNode,
-                                            controller:
-                                                _manualUnitPriceController,
-                                          );
-                                          return;
-                                        }
-                                        _dismissKeyboard();
-                                      },
-                                      validator: (value) {
-                                        final parsed = _parseInt(value);
-                                        if (_saleMode == SaleEntryMode.quick) {
-                                          return parsed <= 0
-                                              ? 'Ingresa una cantidad'
-                                              : null;
-                                        }
-                                        if (product == null) {
-                                          return parsed <= 0
-                                              ? 'Ingresa una cantidad'
-                                              : null;
-                                        }
-                                        return store.saleReadinessMessage(
-                                          product.id,
-                                          quantityUnits: parsed,
-                                        );
-                                      },
-                                    ),
-                                  ),
+                                  child: useMobileSensitiveFieldEditor
+                                      ? MobileFieldEditorFormField(
+                                          controller: _quantityController,
+                                          editorController:
+                                              _quantityEditorController,
+                                          nextEditorController:
+                                              _saleMode == SaleEntryMode.quick
+                                              ? _manualUnitPriceEditorController
+                                              : null,
+                                          nextFieldLabel:
+                                              _saleMode == SaleEntryMode.quick
+                                              ? 'Precio unitario'
+                                              : null,
+                                          labelText: 'Cantidad',
+                                          editorContext:
+                                              _saleMode == SaleEntryMode.quick
+                                              ? 'Venta libre'
+                                              : 'Nueva venta',
+                                          emptyDisplayText:
+                                              'Toca para cargar la cantidad',
+                                          keyboardType: TextInputType.number,
+                                          inputFormatters: [
+                                            FilteringTextInputFormatter
+                                                .digitsOnly,
+                                          ],
+                                          validator: (value) {
+                                            final parsed = _parseInt(value);
+                                            if (_saleMode ==
+                                                SaleEntryMode.quick) {
+                                              return parsed <= 0
+                                                  ? 'Ingresa una cantidad'
+                                                  : null;
+                                            }
+                                            if (product == null) {
+                                              return parsed <= 0
+                                                  ? 'Ingresa una cantidad'
+                                                  : null;
+                                            }
+                                            return store.saleReadinessMessage(
+                                              product.id,
+                                              quantityUnits: parsed,
+                                            );
+                                          },
+                                        )
+                                      : EnsureVisibleWhenFocused(
+                                          focusNode: _quantityFocusNode,
+                                          child: TextFormField(
+                                            controller: _quantityController,
+                                            focusNode: _quantityFocusNode,
+                                            autofocus:
+                                                widget.initialProduct != null &&
+                                                _saleMode ==
+                                                    SaleEntryMode.catalog,
+                                            keyboardType: TextInputType.number,
+                                            inputFormatters: [
+                                              FilteringTextInputFormatter
+                                                  .digitsOnly,
+                                            ],
+                                            textInputAction:
+                                                TextInputAction.next,
+                                            decoration: const InputDecoration(
+                                              labelText: 'Cantidad',
+                                            ),
+                                            onTapOutside: (_) =>
+                                                _quantityFocusNode.unfocus(),
+                                            onFieldSubmitted: (_) {
+                                              if (_saleMode ==
+                                                  SaleEntryMode.quick) {
+                                                _moveFocusTo(
+                                                  _manualUnitPriceFocusNode,
+                                                  controller:
+                                                      _manualUnitPriceController,
+                                                );
+                                                return;
+                                              }
+                                              _moveFocusTo(_paymentFocusNode);
+                                            },
+                                            validator: (value) {
+                                              final parsed = _parseInt(value);
+                                              if (_saleMode ==
+                                                  SaleEntryMode.quick) {
+                                                return parsed <= 0
+                                                    ? 'Ingresa una cantidad'
+                                                    : null;
+                                              }
+                                              if (product == null) {
+                                                return parsed <= 0
+                                                    ? 'Ingresa una cantidad'
+                                                    : null;
+                                              }
+                                              return store.saleReadinessMessage(
+                                                product.id,
+                                                quantityUnits: parsed,
+                                              );
+                                            },
+                                          ),
+                                        ),
                                 ),
                                 if (_saleMode == SaleEntryMode.quick)
                                   SizedBox(
                                     width: fieldWidth,
-                                    child: EnsureVisibleWhenFocused(
-                                      focusNode: _manualUnitPriceFocusNode,
-                                      child: TextFormField(
-                                        controller: _manualUnitPriceController,
-                                        focusNode: _manualUnitPriceFocusNode,
-                                        keyboardType:
-                                            const TextInputType.numberWithOptions(
-                                              decimal: true,
+                                    child: useMobileSensitiveFieldEditor
+                                        ? MobileFieldEditorFormField(
+                                            controller:
+                                                _manualUnitPriceController,
+                                            editorController:
+                                                _manualUnitPriceEditorController,
+                                            labelText: 'Precio unitario',
+                                            editorContext: 'Venta libre',
+                                            emptyDisplayText:
+                                                'Toca para cargar el precio',
+                                            keyboardType:
+                                                const TextInputType.numberWithOptions(
+                                                  decimal: true,
+                                                ),
+                                            inputFormatters: [
+                                              FilteringTextInputFormatter
+                                                  .digitsOnly,
+                                            ],
+                                            prefixText: '\$ ',
+                                            displayValueBuilder: (value) {
+                                              final parsed = _parseInt(value);
+                                              return parsed <= 0
+                                                  ? 'Toca para cargar el precio'
+                                                  : formatMoney(parsed);
+                                            },
+                                            validator: (value) {
+                                              if (_saleMode !=
+                                                  SaleEntryMode.quick) {
+                                                return null;
+                                              }
+                                              final parsed = _parseInt(value);
+                                              return parsed <= 0
+                                                  ? 'Ingresa un precio'
+                                                  : null;
+                                            },
+                                          )
+                                        : EnsureVisibleWhenFocused(
+                                            focusNode:
+                                                _manualUnitPriceFocusNode,
+                                            child: TextFormField(
+                                              controller:
+                                                  _manualUnitPriceController,
+                                              focusNode:
+                                                  _manualUnitPriceFocusNode,
+                                              keyboardType:
+                                                  const TextInputType.numberWithOptions(
+                                                    decimal: true,
+                                                  ),
+                                              inputFormatters: [
+                                                FilteringTextInputFormatter
+                                                    .digitsOnly,
+                                              ],
+                                              textInputAction:
+                                                  TextInputAction.next,
+                                              decoration: const InputDecoration(
+                                                labelText: 'Precio unitario',
+                                                prefixText: '\$ ',
+                                              ),
+                                              onTapOutside: (_) =>
+                                                  _manualUnitPriceFocusNode
+                                                      .unfocus(),
+                                              onFieldSubmitted: (_) =>
+                                                  _moveFocusTo(
+                                                    _paymentFocusNode,
+                                                  ),
+                                              validator: (value) {
+                                                if (_saleMode !=
+                                                    SaleEntryMode.quick) {
+                                                  return null;
+                                                }
+                                                final parsed = _parseInt(value);
+                                                return parsed <= 0
+                                                    ? 'Ingresa un precio'
+                                                    : null;
+                                              },
                                             ),
-                                        inputFormatters: [
-                                          FilteringTextInputFormatter
-                                              .digitsOnly,
-                                        ],
-                                        textInputAction: TextInputAction.done,
-                                        decoration: const InputDecoration(
-                                          labelText: 'Precio unitario',
-                                          prefixText: '\$ ',
-                                        ),
-                                        onTapOutside: (_) =>
-                                            _manualUnitPriceFocusNode.unfocus(),
-                                        onChanged: (_) => setState(() {}),
-                                        onFieldSubmitted: (_) =>
-                                            _dismissKeyboard(),
-                                        validator: (value) {
-                                          if (_saleMode !=
-                                              SaleEntryMode.quick) {
-                                            return null;
-                                          }
-                                          final parsed = _parseInt(value);
-                                          return parsed <= 0
-                                              ? 'Ingresa un precio'
-                                              : null;
-                                        },
-                                      ),
-                                    ),
+                                          ),
                                   ),
                                 SizedBox(
                                   width: fieldWidth,
@@ -669,7 +831,7 @@ class _SaleScreenState extends State<SaleScreen> {
 
   String get _normalizedProductQuery => _productSearchController.text.trim();
 
-  void _handleManualFieldsChanged() {
+  void _handleSaleDraftChanged() {
     if (!mounted) {
       return;
     }
@@ -808,6 +970,29 @@ class _SaleScreenState extends State<SaleScreen> {
     _productFocusNode.requestFocus();
   }
 
+  Product? _exactQuickMatchProduct(CommerceStore store) {
+    final rawQuery = _manualDescriptionController.text.trim();
+    if (rawQuery.isEmpty) {
+      return null;
+    }
+    return store.productByBarcode(rawQuery) ??
+        store.productByNormalizedName(rawQuery);
+  }
+
+  void _useExistingProductFromQuickSale(Product product) {
+    _dismissKeyboard();
+    _productSearchController.value = TextEditingValue(
+      text: product.name,
+      selection: TextSelection.collapsed(offset: product.name.length),
+    );
+    setState(() {
+      _saleMode = SaleEntryMode.catalog;
+      _selectedProduct = product;
+      _autoValidateMode = AutovalidateMode.disabled;
+    });
+    _moveFocusTo(_quantityFocusNode, controller: _quantityController);
+  }
+
   void _showBlockedFeedback(String message) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
@@ -852,6 +1037,12 @@ class _SaleScreenState extends State<SaleScreen> {
       return;
     }
 
+    final exactMatch = _exactQuickMatchProduct(store);
+    if (exactMatch != null) {
+      _useExistingProductFromQuickSale(exactMatch);
+      return;
+    }
+
     final result = await showProductEditor(context, store, seed: seed);
     if (!mounted || result == null) {
       return;
@@ -876,9 +1067,6 @@ class _SaleScreenState extends State<SaleScreen> {
       return;
     }
     final quantity = _parseInt(_quantityController.text);
-    final postSaveSeed = _saleMode == SaleEntryMode.quick
-        ? _buildProductSeedFromFreeSale()
-        : null;
     final resolvedProduct =
         _saleMode == SaleEntryMode.catalog && _selectedProduct != null
         ? store.productById(_selectedProduct!.id)
@@ -913,6 +1101,9 @@ class _SaleScreenState extends State<SaleScreen> {
     setState(() => _saving = true);
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
+    final successMessage = _saleMode == SaleEntryMode.catalog
+        ? 'Venta guardada. Caja y stock al dia.'
+        : 'Venta libre guardada. Caja al dia.';
 
     try {
       if (_saleMode == SaleEntryMode.catalog) {
@@ -933,28 +1124,7 @@ class _SaleScreenState extends State<SaleScreen> {
         return;
       }
       messenger.hideCurrentSnackBar();
-      navigator.pop();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            _saleMode == SaleEntryMode.catalog
-                ? 'Venta guardada. Caja y stock al dia.'
-                : 'Venta libre guardada. Caja al dia.',
-          ),
-          action: _saleMode == SaleEntryMode.quick
-              ? SnackBarAction(
-                  label: 'Crear producto',
-                  onPressed: () {
-                    showProductEditor(
-                      navigator.context,
-                      store,
-                      seed: postSaveSeed,
-                    );
-                  },
-                )
-              : null,
-        ),
-      );
+      navigator.pop(successMessage);
     } catch (error) {
       if (!mounted) {
         return;
@@ -1074,6 +1244,93 @@ class _SaleModeChip extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ExactProductSuggestionCard extends StatelessWidget {
+  const _ExactProductSuggestionCard({
+    required this.product,
+    required this.onUseProduct,
+  });
+
+  final Product product;
+  final VoidCallback onUseProduct;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return BpcPanel(
+      color: scheme.surfaceContainerLow,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: scheme.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(Icons.inventory_2_rounded, color: scheme.primary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ya existe en catalogo',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  product.name,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _SelectedProductMeta(
+                      icon: Icons.sell_rounded,
+                      label: formatMoney(product.pricePesos),
+                    ),
+                    _SelectedProductMeta(
+                      icon: Icons.inventory_2_rounded,
+                      label: 'Stock ${product.stockUnits}',
+                    ),
+                    if ((product.barcode ?? '').isNotEmpty)
+                      _SelectedProductMeta(
+                        icon: Icons.qr_code_rounded,
+                        label: product.barcode!,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Conviene usar ese producto para no duplicar catalogo ni stock.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: scheme.outline),
+                ),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: onUseProduct,
+                  icon: const Icon(Icons.check_circle_rounded),
+                  label: const Text('Usar este producto'),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
