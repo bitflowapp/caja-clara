@@ -141,75 +141,98 @@ class SummaryScreen extends StatelessWidget {
               BpcPanel(
                 padding: const EdgeInsets.all(16),
                 color: Colors.white.withValues(alpha: 0.78),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final wide = constraints.maxWidth >= 900;
-                    final width = wide
-                        ? (constraints.maxWidth - 20) / 3
-                        : constraints.maxWidth;
-                    return Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        SizedBox(
-                          width: width,
-                          child: MetricCard(
-                            label: 'Caja actual',
-                            value: formatMoney(store.cashBalancePesos),
-                            helper: 'Saldo total',
-                          ),
-                        ),
-                        SizedBox(
-                          width: width,
-                          child: MetricCard(
-                            label: 'Apertura del dia',
-                            value: store.todayOpeningCashPesos == null
-                                ? 'Sin abrir'
-                                : formatMoney(store.todayOpeningCashPesos!),
-                            helper: 'Caja inicial del dia',
-                          ),
-                        ),
-                        SizedBox(
-                          width: width,
-                          child: MetricCard(
-                            label: 'Ventas del dia',
-                            value: formatMoney(store.todaySalesPesos),
-                            helper: 'Ingresos hoy',
-                          ),
-                        ),
-                        SizedBox(
-                          width: width,
-                          child: MetricCard(
-                            label: 'Gastos del dia',
-                            value: formatMoney(store.todayExpensesPesos),
-                            helper: 'Egresos hoy',
-                          ),
-                        ),
-                        SizedBox(
-                          width: width,
-                          child: MetricCard(
-                            label: 'Caja esperada',
-                            value: store.todayExpectedCashPesos == null
-                                ? 'Sin apertura'
-                                : formatMoney(store.todayExpectedCashPesos!),
-                            helper: 'Apertura + ventas - gastos',
-                          ),
-                        ),
-                        SizedBox(
-                          width: width,
-                          child: MetricCard(
-                            label: 'Cierre registrado',
-                            value: store.todayClosingCashPesos == null
-                                ? 'Sin cierre'
-                                : formatMoney(store.todayClosingCashPesos!),
-                            helper: store.todayClosingDifferencePesos == null
-                                ? 'Caja contada al cierre'
-                                : 'Diferencia: ${formatMoney(store.todayClosingDifferencePesos!)}',
-                          ),
-                        ),
-                      ],
-                    );
-                  },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Resumen de caja',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 12),
+                    _CashFormulaCard(store: store),
+                    const SizedBox(height: 12),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final wide = constraints.maxWidth >= 900;
+                        final width = wide
+                            ? (constraints.maxWidth - 20) / 3
+                            : constraints.maxWidth;
+                        return Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            SizedBox(
+                              width: width,
+                              child: MetricCard(
+                                label: 'Caja acumulada',
+                                value: formatMoney(store.cashBalancePesos),
+                                helper: 'Saldo total registrado',
+                              ),
+                            ),
+                            SizedBox(
+                              width: width,
+                              child: MetricCard(
+                                label: 'Saldo inicial',
+                                value: store.todayOpeningCashPesos == null
+                                    ? 'Sin abrir'
+                                    : formatMoney(store.todayOpeningCashPesos!),
+                                helper: 'Apertura del dia',
+                              ),
+                            ),
+                            SizedBox(
+                              width: width,
+                              child: MetricCard(
+                                label: 'Caja del dia',
+                                value: store.todayExpectedCashPesos == null
+                                    ? 'Sin apertura'
+                                    : formatMoney(
+                                        store.todayExpectedCashPesos!,
+                                      ),
+                                helper: 'Saldo inicial + ventas - gastos',
+                              ),
+                            ),
+                            SizedBox(
+                              width: width,
+                              child: MetricCard(
+                                label: 'Ventas del dia',
+                                value: formatMoney(store.todaySalesPesos),
+                                helper: 'Ingresos de hoy',
+                              ),
+                            ),
+                            SizedBox(
+                              width: width,
+                              child: MetricCard(
+                                label: 'Gastos del dia',
+                                value: formatMoney(store.todayExpensesPesos),
+                                helper: 'Egresos de hoy',
+                              ),
+                            ),
+                            SizedBox(
+                              width: width,
+                              child: MetricCard(
+                                label: 'Movimientos hoy',
+                                value: '${store.todayMovementCount}',
+                                helper: 'Ventas, gastos y ajustes',
+                              ),
+                            ),
+                            SizedBox(
+                              width: width,
+                              child: MetricCard(
+                                label: 'Cierre registrado',
+                                value: store.todayClosingCashPesos == null
+                                    ? 'Sin cierre'
+                                    : formatMoney(store.todayClosingCashPesos!),
+                                helper:
+                                    store.todayClosingDifferencePesos == null
+                                    ? 'Caja contada al cierre'
+                                    : 'Diferencia: ${formatMoney(store.todayClosingDifferencePesos!)}',
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 18),
@@ -261,6 +284,129 @@ class SummaryScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _CashFormulaCard extends StatelessWidget {
+  const _CashFormulaCard({required this.store});
+
+  final CommerceStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final outline = theme.colorScheme.outline;
+    final opening = store.todayOpeningCashPesos;
+    if (opening == null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Text(
+          'Registra una apertura para ver la formula del dia: saldo inicial + ventas - gastos = caja del dia.',
+          style: theme.textTheme.bodyMedium?.copyWith(color: outline),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Saldo inicial + ventas - gastos = caja del dia',
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: outline,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _FormulaChip(label: 'Saldo inicial', value: formatMoney(opening)),
+              const Text('+'),
+              _FormulaChip(
+                label: 'Ventas',
+                value: formatMoney(store.todaySalesPesos),
+              ),
+              const Text('-'),
+              _FormulaChip(
+                label: 'Gastos',
+                value: formatMoney(store.todayExpensesPesos),
+              ),
+              const Text('='),
+              _FormulaChip(
+                label: 'Caja del dia',
+                value: formatMoney(store.todayExpectedCashPesos ?? 0),
+                emphasized: true,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FormulaChip extends StatelessWidget {
+  const _FormulaChip({
+    required this.label,
+    required this.value,
+    this.emphasized = false,
+  });
+
+  final String label;
+  final String value;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: emphasized ? theme.colorScheme.surface : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: emphasized
+              ? theme.colorScheme.primary.withValues(alpha: 0.26)
+              : theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.outline,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w900,
+              color: emphasized ? theme.colorScheme.primary : null,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

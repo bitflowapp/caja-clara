@@ -40,16 +40,24 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
   bool _undoingMovement = false;
   bool _savingCashEvent = false;
 
-  void _openSale() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const SaleScreen()));
+  Future<void> _openSale() async {
+    final message = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(builder: (_) => const SaleScreen()),
+    );
+    if (!mounted || message == null) {
+      return;
+    }
+    _showMovementSavedFeedback(message);
   }
 
-  void _openExpense() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const ExpenseScreen()));
+  Future<void> _openExpense() async {
+    final message = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(builder: (_) => const ExpenseScreen()),
+    );
+    if (!mounted || message == null) {
+      return;
+    }
+    _showMovementSavedFeedback(message);
   }
 
   void _openBarcodeScan() {
@@ -64,6 +72,38 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
 
   Future<void> _openQuickHelp() async {
     await showQuickHelpDialog(context);
+  }
+
+  void _showMovementSavedFeedback(String message) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 6),
+        content: _ActionSnackContent(
+          message: message,
+          actions: [
+            _ActionSnackButton(
+              label: 'Deshacer',
+              onPressed: () {
+                messenger.hideCurrentSnackBar();
+                _undoLastMovement(skipConfirmation: true);
+              },
+            ),
+            _ActionSnackButton(
+              label: 'Ver caja',
+              onPressed: () {
+                messenger.hideCurrentSnackBar();
+                if (!mounted) {
+                  return;
+                }
+                setState(() => _tab = CommerceTab.summary);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _createProductFromSeed(
@@ -382,7 +422,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     }
   }
 
-  Future<void> _undoLastMovement() async {
+  Future<void> _undoLastMovement({bool skipConfirmation = false}) async {
     if (_undoingMovement) {
       return;
     }
@@ -394,15 +434,17 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       return;
     }
 
-    final confirmed = await showDangerConfirmationDialog(
-      context,
-      title: 'Deshacer ultimo movimiento',
-      message:
-          'Se va a deshacer "${movement.title}". Si fue una venta, tambien se repone el stock.',
-      confirmLabel: 'Deshacer',
-    );
-    if (!confirmed) {
-      return;
+    if (!skipConfirmation) {
+      final confirmed = await showDangerConfirmationDialog(
+        context,
+        title: 'Deshacer ultimo movimiento',
+        message:
+            'Se va a deshacer "${movement.title}". Si fue una venta, tambien se repone el stock.',
+        confirmLabel: 'Deshacer',
+      );
+      if (!confirmed) {
+        return;
+      }
     }
 
     setState(() => _undoingMovement = true);
@@ -486,12 +528,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       if (!mounted) {
         return;
       }
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Apertura de caja registrada'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showMovementSavedFeedback('Apertura de caja registrada.');
     } catch (error) {
       if (!mounted) {
         return;
@@ -559,12 +596,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       if (!mounted) {
         return;
       }
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Cierre de caja registrado'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showMovementSavedFeedback('Cierre de caja registrado.');
     } catch (error) {
       if (!mounted) {
         return;
@@ -945,6 +977,53 @@ class _SaveErrorBanner extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ActionSnackButton {
+  const _ActionSnackButton({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback onPressed;
+}
+
+class _ActionSnackContent extends StatelessWidget {
+  const _ActionSnackContent({required this.message, required this.actions});
+
+  final String message;
+  final List<_ActionSnackButton> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(message),
+        if (actions.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 10,
+            runSpacing: 6,
+            children: [
+              for (final action in actions)
+                TextButton(
+                  onPressed: action.onPressed,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(action.label),
+                ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 }

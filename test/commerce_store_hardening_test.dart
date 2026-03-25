@@ -214,6 +214,21 @@ void main() {
       },
     );
 
+    test('remembers the last payment method used in sales', () async {
+      final store = CommerceStore.emptyForTest();
+
+      expect(store.lastSalePaymentMethod, isNull);
+
+      await store.recordFreeSale(
+        description: 'Cable USB',
+        quantityUnits: 1,
+        unitPricePesos: 4500,
+        paymentMethod: 'Transferencia',
+      );
+
+      expect(store.lastSalePaymentMethod, 'Transferencia');
+    });
+
     test('undo last sale restores stock and movement count', () async {
       final store = CommerceStore.seededForTest();
       final initialStock = store.productById('p-2')!.stockUnits;

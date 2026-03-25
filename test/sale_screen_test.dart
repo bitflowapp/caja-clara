@@ -6,6 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   Future<void> pumpSaleScreen(WidgetTester tester, CommerceStore store) async {
+    final savedMessage = ValueNotifier<String?>(null);
+    addTearDown(savedMessage.dispose);
+
     await tester.pumpWidget(
       CommerceScope(
         store: store,
@@ -13,17 +16,33 @@ void main() {
           home: Builder(
             builder: (context) {
               return Scaffold(
-                body: Center(
-                  child: FilledButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const SaleScreen(),
-                        ),
-                      );
-                    },
-                    child: const Text('Abrir venta'),
-                  ),
+                body: ValueListenableBuilder<String?>(
+                  valueListenable: savedMessage,
+                  builder: (context, message, _) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          FilledButton(
+                            onPressed: () async {
+                              final result = await Navigator.of(context)
+                                  .push<String>(
+                                    MaterialPageRoute<String>(
+                                      builder: (_) => const SaleScreen(),
+                                    ),
+                                  );
+                              savedMessage.value = result;
+                            },
+                            child: const Text('Abrir venta'),
+                          ),
+                          if (message != null) ...[
+                            const SizedBox(height: 12),
+                            Text(message),
+                          ],
+                        ],
+                      ),
+                    );
+                  },
                 ),
               );
             },
@@ -222,6 +241,55 @@ void main() {
         find.text('Vista previa: Cable USB mostrador / \$3.900'),
         findsOneWidget,
       );
+    },
+  );
+
+  testWidgets(
+    'venta libre sugiere usar producto existente ante coincidencia exacta',
+    (tester) async {
+      final store = CommerceStore.seededForTest();
+
+      await pumpSaleScreen(tester, store);
+
+      await tester.ensureVisible(find.byKey(const Key('sale-mode-quick')));
+      await tester.tap(find.byKey(const Key('sale-mode-quick')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Descripcion'),
+        '7791234500011',
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('Ya existe en catalogo'), findsOneWidget);
+      expect(find.text('Yerba premium'), findsOneWidget);
+      expect(find.text('Usar este producto'), findsOneWidget);
+
+      await tester.ensureVisible(find.text('Usar este producto'));
+      await tester.tap(find.text('Usar este producto'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 150));
+
+      expect(find.text('Producto seleccionado'), findsOneWidget);
+      expect(find.text('Stock 8'), findsOneWidget);
+      expect(
+        find.widgetWithText(TextFormField, 'Buscar producto'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'nueva venta usa efectivo por defecto cuando no hay historial previo',
+    (tester) async {
+      final store = CommerceStore.emptyForTest();
+
+      await pumpSaleScreen(tester, store);
+
+      expect(find.text('Efectivo'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'Cantidad'), findsOneWidget);
     },
   );
 }

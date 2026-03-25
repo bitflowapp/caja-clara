@@ -268,6 +268,21 @@ class CommerceStore extends ChangeNotifier {
       .where((movement) => movement.kind == MovementKind.sale)
       .length;
 
+  int get todayMovementCount => _movements.where(_isTodayMovement).length;
+
+  String? get lastSalePaymentMethod {
+    for (final movement in _movements) {
+      if (movement.kind != MovementKind.sale) {
+        continue;
+      }
+      final paymentMethod = movement.paymentMethod?.trim();
+      if (paymentMethod != null && paymentMethod.isNotEmpty) {
+        return paymentMethod;
+      }
+    }
+    return null;
+  }
+
   int get lowStockCount => lowStockProducts.length;
 
   String? saleReadinessMessage(String productId, {required int quantityUnits}) {
