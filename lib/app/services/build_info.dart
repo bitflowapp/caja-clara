@@ -24,11 +24,9 @@ class BuildInfo {
     defaultValue: 'manual',
   );
 
-  static String get shortCommit => shortSha == 'local'
-      ? 'local'
-      : shortSha;
+  static String get shortCommit => shortSha == 'local' ? 'local' : shortSha;
 
-  static String get footerText => 'Build $shortCommit • $branch • $builtAtUtc';
+  static String get footerText => 'Build $shortCommit | $branch | $builtAtUtc';
 
   static Map<String, dynamic> toJson({String? baseHref}) {
     return <String, dynamic>{

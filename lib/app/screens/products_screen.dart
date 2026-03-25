@@ -18,10 +18,14 @@ class ProductsScreen extends StatefulWidget {
     super.key,
     required this.onApplyStarterTemplate,
     required this.applyingStarterTemplate,
+    required this.onLoadDemoData,
+    required this.loadingDemoData,
   });
 
   final Future<void> Function() onApplyStarterTemplate;
   final bool applyingStarterTemplate;
+  final Future<void> Function() onLoadDemoData;
+  final bool loadingDemoData;
 
   @override
   State<ProductsScreen> createState() => _ProductsScreenState();
@@ -83,8 +87,30 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     spacing: 10,
                     runSpacing: 10,
                     children: [
+                      if (emptyCatalog)
+                        FilledButton.icon(
+                          onPressed: widget.loadingDemoData
+                              ? null
+                              : () => widget.onLoadDemoData(),
+                          icon: widget.loadingDemoData
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.play_circle_rounded),
+                          label: Text(
+                            widget.loadingDemoData
+                                ? 'Cargando demo'
+                                : 'Demo comercial',
+                          ),
+                        ),
                       OutlinedButton.icon(
-                        onPressed: widget.applyingStarterTemplate
+                        onPressed:
+                            widget.applyingStarterTemplate ||
+                                widget.loadingDemoData
                             ? null
                             : () => widget.onApplyStarterTemplate(),
                         icon: widget.applyingStarterTemplate
@@ -105,6 +131,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       ),
                     ],
                   ),
+                  if (!emptyCatalog) ...[
+                    const SizedBox(height: 14),
+                    _CatalogMetricsStrip(store: store),
+                  ],
                   const SizedBox(height: 14),
                   LayoutBuilder(
                     builder: (context, constraints) {
@@ -165,7 +195,20 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         children: [
                           if (emptyCatalog)
                             FilledButton(
-                              onPressed: widget.applyingStarterTemplate
+                              onPressed: widget.loadingDemoData
+                                  ? null
+                                  : () => widget.onLoadDemoData(),
+                              child: Text(
+                                widget.loadingDemoData
+                                    ? 'Cargando demo...'
+                                    : 'Cargar demo comercial',
+                              ),
+                            ),
+                          if (emptyCatalog)
+                            OutlinedButton(
+                              onPressed:
+                                  widget.applyingStarterTemplate ||
+                                      widget.loadingDemoData
                                   ? null
                                   : () => widget.onApplyStarterTemplate(),
                               child: Text(
@@ -347,6 +390,66 @@ class _ProductsScreenState extends State<ProductsScreen> {
         ),
       );
     }
+  }
+}
+
+class _CatalogMetricsStrip extends StatelessWidget {
+  const _CatalogMetricsStrip({required this.store});
+
+  final CommerceStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    return BpcPanel(
+      padding: const EdgeInsets.all(14),
+      color: Colors.white.withValues(alpha: 0.78),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final columns = constraints.maxWidth >= 880
+              ? 4
+              : constraints.maxWidth >= 560
+              ? 2
+              : 1;
+          final gaps = columns > 1 ? 10.0 * (columns - 1) : 0.0;
+          final itemWidth = (constraints.maxWidth - gaps) / columns;
+          final cards = <Widget>[
+            MetricCard(
+              label: 'Productos cargados',
+              value: '${store.products.length}',
+              helper: '${store.totalStockUnits} unidades en stock',
+              tight: true,
+            ),
+            MetricCard(
+              label: 'Listos para vender',
+              value: '${store.sellableProductsCount}',
+              helper: 'Con precio y stock positivo',
+              tight: true,
+            ),
+            MetricCard(
+              label: 'Cobertura barcode',
+              value:
+                  '${store.productsWithBarcodeCount}/${store.products.length}',
+              helper: 'Productos listos para scanner',
+              tight: true,
+            ),
+            MetricCard(
+              label: 'Stock valorizado',
+              value: formatMoney(store.estimatedInventoryCostPesos),
+              helper: '${store.lowStockCount} alertas de reposicion',
+              tight: true,
+            ),
+          ];
+
+          return Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: cards
+                .map((card) => SizedBox(width: itemWidth, child: card))
+                .toList(growable: false),
+          );
+        },
+      ),
+    );
   }
 }
 

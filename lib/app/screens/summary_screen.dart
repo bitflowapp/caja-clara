@@ -56,7 +56,7 @@ class SummaryScreen extends StatelessWidget {
             children: [
               const SectionHeader(
                 title: 'Caja / Resumen',
-                subtitle: 'Caja del dia, exportacion y respaldo local',
+                subtitle: 'Control diario, exportacion y respaldo local',
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -137,6 +137,10 @@ class SummaryScreen extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 14),
+              _OperationalSnapshotBanner(store: store),
+              const SizedBox(height: 12),
+              const _DataConfidenceNote(),
               const SizedBox(height: 16),
               BpcPanel(
                 padding: const EdgeInsets.all(16),
@@ -218,6 +222,16 @@ class SummaryScreen extends StatelessWidget {
                             SizedBox(
                               width: width,
                               child: MetricCard(
+                                label: 'Margen estimado hoy',
+                                value: formatMoney(
+                                  store.todayEstimatedProfitPesos,
+                                ),
+                                helper: 'Ventas menos costo estimado',
+                              ),
+                            ),
+                            SizedBox(
+                              width: width,
+                              child: MetricCard(
                                 label: 'Cierre registrado',
                                 value: store.todayClosingCashPesos == null
                                     ? 'Sin cierre'
@@ -284,6 +298,172 @@ class SummaryScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _OperationalSnapshotBanner extends StatelessWidget {
+  const _OperationalSnapshotBanner({required this.store});
+
+  final CommerceStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final opening = store.todayOpeningCashPesos;
+    final closing = store.todayClosingCashPesos;
+    final expected = store.todayExpectedCashPesos;
+    final difference = store.todayClosingDifferencePesos;
+    final isBalanced = closing != null && difference == 0;
+
+    late final IconData icon;
+    late final Color accent;
+    late final Color surface;
+    late final String title;
+    late final String message;
+
+    if (opening == null) {
+      icon = Icons.login_rounded;
+      accent = scheme.primary;
+      surface = scheme.surfaceContainerLow;
+      title = 'Falta apertura de caja';
+      message =
+          'Registra la caja inicial para controlar el dia y detectar diferencias antes del cierre.';
+    } else if (closing == null) {
+      icon = Icons.timelapse_rounded;
+      accent = scheme.primary;
+      surface = scheme.surfaceContainerLow;
+      title = 'Caja abierta y bajo seguimiento';
+      message = expected == null
+          ? 'Ya registraste la apertura. Cuando cierres, podras comparar contra el esperado.'
+          : 'Ya registraste la apertura. Si cerraras ahora, la caja esperada seria ${formatMoney(expected)}.';
+    } else if (difference == 0) {
+      icon = Icons.verified_rounded;
+      accent = Colors.white;
+      surface = const Color(0xFF184D41);
+      title = 'Cierre cuadrado';
+      message =
+          'La caja contada coincide con la caja esperada. Es una buena senal para demo y operacion real.';
+    } else {
+      icon = Icons.warning_amber_rounded;
+      accent = scheme.error;
+      surface = scheme.errorContainer.withValues(alpha: 0.72);
+      title = 'Diferencia a revisar';
+      message =
+          'La caja esperada y la caja contada no coinciden. Revisa movimientos o el conteo antes de cerrar el dia.';
+    }
+
+    final onAccent = isBalanced ? Colors.white : null;
+    return BpcPanel(
+      color: surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: (onAccent == Colors.white ? Colors.white : accent)
+                      .withValues(
+                        alpha: onAccent == Colors.white ? 0.16 : 0.14,
+                      ),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: accent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: onAccent,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      message,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: onAccent?.withValues(alpha: 0.88),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (opening != null) ...[
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _FormulaChip(
+                  label: 'Apertura',
+                  value: formatMoney(opening),
+                  emphasized: isBalanced,
+                ),
+                if (expected != null)
+                  _FormulaChip(
+                    label: 'Esperada',
+                    value: formatMoney(expected),
+                    emphasized: isBalanced,
+                  ),
+                if (closing != null)
+                  _FormulaChip(
+                    label: 'Contada',
+                    value: formatMoney(closing),
+                    emphasized: isBalanced,
+                  ),
+                if (difference != null)
+                  _FormulaChip(
+                    label: 'Diferencia',
+                    value: formatMoney(difference),
+                    emphasized: difference == 0,
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DataConfidenceNote extends StatelessWidget {
+  const _DataConfidenceNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return BpcPanel(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      color: Colors.white.withValues(alpha: 0.74),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.shield_outlined,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Excel sirve para compartir o revisar fuera de la app. El backup guarda el estado completo para moverlo o restaurarlo sin depender de internet.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.outline,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

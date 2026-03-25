@@ -80,6 +80,7 @@ class CommerceStore extends ChangeNotifier {
   String? get lastError => _lastError;
   bool get hasProducts => _products.isNotEmpty;
   bool get hasMovements => _movements.isNotEmpty;
+  bool get isEmptyState => _products.isEmpty && _movements.isEmpty;
 
   UnmodifiableListView<Product> get products => UnmodifiableListView(_products);
   UnmodifiableListView<Movement> get movements =>
@@ -269,6 +270,21 @@ class CommerceStore extends ChangeNotifier {
       .length;
 
   int get todayMovementCount => _movements.where(_isTodayMovement).length;
+
+  int get totalStockUnits =>
+      _products.fold<int>(0, (sum, product) => sum + product.stockUnits);
+
+  int get sellableProductsCount => _products
+      .where((product) => product.pricePesos > 0 && product.stockUnits > 0)
+      .length;
+
+  int get productsWithBarcodeCount =>
+      _products.where((product) => (product.barcode ?? '').isNotEmpty).length;
+
+  int get estimatedInventoryCostPesos => _products.fold<int>(
+    0,
+    (sum, product) => sum + (product.costPesos * product.stockUnits),
+  );
 
   String? get lastSalePaymentMethod {
     for (final movement in _movements) {
@@ -529,6 +545,16 @@ class CommerceStore extends ChangeNotifier {
       addedCount: pendingProducts.length,
       skippedCount: skippedCount,
     );
+  }
+
+  Future<void> loadDemoData({bool overwrite = false}) async {
+    if (!overwrite && !isEmptyState) {
+      throw StateError(
+        'La demo comercial solo se puede cargar sobre una app vacia.',
+      );
+    }
+
+    await _runPersistedMutation(_seedDemoData);
   }
 
   Future<void> addProduct(Product product) async {

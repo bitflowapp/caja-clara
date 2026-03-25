@@ -24,7 +24,8 @@ void main() {
     await tester.pumpWidget(BPlusCommerceApp(store: store));
     await tester.pumpAndSettle();
 
-    expect(find.text('Arranca con una base de kiosco'), findsOneWidget);
+    expect(find.text('Lista para demo o primer uso'), findsOneWidget);
+    expect(find.text('Cargar demo comercial'), findsOneWidget);
     expect(find.text('Cargar Kiosco argentino'), findsOneWidget);
     expect(find.text('Agregar producto manualmente'), findsOneWidget);
   });

@@ -19,11 +19,13 @@ class HomeScreen extends StatelessWidget {
     required this.onOpenProducts,
     required this.onExportExcel,
     required this.onApplyStarterTemplate,
+    required this.onLoadDemoData,
     required this.onCreateProductFromFreeSale,
     required this.onCreateProductFromSuggestion,
     required this.onDismissFreeSaleSuggestion,
     required this.exportingExcel,
     required this.applyingStarterTemplate,
+    required this.loadingDemoData,
   });
 
   final VoidCallback onNewSale;
@@ -32,6 +34,7 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onOpenProducts;
   final VoidCallback onExportExcel;
   final VoidCallback onApplyStarterTemplate;
+  final VoidCallback onLoadDemoData;
   final Future<void> Function(Movement movement) onCreateProductFromFreeSale;
   final Future<void> Function(FreeSaleSuggestion suggestion)
   onCreateProductFromSuggestion;
@@ -39,6 +42,7 @@ class HomeScreen extends StatelessWidget {
   onDismissFreeSaleSuggestion;
   final bool exportingExcel;
   final bool applyingStarterTemplate;
+  final bool loadingDemoData;
 
   @override
   Widget build(BuildContext context) {
@@ -59,8 +63,10 @@ class HomeScreen extends StatelessWidget {
                 const SizedBox(height: 14),
                 _StarterTemplateCard(
                   onApplyStarterTemplate: onApplyStarterTemplate,
+                  onLoadDemoData: onLoadDemoData,
                   onAddProduct: () => showProductEditor(context, store),
                   applyingStarterTemplate: applyingStarterTemplate,
+                  loadingDemoData: loadingDemoData,
                 ),
               ],
               const SizedBox(height: 14),
@@ -78,6 +84,10 @@ class HomeScreen extends StatelessWidget {
                 exportingExcel: exportingExcel,
                 hasProducts: store.hasProducts,
               ),
+              if (store.hasProducts) ...[
+                const SizedBox(height: 16),
+                _CatalogReadinessCard(store: store),
+              ],
               if (suggestions.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 _FreeSaleSuggestionCard(
@@ -351,6 +361,7 @@ class _HeaderStrip extends StatelessWidget {
             label: 'Caja actual',
             value: formatMoney(store.cashBalancePesos),
           ),
+          _HeaderMetric(label: 'Productos', value: '${store.products.length}'),
         ],
       ),
     );
@@ -509,13 +520,17 @@ class _SecondaryActions extends StatelessWidget {
 class _StarterTemplateCard extends StatelessWidget {
   const _StarterTemplateCard({
     required this.onApplyStarterTemplate,
+    required this.onLoadDemoData,
     required this.onAddProduct,
     required this.applyingStarterTemplate,
+    required this.loadingDemoData,
   });
 
   final VoidCallback onApplyStarterTemplate;
+  final VoidCallback onLoadDemoData;
   final VoidCallback onAddProduct;
   final bool applyingStarterTemplate;
+  final bool loadingDemoData;
 
   @override
   Widget build(BuildContext context) {
@@ -526,7 +541,7 @@ class _StarterTemplateCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Arranca con una base de kiosco',
+            'Lista para demo o primer uso',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: BpcColors.ink,
               fontWeight: FontWeight.w900,
@@ -534,7 +549,7 @@ class _StarterTemplateCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Carga una plantilla opcional con bebidas, golosinas, snacks y mostrador. Los productos se crean en 0 para que completes tus precios sin apuro.',
+            'Puedes mostrar valor en segundos con una demo comercial ya armada o empezar desde una plantilla kiosco editable. Todo queda local en este dispositivo.',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
@@ -543,9 +558,48 @@ class _StarterTemplateCard extends StatelessWidget {
           Wrap(
             spacing: 10,
             runSpacing: 10,
+            children: const [
+              _OnboardingStepChip(
+                step: '1',
+                title: 'Carga datos',
+                subtitle: 'Demo comercial o plantilla kiosco',
+              ),
+              _OnboardingStepChip(
+                step: '2',
+                title: 'Registra una venta',
+                subtitle: 'Caja y stock se actualizan al instante',
+              ),
+              _OnboardingStepChip(
+                step: '3',
+                title: 'Muestra control',
+                subtitle: 'Caja, backup y export en el mismo flujo',
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
             children: [
               FilledButton.icon(
-                onPressed: applyingStarterTemplate
+                onPressed: loadingDemoData || applyingStarterTemplate
+                    ? null
+                    : onLoadDemoData,
+                icon: loadingDemoData
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.play_circle_rounded),
+                label: Text(
+                  loadingDemoData
+                      ? 'Cargando demo...'
+                      : 'Cargar demo comercial',
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: applyingStarterTemplate || loadingDemoData
                     ? null
                     : onApplyStarterTemplate,
                 icon: applyingStarterTemplate
@@ -565,6 +619,133 @@ class _StarterTemplateCard extends StatelessWidget {
                 onPressed: onAddProduct,
                 icon: const Icon(Icons.add_box_rounded),
                 label: const Text('Agregar producto manualmente'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OnboardingStepChip extends StatelessWidget {
+  const _OnboardingStepChip({
+    required this.step,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final String step;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 180, maxWidth: 240),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.82),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: BpcColors.line),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: BpcColors.greenDeep,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                step,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: BpcColors.ink,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: BpcColors.subtleInk,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CatalogReadinessCard extends StatelessWidget {
+  const _CatalogReadinessCard({required this.store});
+
+  final CommerceStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    return BpcPanel(
+      color: Colors.white.withValues(alpha: 0.76),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Catalogo listo para demo y operacion',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: BpcColors.ink,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Estas senales ayudan a mostrar control rapido: productos vendibles, cobertura de barcode y capital inmovilizado en stock.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _SuggestionMeta(
+                label: 'Listos para vender',
+                value: '${store.sellableProductsCount}',
+              ),
+              _SuggestionMeta(
+                label: 'Con barcode',
+                value:
+                    '${store.productsWithBarcodeCount}/${store.products.length}',
+              ),
+              _SuggestionMeta(
+                label: 'Stock valorizado',
+                value: formatMoney(store.estimatedInventoryCostPesos),
+              ),
+              _SuggestionMeta(
+                label: 'Alertas de stock',
+                value: '${store.lowStockCount}',
               ),
             ],
           ),

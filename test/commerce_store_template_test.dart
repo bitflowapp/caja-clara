@@ -12,6 +12,20 @@ void main() {
       expect(store.hasMovements, isFalse);
     });
 
+    test('loads commercial demo data from the empty first-use state', () async {
+      final store = CommerceStore.emptyForTest();
+
+      await store.loadDemoData();
+
+      expect(store.hasProducts, isTrue);
+      expect(store.hasMovements, isTrue);
+      expect(store.products.length, 5);
+      expect(store.productsWithBarcodeCount, 5);
+      expect(store.sellableProductsCount, greaterThan(0));
+      expect(store.estimatedInventoryCostPesos, greaterThan(0));
+      expect(store.movements.first.title, 'Venta');
+    });
+
     test(
       'applies argentinian kiosk template once without duplicates',
       () async {
@@ -32,6 +46,14 @@ void main() {
         expect(store.products.length, firstResult.totalCount);
       },
     );
+
+    test('blocks loading demo data when the app already has data', () async {
+      final store = CommerceStore.emptyForTest();
+
+      await store.applyArgentinianKioskTemplate();
+
+      await expectLater(store.loadDemoData(), throwsA(isA<StateError>()));
+    });
 
     test('allows zero price but blocks sale until price is defined', () async {
       final store = CommerceStore.emptyForTest();

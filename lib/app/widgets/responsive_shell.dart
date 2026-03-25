@@ -34,6 +34,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
   CommerceTab _tab = CommerceTab.home;
   bool _exportingExcel = false;
   bool _applyingStarterTemplate = false;
+  bool _loadingDemoData = false;
   bool _exportingBackup = false;
   bool _restoringBackup = false;
   bool _retryingSave = false;
@@ -265,6 +266,47 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     } finally {
       if (mounted) {
         setState(() => _applyingStarterTemplate = false);
+      }
+    }
+  }
+
+  Future<void> _loadDemoData() async {
+    if (_loadingDemoData) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    final store = CommerceScope.of(context);
+
+    setState(() => _loadingDemoData = true);
+    try {
+      await store.loadDemoData();
+      if (!mounted) {
+        return;
+      }
+
+      setState(() => _tab = CommerceTab.home);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Demo comercial cargada. Ya puedes mostrar ventas, productos y caja.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(userFacingErrorMessage(error)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loadingDemoData = false);
       }
     }
   }
@@ -627,15 +669,19 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         onOpenProducts: _openProducts,
         onExportExcel: _exportExcel,
         onApplyStarterTemplate: _applyStarterTemplate,
+        onLoadDemoData: _loadDemoData,
         onCreateProductFromFreeSale: _createProductFromFreeSale,
         onCreateProductFromSuggestion: _createProductFromSuggestion,
         onDismissFreeSaleSuggestion: _dismissFreeSaleSuggestion,
         exportingExcel: _exportingExcel,
         applyingStarterTemplate: _applyingStarterTemplate,
+        loadingDemoData: _loadingDemoData,
       ),
       CommerceTab.products: ProductsScreen(
         onApplyStarterTemplate: _applyStarterTemplate,
         applyingStarterTemplate: _applyingStarterTemplate,
+        onLoadDemoData: _loadDemoData,
+        loadingDemoData: _loadingDemoData,
       ),
       CommerceTab.summary: SummaryScreen(
         onExportExcel: _exportExcel,
