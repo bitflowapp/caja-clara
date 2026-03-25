@@ -43,6 +43,26 @@ void main() {
       );
     });
 
+    test('normalizes alphanumeric barcode lookups consistently', () async {
+      final store = CommerceStore.emptyForTest();
+
+      await store.addProduct(
+        const Product(
+          id: 'p-alpha',
+          name: 'Cable de datos',
+          stockUnits: 4,
+          minStockUnits: 1,
+          costPesos: 2100,
+          pricePesos: 3900,
+          barcode: ' abC123 ',
+        ),
+      );
+
+      expect(store.productByBarcode('ABC123')?.id, 'p-alpha');
+      expect(store.productByBarcode('abc123')?.id, 'p-alpha');
+      expect(store.productByBarcode('  aBc123  ')?.barcode, 'ABC123');
+    });
+
     test('returns null when barcode does not exist', () {
       final store = CommerceStore.seededForTest();
 
@@ -61,7 +81,10 @@ void main() {
         paymentMethod: 'Efectivo',
       );
 
-      expect(store.productByBarcode('7791234500028')!.stockUnits, initialStock - 2);
+      expect(
+        store.productByBarcode('7791234500028')!.stockUnits,
+        initialStock - 2,
+      );
       expect(store.cashBalancePesos, initialCash + (product.pricePesos * 2));
     });
 
@@ -77,7 +100,10 @@ void main() {
         note: 'Barcode',
       );
 
-      expect(store.productByBarcode('7791234500035')!.stockUnits, initialStock + 5);
+      expect(
+        store.productByBarcode('7791234500035')!.stockUnits,
+        initialStock + 5,
+      );
       expect(store.movements.length, initialMovements + 1);
       expect(store.movements.first.title, 'Ingreso de stock');
     });

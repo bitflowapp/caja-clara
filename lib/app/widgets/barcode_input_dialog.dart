@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../services/commerce_store.dart';
 import '../utils/text_field_selection.dart';
@@ -14,16 +13,96 @@ Future<String?> showBarcodeInputDialog(
   String helper = 'Escanea o pega el codigo. Enter busca al instante.',
   String confirmLabel = 'Buscar producto',
 }) async {
-  final controller = TextEditingController(text: initialValue ?? '');
-  final focusNode = FocusNode();
-  final formKey = GlobalKey<FormState>();
-  selectAllTextOnFocus(focusNode, controller);
+  final useFullscreen = useFullscreenFormLayout(context);
+  final navigator = Navigator.of(context);
 
-  Widget buildForm(BuildContext context, VoidCallback submit) {
+  if (useFullscreen) {
+    return navigator.push<String>(
+      MaterialPageRoute<String>(
+        fullscreenDialog: true,
+        builder: (_) {
+          return KeyboardAwareFormScaffold(
+            title: title,
+            child: BpcPanel(
+              child: _BarcodeInputForm(
+                initialValue: initialValue ?? '',
+                helper: helper,
+                confirmLabel: confirmLabel,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  return showDialog<String>(
+    context: context,
+    useSafeArea: true,
+    builder: (dialogContext) {
+      return AlertDialog(
+        insetPadding: EdgeInsets.fromLTRB(
+          16,
+          24,
+          16,
+          16 + MediaQuery.viewInsetsOf(dialogContext).bottom,
+        ),
+        scrollable: true,
+        title: Text(title),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: _BarcodeInputForm(
+            initialValue: initialValue ?? '',
+            helper: helper,
+            confirmLabel: confirmLabel,
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _BarcodeInputForm extends StatefulWidget {
+  const _BarcodeInputForm({
+    required this.initialValue,
+    required this.helper,
+    required this.confirmLabel,
+  });
+
+  final String initialValue;
+  final String helper;
+  final String confirmLabel;
+
+  @override
+  State<_BarcodeInputForm> createState() => _BarcodeInputFormState();
+}
+
+class _BarcodeInputFormState extends State<_BarcodeInputForm> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _controller;
+  final _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue);
+    selectAllTextOnFocus(_focusNode, _controller);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 640;
     return InputShortcutScope(
       onCancel: () => Navigator.of(context).pop(),
       child: Form(
-        key: formKey,
+        key: _formKey,
         child: FocusTraversalGroup(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -46,7 +125,7 @@ Future<String?> showBarcodeInputDialog(
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        helper,
+                        widget.helper,
                         style: Theme.of(
                           context,
                         ).textTheme.bodyMedium?.copyWith(height: 1.3),
@@ -57,64 +136,57 @@ Future<String?> showBarcodeInputDialog(
               ),
               const SizedBox(height: 14),
               EnsureVisibleWhenFocused(
-                focusNode: focusNode,
+                focusNode: _focusNode,
                 child: TextFormField(
-                  controller: controller,
-                  focusNode: focusNode,
+                  controller: _controller,
+                  focusNode: _focusNode,
                   autofocus: true,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  keyboardType: TextInputType.text,
+                  textCapitalization: TextCapitalization.characters,
                   textInputAction: TextInputAction.search,
                   decoration: const InputDecoration(
                     labelText: 'Codigo de barras',
-                    hintText: 'Ej. 7791234500011',
+                    hintText: 'Ej. 7791234500011 o ABC123',
                     prefixIcon: Icon(Icons.qr_code_2_rounded),
                   ),
-                  onTapOutside: (_) => focusNode.unfocus(),
+                  onTapOutside: (_) => _focusNode.unfocus(),
                   validator: (value) {
                     if (CommerceStore.normalizeBarcode(value) == null) {
                       return 'Ingresa un codigo valido.';
                     }
                     return null;
                   },
-                  onFieldSubmitted: (_) => submit(),
+                  onFieldSubmitted: (_) => _submit(),
                 ),
               ),
               const SizedBox(height: 16),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 520;
-                  final cancelButton = TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancelar'),
-                  );
-                  final submitButton = FilledButton.icon(
-                    onPressed: submit,
-                    icon: const Icon(Icons.search_rounded),
-                    label: Text(confirmLabel),
-                  );
-
-                  if (compact) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        submitButton,
-                        const SizedBox(height: 10),
-                        cancelButton,
-                      ],
-                    );
-                  }
-
-                  return Row(
-                    children: [
-                      const Spacer(),
-                      cancelButton,
-                      const SizedBox(width: 10),
-                      submitButton,
-                    ],
-                  );
-                },
-              ),
+              if (compact) ...[
+                FilledButton.icon(
+                  onPressed: _submit,
+                  icon: const Icon(Icons.search_rounded),
+                  label: Text(widget.confirmLabel),
+                ),
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
+                ),
+              ] else
+                Row(
+                  children: [
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancelar'),
+                    ),
+                    const SizedBox(width: 10),
+                    FilledButton.icon(
+                      onPressed: _submit,
+                      icon: const Icon(Icons.search_rounded),
+                      label: Text(widget.confirmLabel),
+                    ),
+                  ],
+                ),
             ],
           ),
         ),
@@ -122,52 +194,11 @@ Future<String?> showBarcodeInputDialog(
     );
   }
 
-  void submit(BuildContext context) {
-    if (!formKey.currentState!.validate()) {
+  void _submit() {
+    if (!_formKey.currentState!.validate()) {
       return;
     }
     FocusScope.of(context).unfocus();
-    Navigator.of(context).pop(CommerceStore.normalizeBarcode(controller.text));
+    Navigator.of(context).pop(CommerceStore.normalizeBarcode(_controller.text));
   }
-
-  final useFullscreen = useFullscreenFormLayout(context);
-  final NavigatorState navigator = Navigator.of(context);
-  final String? result;
-  if (useFullscreen) {
-    result = await navigator.push<String>(
-      MaterialPageRoute<String>(
-        fullscreenDialog: true,
-        builder: (pageContext) {
-          return KeyboardAwareFormScaffold(
-            title: title,
-            child: BpcPanel(
-              child: buildForm(pageContext, () => submit(pageContext)),
-            ),
-          );
-        },
-      ),
-    );
-  } else {
-    result = await showDialog<String>(
-      context: context,
-      useSafeArea: true,
-      builder: (dialogContext) {
-        return AlertDialog(
-          insetPadding: EdgeInsets.fromLTRB(
-            16,
-            24,
-            16,
-            16 + MediaQuery.viewInsetsOf(dialogContext).bottom,
-          ),
-          scrollable: true,
-          title: Text(title),
-          content: buildForm(dialogContext, () => submit(dialogContext)),
-        );
-      },
-    );
-  }
-
-  controller.dispose();
-  focusNode.dispose();
-  return result;
 }

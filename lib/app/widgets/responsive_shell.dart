@@ -534,8 +534,10 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
           : 'Apertura de caja',
       label: 'Caja inicial',
       confirmLabel: store.hasCashOpeningToday ? 'Actualizar' : 'Guardar',
-      helper: 'Ingresa el efectivo inicial del dia.',
+      helper:
+          'Ingresa el efectivo inicial del dia. Puedes usar 0 si abres sin efectivo.',
       initialValue: store.todayOpeningCashPesos,
+      allowZero: true,
     );
     if (amount == null) {
       return;
@@ -602,8 +604,10 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       title: store.hasCashClosingToday ? 'Actualizar cierre' : 'Cierre de caja',
       label: 'Caja contada',
       confirmLabel: store.hasCashClosingToday ? 'Actualizar' : 'Guardar',
-      helper: 'Ingresa el monto contado al cierre.',
+      helper:
+          'Ingresa el monto contado al cierre. Puedes usar 0 si la caja queda vacia.',
       initialValue: store.todayClosingCashPesos,
+      allowZero: true,
     );
     if (amount == null) {
       return;

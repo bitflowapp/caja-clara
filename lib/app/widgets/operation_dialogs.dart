@@ -53,84 +53,170 @@ Future<int?> showAmountEntryDialog(
   required String confirmLabel,
   String? helper,
   int? initialValue,
+  bool allowZero = false,
 }) async {
-  final controller = TextEditingController(
-    text: initialValue == null ? '' : initialValue.toString(),
-  );
-  final focusNode = FocusNode();
-  final formKey = GlobalKey<FormState>();
-  selectAllTextOnFocus(focusNode, controller);
+  final useFullscreen = useFullscreenFormLayout(context);
+  final navigator = Navigator.of(context);
 
-  Widget buildForm(BuildContext context, VoidCallback submit) {
+  if (useFullscreen) {
+    return navigator.push<int>(
+      MaterialPageRoute<int>(
+        fullscreenDialog: true,
+        builder: (_) {
+          return KeyboardAwareFormScaffold(
+            title: title,
+            child: BpcPanel(
+              child: _AmountEntryForm(
+                label: label,
+                confirmLabel: confirmLabel,
+                helper: helper,
+                initialValue: initialValue,
+                allowZero: allowZero,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  return showDialog<int>(
+    context: context,
+    useSafeArea: true,
+    builder: (dialogContext) {
+      return AlertDialog(
+        insetPadding: EdgeInsets.fromLTRB(
+          16,
+          24,
+          16,
+          16 + MediaQuery.viewInsetsOf(dialogContext).bottom,
+        ),
+        scrollable: true,
+        title: Text(title),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: _AmountEntryForm(
+            label: label,
+            confirmLabel: confirmLabel,
+            helper: helper,
+            initialValue: initialValue,
+            allowZero: allowZero,
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _AmountEntryForm extends StatefulWidget {
+  const _AmountEntryForm({
+    required this.label,
+    required this.confirmLabel,
+    this.helper,
+    this.initialValue,
+    required this.allowZero,
+  });
+
+  final String label;
+  final String confirmLabel;
+  final String? helper;
+  final int? initialValue;
+  final bool allowZero;
+
+  @override
+  State<_AmountEntryForm> createState() => _AmountEntryFormState();
+}
+
+class _AmountEntryFormState extends State<_AmountEntryForm> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _controller;
+  final _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: widget.initialValue == null ? '' : widget.initialValue.toString(),
+    );
+    selectAllTextOnFocus(_focusNode, _controller);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 640;
     return InputShortcutScope(
       onCancel: () => Navigator.of(context).pop(),
-      onSave: submit,
+      onSave: _submit,
       child: Form(
-        key: formKey,
+        key: _formKey,
         child: FocusTraversalGroup(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (helper != null) ...[Text(helper), const SizedBox(height: 12)],
+              if (widget.helper != null) ...[
+                Text(widget.helper!),
+                const SizedBox(height: 12),
+              ],
               EnsureVisibleWhenFocused(
-                focusNode: focusNode,
+                focusNode: _focusNode,
                 child: TextFormField(
-                  controller: controller,
-                  focusNode: focusNode,
+                  controller: _controller,
+                  focusNode: _focusNode,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   autofocus: true,
                   textInputAction: TextInputAction.done,
-                  decoration: InputDecoration(labelText: label),
-                  onTapOutside: (_) => focusNode.unfocus(),
-                  onFieldSubmitted: (_) => submit(),
+                  decoration: InputDecoration(labelText: widget.label),
+                  onTapOutside: (_) => _focusNode.unfocus(),
+                  onFieldSubmitted: (_) => _submit(),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Completa este campo.';
                     }
                     final parsed = _parseInt(value);
-                    if (parsed <= 0) {
-                      return 'Ingresa un valor mayor a 0.';
+                    if (parsed < 0 || (!widget.allowZero && parsed == 0)) {
+                      return widget.allowZero
+                          ? 'Ingresa un valor igual o mayor a 0.'
+                          : 'Ingresa un valor mayor a 0.';
                     }
                     return null;
                   },
                 ),
               ),
               const SizedBox(height: 16),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 520;
-                  final cancelButton = TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancelar'),
-                  );
-                  final submitButton = FilledButton(
-                    onPressed: submit,
-                    child: Text(confirmLabel),
-                  );
-
-                  if (compact) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        submitButton,
-                        const SizedBox(height: 10),
-                        cancelButton,
-                      ],
-                    );
-                  }
-
-                  return Row(
-                    children: [
-                      const Spacer(),
-                      cancelButton,
-                      const SizedBox(width: 10),
-                      submitButton,
-                    ],
-                  );
-                },
-              ),
+              if (compact) ...[
+                FilledButton(
+                  onPressed: _submit,
+                  child: Text(widget.confirmLabel),
+                ),
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
+                ),
+              ] else
+                Row(
+                  children: [
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancelar'),
+                    ),
+                    const SizedBox(width: 10),
+                    FilledButton(
+                      onPressed: _submit,
+                      child: Text(widget.confirmLabel),
+                    ),
+                  ],
+                ),
             ],
           ),
         ),
@@ -138,54 +224,13 @@ Future<int?> showAmountEntryDialog(
     );
   }
 
-  void submit(BuildContext context) {
-    if (!formKey.currentState!.validate()) {
+  void _submit() {
+    if (!_formKey.currentState!.validate()) {
       return;
     }
     FocusScope.of(context).unfocus();
-    Navigator.of(context).pop(_parseInt(controller.text));
+    Navigator.of(context).pop(_parseInt(_controller.text));
   }
-
-  final useFullscreen = useFullscreenFormLayout(context);
-  final NavigatorState navigator = Navigator.of(context);
-  final int? result;
-  if (useFullscreen) {
-    result = await navigator.push<int>(
-      MaterialPageRoute<int>(
-        fullscreenDialog: true,
-        builder: (pageContext) {
-          return KeyboardAwareFormScaffold(
-            title: title,
-            child: BpcPanel(
-              child: buildForm(pageContext, () => submit(pageContext)),
-            ),
-          );
-        },
-      ),
-    );
-  } else {
-    result = await showDialog<int>(
-      context: context,
-      useSafeArea: true,
-      builder: (dialogContext) {
-        return AlertDialog(
-          insetPadding: EdgeInsets.fromLTRB(
-            16,
-            24,
-            16,
-            16 + MediaQuery.viewInsetsOf(dialogContext).bottom,
-          ),
-          scrollable: true,
-          title: Text(title),
-          content: buildForm(dialogContext, () => submit(dialogContext)),
-        );
-      },
-    );
-  }
-
-  controller.dispose();
-  focusNode.dispose();
-  return result;
 }
 
 int _parseInt(String? value) {

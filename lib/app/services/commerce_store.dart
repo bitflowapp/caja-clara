@@ -170,7 +170,7 @@ class CommerceStore extends ChangeNotifier {
     if (raw == null) {
       return null;
     }
-    final normalized = raw.replaceAll(RegExp(r'\s+'), '').trim();
+    final normalized = raw.replaceAll(RegExp(r'\s+'), '').trim().toUpperCase();
     return normalized.isEmpty ? null : normalized;
   }
 

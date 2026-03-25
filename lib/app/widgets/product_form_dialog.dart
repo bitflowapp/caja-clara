@@ -450,15 +450,17 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                   labelText: 'Codigo de barras (opcional)',
                   editorContext: _title,
                   emptyDisplayText: 'Toca para cargar el codigo',
-                  keyboardType: TextInputType.number,
+                  keyboardType: TextInputType.text,
+                  textCapitalization: TextCapitalization.characters,
                 )
               : EnsureVisibleWhenFocused(
                   focusNode: _barcodeFocusNode,
                   child: TextFormField(
                     controller: _barcodeController,
                     focusNode: _barcodeFocusNode,
-                    keyboardType: TextInputType.number,
+                    keyboardType: TextInputType.text,
                     textInputAction: TextInputAction.next,
+                    textCapitalization: TextCapitalization.characters,
                     decoration: const InputDecoration(
                       labelText: 'Codigo de barras (opcional)',
                     ),

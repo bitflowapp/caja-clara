@@ -172,14 +172,22 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
   }
 
   Future<void> _openSale(Product product) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
+    final message = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
         builder: (_) => SaleScreen(initialProduct: product),
       ),
     );
-    if (mounted) {
-      setState(() {});
+    if (!mounted) {
+      return;
     }
+    if (message != null) {
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+      );
+    }
+    setState(() {});
   }
 
   Future<void> _addStock(CommerceStore store, Product product) async {
