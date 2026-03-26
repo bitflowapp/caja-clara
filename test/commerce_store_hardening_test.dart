@@ -229,6 +229,20 @@ void main() {
       expect(store.lastSalePaymentMethod, 'Transferencia');
     });
 
+    test('stores payment methods trimmed for future defaults', () async {
+      final store = CommerceStore.emptyForTest();
+
+      await store.recordFreeSale(
+        description: 'Cable USB',
+        quantityUnits: 1,
+        unitPricePesos: 4500,
+        paymentMethod: '  Mercado Pago  ',
+      );
+
+      expect(store.movements.first.paymentMethod, 'Mercado Pago');
+      expect(store.lastSalePaymentMethod, 'Mercado Pago');
+    });
+
     test('undo last sale restores stock and movement count', () async {
       final store = CommerceStore.seededForTest();
       final initialStock = store.productById('p-2')!.stockUnits;

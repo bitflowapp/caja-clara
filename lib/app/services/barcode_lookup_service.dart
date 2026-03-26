@@ -122,7 +122,7 @@ class DisabledBarcodeLookupService extends BarcodeLookupService {
   Future<BarcodeLookupResult> lookup(String normalizedBarcode) async {
     return const BarcodeLookupResult.disabled(
       message:
-          'El catálogo externo no está activo en esta build. Puedes cargar el producto manualmente sin perder el código.',
+          'El catalogo externo no esta activo en esta build. Puedes cargar el producto manualmente sin perder el codigo.',
     );
   }
 }
@@ -151,7 +151,7 @@ class OpenFoodFactsBarcodeLookupService extends BarcodeLookupService {
     final barcode = CommerceStore.normalizeBarcode(normalizedBarcode);
     if (barcode == null) {
       return const BarcodeLookupResult.notFound(
-        message: 'Ingresa un código válido para buscar datos.',
+        message: 'Ingresa un codigo valido para buscar datos.',
       );
     }
 
@@ -169,19 +169,19 @@ class OpenFoodFactsBarcodeLookupService extends BarcodeLookupService {
       if (response.statusCode == 404) {
         return const BarcodeLookupResult.notFound(
           message:
-              'No encontramos ese código en el catálogo externo. Puedes cargarlo manualmente.',
+              'No encontramos ese codigo en el catalogo externo. Puedes cargarlo manualmente.',
         );
       }
       if (response.statusCode == 429) {
         return const BarcodeLookupResult.failed(
           message:
-              'El catálogo externo está saturado ahora mismo. Puedes seguir con alta manual.',
+              'El catalogo externo esta saturado ahora mismo. Puedes seguir con alta manual.',
         );
       }
       if (response.statusCode < 200 || response.statusCode >= 300) {
         return const BarcodeLookupResult.failed(
           message:
-              'No pudimos consultar el catálogo externo ahora. Puedes seguir con alta manual.',
+              'No pudimos consultar el catalogo externo ahora. Puedes seguir con alta manual.',
         );
       }
 
@@ -189,7 +189,7 @@ class OpenFoodFactsBarcodeLookupService extends BarcodeLookupService {
       if (decoded is! Map<String, dynamic>) {
         return const BarcodeLookupResult.failed(
           message:
-              'La respuesta del catálogo externo no fue válida. Puedes seguir con alta manual.',
+              'La respuesta del catalogo externo no fue valida. Puedes seguir con alta manual.',
         );
       }
 
@@ -197,7 +197,7 @@ class OpenFoodFactsBarcodeLookupService extends BarcodeLookupService {
       if (status != 1) {
         return const BarcodeLookupResult.notFound(
           message:
-              'No encontramos ese código en el catálogo externo. Puedes cargarlo manualmente.',
+              'No encontramos ese codigo en el catalogo externo. Puedes cargarlo manualmente.',
         );
       }
 
@@ -205,7 +205,7 @@ class OpenFoodFactsBarcodeLookupService extends BarcodeLookupService {
       if (product == null) {
         return const BarcodeLookupResult.notFound(
           message:
-              'No encontramos datos confiables para este código. Puedes cargarlo manualmente.',
+              'No encontramos datos confiables para este codigo. Puedes cargarlo manualmente.',
         );
       }
 
@@ -213,7 +213,7 @@ class OpenFoodFactsBarcodeLookupService extends BarcodeLookupService {
       if (name == null) {
         return const BarcodeLookupResult.notFound(
           message:
-              'El catálogo externo no devolvió un nombre confiable. Puedes cargarlo manualmente.',
+              'El catalogo externo no devolvio un nombre confiable. Puedes cargarlo manualmente.',
         );
       }
 
@@ -241,12 +241,12 @@ class OpenFoodFactsBarcodeLookupService extends BarcodeLookupService {
     } on TimeoutException {
       return const BarcodeLookupResult.failed(
         message:
-            'El catálogo externo tardó demasiado. Puedes seguir con alta manual.',
+            'El catalogo externo tardo demasiado. Puedes seguir con alta manual.',
       );
     } catch (_) {
       return const BarcodeLookupResult.failed(
         message:
-            'No pudimos consultar el catálogo externo ahora. Puedes seguir con alta manual.',
+            'No pudimos consultar el catalogo externo ahora. Puedes seguir con alta manual.',
       );
     }
   }

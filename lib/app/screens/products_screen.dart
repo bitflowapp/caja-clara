@@ -62,6 +62,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       builder: (context, _) {
         final products = _filteredProducts(store.products);
         final emptyCatalog = store.products.isEmpty;
+        final canLoadDemoData = store.isEmptyState;
         final filteredEmpty = products.isEmpty && !emptyCatalog;
         return InputShortcutScope(
           onCancel: () {
@@ -87,7 +88,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     spacing: 10,
                     runSpacing: 10,
                     children: [
-                      if (emptyCatalog)
+                      if (emptyCatalog && canLoadDemoData)
                         FilledButton.icon(
                           onPressed: widget.loadingDemoData
                               ? null
@@ -186,14 +187,16 @@ class _ProductsScreenState extends State<ProductsScreen> {
                           ? 'Todavia no cargaste productos'
                           : 'Sin resultados',
                       message: emptyCatalog
-                          ? 'Puedes empezar con la plantilla kiosco o crear tus productos a mano. Todo queda editable y se guarda localmente.'
+                          ? canLoadDemoData
+                                ? 'Puedes empezar con la plantilla kiosco o crear tus productos a mano. Todo queda editable y se guarda localmente.'
+                                : 'Ya hay movimientos guardados, asi que conviene sumar catalogo real con una plantilla kiosco o alta manual sin pisar ese historial.'
                           : 'No hay productos con ese filtro. Ajusta la busqueda o carga uno nuevo.',
                       action: Wrap(
                         spacing: 10,
                         runSpacing: 10,
                         alignment: WrapAlignment.center,
                         children: [
-                          if (emptyCatalog)
+                          if (emptyCatalog && canLoadDemoData)
                             FilledButton(
                               onPressed: widget.loadingDemoData
                                   ? null

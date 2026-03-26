@@ -88,6 +88,6 @@ void main() {
     final result = await service.lookup('7791234500011');
 
     expect(result.status, BarcodeLookupStatus.disabled);
-    expect(result.message, contains('no está activo'));
+    expect(result.message, contains('no esta activo'));
   });
 }

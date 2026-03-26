@@ -1,3 +1,4 @@
+import 'package:b_plus_commerce/app/models/product.dart';
 import 'package:b_plus_commerce/app/services/commerce_store.dart';
 import 'package:b_plus_commerce/app/widgets/commerce_scope.dart';
 import 'package:b_plus_commerce/app/widgets/product_form_dialog.dart';
@@ -8,6 +9,7 @@ void main() {
   Future<void> pumpProductDialog(
     WidgetTester tester,
     CommerceStore store, {
+    Product? product,
     ProductEditorSeed? seed,
     Size size = const Size(390, 844),
   }) async {
@@ -28,7 +30,12 @@ void main() {
                 body: Center(
                   child: FilledButton(
                     onPressed: () {
-                      showProductEditor(context, store, seed: seed);
+                      showProductEditor(
+                        context,
+                        store,
+                        product: product,
+                        seed: seed,
+                      );
                     },
                     child: const Text('Abrir producto'),
                   ),
@@ -132,6 +139,43 @@ void main() {
     expect(store.products.length, initialCount);
     expect(find.byType(SnackBar), findsNothing);
   });
+
+  testWidgets(
+    'warns when editing a product into the exact name of another one',
+    (tester) async {
+      final store = CommerceStore.seededForTest();
+      final product = store.productById('p-2')!;
+
+      await pumpProductDialog(
+        tester,
+        store,
+        product: product,
+        size: const Size(1100, 900),
+      );
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Nombre'),
+        'Yerba premium',
+      );
+      await tester.pump();
+
+      await tester.ensureVisible(find.text('Guardar'));
+      await tester.tap(find.text('Guardar'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(
+        find.text('Ya existe otro producto con ese nombre'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Usar existente'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(store.productById('p-2')?.name, 'Papel higienico x4');
+    },
+  );
 
   testWidgets(
     'uses fullscreen form on narrow screens and dialog on wide screens',

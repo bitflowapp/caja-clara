@@ -292,4 +292,27 @@ void main() {
       expect(find.widgetWithText(TextFormField, 'Cantidad'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'nueva venta mantiene un medio de pago recuperado aunque no sea default',
+    (tester) async {
+      final store = CommerceStore.emptyForTest();
+      await store.recordFreeSale(
+        description: 'Cable USB',
+        quantityUnits: 1,
+        unitPricePesos: 4500,
+        paymentMethod: '  Mercado Pago  ',
+      );
+
+      await pumpSaleScreen(tester, store);
+
+      expect(find.text('Mercado Pago'), findsOneWidget);
+      expect(
+        find.text(
+          'Se recupero el ultimo medio guardado. Puedes cambiarlo si hace falta.',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 }

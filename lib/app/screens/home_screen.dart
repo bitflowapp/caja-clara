@@ -67,6 +67,8 @@ class HomeScreen extends StatelessWidget {
                   onAddProduct: () => showProductEditor(context, store),
                   applyingStarterTemplate: applyingStarterTemplate,
                   loadingDemoData: loadingDemoData,
+                  canLoadDemoData: store.isEmptyState,
+                  hasMovements: store.hasMovements,
                 ),
               ],
               const SizedBox(height: 14),
@@ -524,6 +526,8 @@ class _StarterTemplateCard extends StatelessWidget {
     required this.onAddProduct,
     required this.applyingStarterTemplate,
     required this.loadingDemoData,
+    required this.canLoadDemoData,
+    required this.hasMovements,
   });
 
   final VoidCallback onApplyStarterTemplate;
@@ -531,9 +535,22 @@ class _StarterTemplateCard extends StatelessWidget {
   final VoidCallback onAddProduct;
   final bool applyingStarterTemplate;
   final bool loadingDemoData;
+  final bool canLoadDemoData;
+  final bool hasMovements;
 
   @override
   Widget build(BuildContext context) {
+    final title = canLoadDemoData
+        ? 'Lista para demo o primer uso'
+        : 'Falta resolver el catalogo base';
+    final message = canLoadDemoData
+        ? 'Puedes mostrar valor en segundos con una demo comercial ya armada o empezar desde una plantilla kiosco editable. Todo queda local en este dispositivo.'
+        : hasMovements
+        ? 'Ya hay movimientos guardados en este dispositivo, asi que la demo comercial no corresponde sobre este estado. Conviene sumar catalogo real con una plantilla o alta manual.'
+        : 'Conviene sumar catalogo real con una plantilla editable o alta manual para empezar a vender sin estados ambiguos.';
+    final firstStepSubtitle = canLoadDemoData
+        ? 'Demo comercial o plantilla kiosco'
+        : 'Plantilla kiosco o alta manual';
     return BpcPanel(
       padding: const EdgeInsets.all(16),
       color: Theme.of(context).colorScheme.surfaceContainerLow,
@@ -541,7 +558,7 @@ class _StarterTemplateCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Lista para demo o primer uso',
+            title,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: BpcColors.ink,
               fontWeight: FontWeight.w900,
@@ -549,7 +566,7 @@ class _StarterTemplateCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Puedes mostrar valor en segundos con una demo comercial ya armada o empezar desde una plantilla kiosco editable. Todo queda local en este dispositivo.',
+            message,
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
@@ -558,11 +575,11 @@ class _StarterTemplateCard extends StatelessWidget {
           Wrap(
             spacing: 10,
             runSpacing: 10,
-            children: const [
+            children: [
               _OnboardingStepChip(
                 step: '1',
                 title: 'Carga datos',
-                subtitle: 'Demo comercial o plantilla kiosco',
+                subtitle: firstStepSubtitle,
               ),
               _OnboardingStepChip(
                 step: '2',
@@ -581,23 +598,24 @@ class _StarterTemplateCard extends StatelessWidget {
             spacing: 10,
             runSpacing: 10,
             children: [
-              FilledButton.icon(
-                onPressed: loadingDemoData || applyingStarterTemplate
-                    ? null
-                    : onLoadDemoData,
-                icon: loadingDemoData
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.play_circle_rounded),
-                label: Text(
-                  loadingDemoData
-                      ? 'Cargando demo...'
-                      : 'Cargar demo comercial',
+              if (canLoadDemoData)
+                FilledButton.icon(
+                  onPressed: loadingDemoData || applyingStarterTemplate
+                      ? null
+                      : onLoadDemoData,
+                  icon: loadingDemoData
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.play_circle_rounded),
+                  label: Text(
+                    loadingDemoData
+                        ? 'Cargando demo...'
+                        : 'Cargar demo comercial',
+                  ),
                 ),
-              ),
               OutlinedButton.icon(
                 onPressed: applyingStarterTemplate || loadingDemoData
                     ? null

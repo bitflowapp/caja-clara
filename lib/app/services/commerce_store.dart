@@ -5,6 +5,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import '../models/movement.dart';
 import '../models/product.dart';
+import '../utils/payment_methods.dart';
 import 'commerce_persistence.dart';
 import 'starter_templates.dart';
 
@@ -678,6 +679,7 @@ class CommerceStore extends ChangeNotifier {
     final revenue = product.pricePesos * quantityUnits;
     final cost = product.costPesos * quantityUnits;
     final timestamp = createdAt ?? DateTime.now();
+    final normalizedPaymentMethod = normalizeStoredPaymentMethod(paymentMethod);
     await _runPersistedMutation(() {
       _products[index] = product.copyWith(
         stockUnits: product.stockUnits - quantityUnits,
@@ -695,9 +697,7 @@ class CommerceStore extends ChangeNotifier {
           subtitle: product.name,
           productId: product.id,
           quantityUnits: quantityUnits,
-          paymentMethod: paymentMethod.trim().isEmpty
-              ? 'Sin dato'
-              : paymentMethod,
+          paymentMethod: normalizedPaymentMethod,
         ),
       );
       _sortProducts();
@@ -722,6 +722,7 @@ class CommerceStore extends ChangeNotifier {
     }
 
     final revenue = unitPricePesos * quantityUnits;
+    final normalizedPaymentMethod = normalizeStoredPaymentMethod(paymentMethod);
     await _runPersistedMutation(() {
       _movements.insert(
         0,
@@ -736,9 +737,7 @@ class CommerceStore extends ChangeNotifier {
           title: 'Venta libre',
           subtitle: cleanDescription,
           quantityUnits: quantityUnits,
-          paymentMethod: paymentMethod.trim().isEmpty
-              ? 'Sin dato'
-              : paymentMethod,
+          paymentMethod: normalizedPaymentMethod,
         ),
       );
     });

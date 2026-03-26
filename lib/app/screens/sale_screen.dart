@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../models/product.dart';
 import '../services/commerce_store.dart';
 import '../utils/formatters.dart';
+import '../utils/payment_methods.dart';
 import '../utils/user_facing_errors.dart';
 import '../utils/text_field_selection.dart';
 import '../widgets/commerce_components.dart';
@@ -69,7 +70,9 @@ class _SaleScreenState extends State<SaleScreen> {
       return;
     }
     final store = CommerceScope.of(context);
-    _paymentMethod = store.lastSalePaymentMethod ?? 'Efectivo';
+    _paymentMethod = resolveSalePaymentMethodSelection(
+      store.lastSalePaymentMethod,
+    );
     _didSeedDefaults = true;
   }
 
@@ -161,6 +164,12 @@ class _SaleScreenState extends State<SaleScreen> {
               (_saleMode == SaleEntryMode.catalog
                   ? product != null && saleWarning == null && quantity > 0
                   : saleWarning == null && quantity > 0);
+          final paymentMethodOptions = salePaymentMethodOptions(
+            selectedValue: _paymentMethod,
+          );
+          final hasCustomPaymentMethod = !supportedSalePaymentMethods.contains(
+            _paymentMethod,
+          );
           return KeyboardAwarePageBody(
             child: InputShortcutScope(
               onSave: _saving ? null : () => _submitSale(store),
@@ -618,24 +627,26 @@ class _SaleScreenState extends State<SaleScreen> {
                                     focusNode: _paymentFocusNode,
                                     child: DropdownButtonFormField<String>(
                                       focusNode: _paymentFocusNode,
-                                      initialValue: _paymentMethod,
+                                      initialValue:
+                                          paymentMethodOptions.contains(
+                                            _paymentMethod,
+                                          )
+                                          ? _paymentMethod
+                                          : paymentMethodOptions.first,
                                       isExpanded: true,
-                                      decoration: const InputDecoration(
+                                      decoration: InputDecoration(
                                         labelText: 'Medio de pago',
+                                        helperText: hasCustomPaymentMethod
+                                            ? 'Se recupero el ultimo medio guardado. Puedes cambiarlo si hace falta.'
+                                            : null,
                                       ),
-                                      items: const [
-                                        DropdownMenuItem(
-                                          value: 'Efectivo',
-                                          child: Text('Efectivo'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: 'Debito',
-                                          child: Text('Debito'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: 'Transferencia',
-                                          child: Text('Transferencia'),
-                                        ),
+                                      items: [
+                                        for (final paymentMethod
+                                            in paymentMethodOptions)
+                                          DropdownMenuItem(
+                                            value: paymentMethod,
+                                            child: Text(paymentMethod),
+                                          ),
                                       ],
                                       onChanged: (value) {
                                         if (value == null) {

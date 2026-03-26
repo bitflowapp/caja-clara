@@ -836,25 +836,26 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       barcode: CommerceStore.normalizeBarcode(_barcodeController.text),
     );
 
-    if (widget.product == null) {
-      final existing = widget.store.productByNormalizedName(product.name);
-      if (existing != null) {
-        final resolution = await _showDuplicateNameDialog(existing);
-        if (!mounted) {
-          return;
-        }
-        if (resolution == _DuplicateProductResolution.cancel) {
-          return;
-        }
-        if (resolution == _DuplicateProductResolution.useExisting) {
-          Navigator.of(context).pop(
-            ProductEditorResult(
-              kind: ProductEditorResultKind.usedExisting,
-              product: existing,
-            ),
-          );
-          return;
-        }
+    final existingByName = widget.store.productByNormalizedName(
+      product.name,
+      excludingProductId: widget.product?.id,
+    );
+    if (existingByName != null) {
+      final resolution = await _showDuplicateNameDialog(existingByName);
+      if (!mounted) {
+        return;
+      }
+      if (resolution == _DuplicateProductResolution.cancel) {
+        return;
+      }
+      if (resolution == _DuplicateProductResolution.useExisting) {
+        Navigator.of(context).pop(
+          ProductEditorResult(
+            kind: ProductEditorResultKind.usedExisting,
+            product: existingByName,
+          ),
+        );
+        return;
       }
     }
 
@@ -934,13 +935,20 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   Future<_DuplicateProductResolution?> _showDuplicateNameDialog(
     Product existing,
   ) {
+    final editingCurrentProduct = widget.product != null;
     return showDialog<_DuplicateProductResolution>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Ya existe un producto con ese nombre'),
+          title: Text(
+            editingCurrentProduct
+                ? 'Ya existe otro producto con ese nombre'
+                : 'Ya existe un producto con ese nombre',
+          ),
           content: Text(
-            'Se encontro "${existing.name}" en el catalogo. Puedes usar ese producto, cancelar o crear otro igual si de verdad lo necesitas.',
+            editingCurrentProduct
+                ? 'Se encontro "${existing.name}" en el catalogo. Si guardas asi, quedaran dos productos con el mismo nombre exacto. Puedes usar el existente, volver o guardar igual si de verdad lo necesitas.'
+                : 'Se encontro "${existing.name}" en el catalogo. Puedes usar ese producto, cancelar o crear otro igual si de verdad lo necesitas.',
           ),
           actions: [
             TextButton(
@@ -958,7 +966,9 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
               onPressed: () => Navigator.of(
                 context,
               ).pop(_DuplicateProductResolution.createDuplicate),
-              child: const Text('Crear igual'),
+              child: Text(
+                editingCurrentProduct ? 'Guardar igual' : 'Crear igual',
+              ),
             ),
           ],
         );

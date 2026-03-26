@@ -40,4 +40,29 @@ void main() {
     expect(find.text('Cargar Kiosco argentino'), findsOneWidget);
     expect(find.text('Agregar producto manualmente'), findsOneWidget);
   });
+
+  testWidgets(
+    'Home hides demo CTA when there are movements but the catalog is still empty',
+    (tester) async {
+      final store = CommerceStore.emptyForTest();
+      await store.recordFreeSale(
+        description: 'Venta mostrador',
+        quantityUnits: 1,
+        unitPricePesos: 2500,
+        paymentMethod: 'Efectivo',
+      );
+
+      await tester.pumpWidget(
+        BPlusCommerceApp(
+          store: store,
+          barcodeLookupService: const DisabledBarcodeLookupService(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cargar demo comercial'), findsNothing);
+      expect(find.text('Cargar Kiosco argentino'), findsOneWidget);
+      expect(find.text('Agregar producto manualmente'), findsOneWidget);
+    },
+  );
 }
