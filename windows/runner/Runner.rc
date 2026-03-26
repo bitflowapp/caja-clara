@@ -92,9 +92,9 @@ BEGIN
             VALUE "CompanyName", "Caja Clara" "\0"
             VALUE "FileDescription", "Caja Clara" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "b_plus_commerce" "\0"
+            VALUE "InternalName", "CajaClara" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 Caja Clara. All rights reserved." "\0"
-            VALUE "OriginalFilename", "b_plus_commerce.exe" "\0"
+            VALUE "OriginalFilename", "CajaClara.exe" "\0"
             VALUE "ProductName", "Caja Clara" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END

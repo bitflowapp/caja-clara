@@ -33,4 +33,4 @@ if ($Release) {
     --dart-define=CAJA_CLARA_BUILD_SOURCE=local-script
 }
 
-Write-Host "OK: build/windows"
+Write-Host "OK: build/windows/x64/runner/Release/CajaClara.exe"

@@ -1,0 +1,68 @@
+name: Caja Clara Windows
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  FLUTTER_CHANNEL: stable
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Prepare build metadata
+        shell: pwsh
+        run: |
+          "CAJA_CLARA_BUILD_SHA=$env:GITHUB_SHA" >> $env:GITHUB_ENV
+          "CAJA_CLARA_BUILD_SHORT_SHA=$($env:GITHUB_SHA.Substring(0,7))" >> $env:GITHUB_ENV
+          "CAJA_CLARA_BUILD_BRANCH=$env:GITHUB_REF_NAME" >> $env:GITHUB_ENV
+          "CAJA_CLARA_BUILD_TIME_UTC=$((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))" >> $env:GITHUB_ENV
+          "CAJA_CLARA_BUILD_SOURCE=github-actions-windows" >> $env:GITHUB_ENV
+
+      - name: Analyze
+        run: flutter analyze --no-pub
+
+      - name: Test
+        run: flutter test --no-pub
+
+      - name: Build Windows
+        run: >
+          flutter build windows --release --no-pub
+          --dart-define=CAJA_CLARA_BUILD_SHA=${{ env.CAJA_CLARA_BUILD_SHA }}
+          --dart-define=CAJA_CLARA_BUILD_SHORT_SHA=${{ env.CAJA_CLARA_BUILD_SHORT_SHA }}
+          --dart-define=CAJA_CLARA_BUILD_BRANCH=${{ env.CAJA_CLARA_BUILD_BRANCH }}
+          --dart-define=CAJA_CLARA_BUILD_TIME_UTC=${{ env.CAJA_CLARA_BUILD_TIME_UTC }}
+          --dart-define=CAJA_CLARA_BUILD_SOURCE=${{ env.CAJA_CLARA_BUILD_SOURCE }}
+
+      - name: Package portable release
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File scripts/package_windows_release.ps1 -SkipBuild
+
+      - name: Package MSIX
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File scripts/package_msix.ps1 -SkipBuild
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: caja-clara-windows
+          path: |
+            build/windows/x64/runner/Release
+            dist/windows-portable
+            dist/msix
+            certs

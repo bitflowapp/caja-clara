@@ -1,6 +1,8 @@
 param(
   [string]$CertificateSubject = "CN=Caja Clara Dev",
-  [string]$CertificatePassword = "CajaClara123!"
+  [string]$CertificatePassword = "CajaClara123!",
+  [switch]$SkipBuild,
+  [switch]$InstallAfterCreate
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,7 +20,9 @@ if (-not (Test-Path $certsDir)) {
 }
 
 $password = ConvertTo-SecureString -String $CertificatePassword -AsPlainText -Force
-$cert = Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.Subject -eq $CertificateSubject } | Select-Object -First 1
+$cert = Get-ChildItem Cert:\CurrentUser\My |
+  Where-Object { $_.Subject -eq $CertificateSubject } |
+  Select-Object -First 1
 
 if (-not $cert) {
   Write-Host "Creating local signing certificate..."
@@ -38,11 +42,10 @@ Export-Certificate -Cert $cert -FilePath $cerPath | Out-Null
 Write-Host "Trusting certificate for current user..."
 Import-Certificate -FilePath $cerPath -CertStoreLocation "Cert:\CurrentUser\TrustedPeople" | Out-Null
 
-Write-Host "Flutter pub get..."
-flutter pub get
-
-Write-Host "Building Windows release..."
-flutter build windows --release
+if (-not $SkipBuild) {
+  Write-Host "Building Windows release..."
+  powershell -ExecutionPolicy Bypass -File (Join-Path $root "scripts\\build_windows.ps1")
+}
 
 Write-Host "Creating signed MSIX package..."
 dart run msix:create `
@@ -55,7 +58,13 @@ if (-not (Test-Path $msixPath)) {
   throw "MSIX package not found at $msixPath"
 }
 
-Write-Host "Installing MSIX package..."
-Add-AppxPackage -Path $msixPath -ForceApplicationShutdown
+if ($InstallAfterCreate) {
+  Write-Host "Installing MSIX package..."
+  Add-AppxPackage -Path $msixPath -ForceApplicationShutdown
+}
 
-Write-Host "OK: $msixPath"
+Write-Host "MSIX package: $msixPath"
+Write-Host "Certificate (.cer): $cerPath"
+if (-not $InstallAfterCreate) {
+  Write-Host "Installation skipped. To install later, trust the certificate if needed and run Add-AppxPackage over the MSIX."
+}

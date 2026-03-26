@@ -2,58 +2,71 @@
 
 ![Caja Clara](assets/branding/caja_clara_logo.png)
 
-Caja Clara es una app Flutter para comercios chicos y pymes que necesitan operar ventas, gastos, productos, caja, stock y barcode desde una base local, simple y offline.
+Caja Clara es una app Flutter para comercios chicos que necesitan vender, manejar caja, controlar productos y trabajar con barcode desde una base local y simple.
 
-Carga productos, registra ventas y gastos, controla caja y exporta la informacion sin depender de un backend.
-Esta pensada para negocios chicos que necesitan una herramienta clara, rapida y facil de mostrar o usar todos los dias.
+La version principal es Windows desktop. La version web en GitHub Pages queda como demo, landing o adicional comercial, no como reemplazo de la app local.
 
-Este repo esta preparado para dos salidas reales:
+## Producto principal: Windows
 
-- Windows desktop
-- Web/PWA publicada en GitHub Pages para uso desde el telefono
+La experiencia de Windows esta pensada para uso diario en PC:
 
-URL final esperada en Pages:
+- venta, gasto, caja y resumen en una sola app local
+- catalogo con stock, costo, precio y barcode
+- scanner por camara donde existe soporte y, en Windows, flujo comodo para scanner tipo teclado
+- lookup local-first por codigo de barras y alta asistida cuando no hay match
+- exportacion Excel y backup JSON
+- prueba de 30 dias con activacion manual posterior
+- modo solo lectura al vencer: los datos siguen visibles y exportables, pero se bloquean acciones operativas hasta activar
 
-```text
-https://TU-USUARIO.github.io/caja-clara/
-```
+## Web / GitHub Pages como extra
 
-## Features reales
+La web sirve para:
 
-- ventas con impacto en stock y caja
-- gastos con impacto en caja
-- productos con barcode opcional
-- stock bajo
-- caja y resumen operativo
-- exportacion Excel
-- backup y restore JSON
-- undo del ultimo movimiento
+- demo comercial
+- landing o vidriera
+- presencia online simple
+
+No esta planteada como producto principal. La operacion real y la propuesta mas fuerte quedan en Windows.
+
+## Flujos principales
+
 - apertura y cierre de caja
-- flujo de barcode con camara o ingreso manual
+- venta de catalogo y venta libre
+- gastos
+- alta y edicion de productos
+- scanner / barcode con fallback manual
+- resumen operativo del dia
+- exportacion y backup
 
-## Propuesta de valor corta
+## Scanner y barcode
 
-Caja Clara ordena lo esencial de un comercio chico en una sola app: productos, ventas, gastos, caja y barcode.
-Sirve para vender rapido, entender la caja en segundos y llevarse la informacion en Excel o backup local.
+Caja Clara no promete magia falsa:
 
-## Mini manual
+- primero busca el barcode en el catalogo local
+- si no existe, puede consultar un catalogo externo configurable
+- si encuentra datos confiables, autocompleta nombre y categoria sugerida
+- si no encuentra datos, deja el codigo cargado para alta manual asistida
+- nunca inventa nombre o categoria
 
-- [`docs/mini_manual_caja_clara.md`](docs/mini_manual_caja_clara.md)
+En Windows, el flujo esta optimizado para lectores USB o Bluetooth que funcionan como teclado: escanear y Enter suele ser suficiente.
 
-## Estructura
+## Trial y activacion
 
-```text
-caja-clara/
-|- lib/
-|- assets/
-|- docs/
-|- scripts/
-|- test/
-|- web/
-`- windows/
-```
+La version Windows incluye:
 
-## Abrir la app en Windows
+- prueba gratuita de 30 dias
+- activacion manual por codigo
+- estado visible de prueba / activa / solo lectura
+
+Cuando vence la prueba:
+
+- puedes seguir abriendo la app
+- puedes seguir viendo datos, exportando Excel y haciendo backup
+- no puedes registrar ventas, gastos, cambios de catalogo, stock o caja hasta activar
+
+La activacion se hace desde la propia app usando el ID de instalacion que muestra Caja Clara.
+
+## Desarrollo local
 
 Desde la raiz del repo:
 
@@ -62,166 +75,114 @@ flutter pub get
 flutter run -d windows
 ```
 
-## Launcher facil de clickear
+## Validacion de release
 
-Archivos:
-
-- [`Caja Clara Launcher.ps1`](D:/bit%20flow%20hoy%20actualizado%2012.2/caja-clara/Caja%20Clara%20Launcher.ps1)
-- [`Caja Clara Launcher.bat`](D:/bit%20flow%20hoy%20actualizado%2012.2/caja-clara/Caja%20Clara%20Launcher.bat)
-
-Comportamiento:
-
-- si existe el build release, abre el `.exe`
-- si no existe, construye `flutter build windows --release`
-- luego abre Caja Clara
-
-Tambien queda un acceso directo de escritorio:
-
-- [`Caja Clara.lnk`](C:/Users/marco/Desktop/Caja%20Clara.lnk)
+```powershell
+flutter analyze --no-pub
+flutter test --no-pub
+flutter build web --no-pub
+flutter build windows --no-pub
+```
 
 ## Build Windows
 
-Comando exacto:
+Comando directo:
 
 ```powershell
 flutter build windows --release
 ```
 
-Atajo:
+Script recomendado:
 
 ```powershell
 .\scripts\build_windows.ps1
 ```
 
-Salida esperada:
+Salida principal:
 
 ```text
-build/windows/x64/runner/Release/b_plus_commerce.exe
+build/windows/x64/runner/Release/CajaClara.exe
 ```
 
-## Version portable usable ahora
+## Abrir rapido en Windows
 
-Carpeta portable:
+Launcher local:
 
-- [`dist/windows-portable/`](D:/bit%20flow%20hoy%20actualizado%2012.2/caja-clara/dist/windows-portable)
+- [`Caja Clara Launcher.ps1`](./Caja%20Clara%20Launcher.ps1)
+- [`Caja Clara Launcher.bat`](./Caja%20Clara%20Launcher.bat)
 
-Para usarla:
+El launcher:
 
-1. abrir la carpeta portable
-2. ejecutar `b_plus_commerce.exe`
+- abre `CajaClara.exe` si ya existe el release
+- si no existe, ejecuta el build release
+- luego abre la app
 
-## Instalable Windows
+## Paquete portable
 
-Script de empaquetado:
+Script:
 
-- [`scripts/package_msix.ps1`](D:/bit%20flow%20hoy%20actualizado%2012.2/caja-clara/scripts/package_msix.ps1)
+```powershell
+.\scripts\package_windows_release.ps1
+```
 
-Comando:
+Salida:
+
+```text
+dist/windows-portable/CajaClara/
+dist/windows-portable/CajaClara-win64.zip
+```
+
+Ese paquete sirve para entregar una version portable lista para copiar y usar.
+
+## MSIX / instalable
+
+Script:
 
 ```powershell
 .\scripts\package_msix.ps1
 ```
 
-Paquete generado:
-
-- [`dist/msix/CajaClara.msix`](D:/bit%20flow%20hoy%20actualizado%2012.2/caja-clara/dist/msix/CajaClara.msix)
-
-Estado real hoy:
-
-- el `.msix` queda generado y firmado con certificado local de desarrollo
-- la instalacion automatica quedo bloqueada por confianza del certificado raiz en este perfil de Windows
-- la opcion portable queda lista y usable ahora
-
-Paso faltante si quieres cerrar la instalacion en esta maquina:
-
-1. abrir PowerShell como administrador
-2. importar `certs/caja-clara-dev.cer` a `Trusted Root Certification Authorities`
-3. instalar `dist/msix/CajaClara.msix`
-
-## Build Web / PWA
-
-Comando exacto:
+Opcionalmente, para crear e instalar en la misma maquina:
 
 ```powershell
-flutter build web --release --base-href "/caja-clara/" --pwa-strategy offline-first
+.\scripts\package_msix.ps1 -InstallAfterCreate
 ```
 
-Atajo:
-
-```powershell
-.\scripts\build_web.ps1 -BaseHref "/caja-clara/"
-```
-
-Salida esperada:
+Salida:
 
 ```text
-build/web/
+dist/msix/CajaClara.msix
+certs/caja-clara-dev.cer
+certs/caja-clara-dev.pfx
 ```
 
-### Marca de build
+Notas reales:
 
-La web publicada expone tambien `version.json` en la raiz del sitio:
+- el script genera un certificado local de desarrollo si hace falta
+- el MSIX queda firmado para pruebas razonables
+- la instalacion puede requerir confiar el certificado segun la politica del equipo
+
+## CI
+
+Workflows incluidos:
+
+- [`pages.yml`](./.github/workflows/pages.yml): build y deploy de GitHub Pages
+- [`windows-release.yml`](./.github/workflows/windows-release.yml): analyze, test, build Windows y artefactos de release
+
+## Estructura
 
 ```text
-https://bitflowapp.github.io/caja-clara/version.json
+caja-clara/
+|- .github/
+|- assets/
+|- docs/
+|- lib/
+|- scripts/
+|- test/
+|- web/
+`- windows/
 ```
 
-La app muestra una huella discreta de build en el footer para debug real:
+## Mini manual
 
-```text
-Build <short-sha> • <branch> • <utc>
-```
-
-## GitHub Pages
-
-Workflow activo:
-
-- [`.github/workflows/pages.yml`](D:/bit%20flow%20hoy%20actualizado%2012.2/caja-clara/.github/workflows/pages.yml)
-
-Configuracion actual:
-
-- app en la raiz del repo
-- `BASE_HREF = /caja-clara/`
-- `flutter analyze`
-- `flutter test`
-- `flutter build web --release --base-href "/caja-clara/" --pwa-strategy offline-first`
-- publicacion de `build/web`
-
-### Pasos exactos para publicar
-
-1. crear el repo GitHub `caja-clara`
-2. subir este contenido a la raiz del repo
-3. en GitHub, abrir `Settings -> Pages`
-4. elegir `GitHub Actions` como source
-5. hacer push a `main`
-6. esperar el workflow `Caja Clara Pages`
-
-### URL final esperada
-
-```text
-https://TU-USUARIO.github.io/caja-clara/
-```
-
-## Git y push
-
-Si el repo remoto ya existe:
-
-```powershell
-git remote add origin https://github.com/TU-USUARIO/caja-clara.git
-git push -u origin main
-```
-
-## Checks de release
-
-```powershell
-flutter analyze
-flutter test
-flutter build windows --release
-flutter build web --release --base-href "/caja-clara/" --pwa-strategy offline-first
-```
-
-## Limitaciones reales
-
-- el nombre tecnico del paquete y del exe sigue siendo `b_plus_commerce.exe`
-- no toque la logica de negocio
-- el `.msix` ya se genera, pero la instalacion final puede requerir importar el certificado con permisos mas altos
+- [`mini_manual_caja_clara.md`](./docs/mini_manual_caja_clara.md)

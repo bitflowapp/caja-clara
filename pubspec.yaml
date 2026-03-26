@@ -1,5 +1,5 @@
 name: b_plus_commerce
-description: "Caja Clara: ventas, gastos, caja, stock y barcode simple para pymes. Offline-first (Windows + Web/PWA)."
+description: "Caja Clara: app Windows-first para ventas, caja, stock y barcode en comercios chicos."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -75,7 +75,7 @@ flutter:
 
 msix_config:
   display_name: Caja Clara
-  publisher_display_name: Marco Luna
+  publisher_display_name: Caja Clara
   identity_name: gridnote.caja-clara
   msix_version: 0.1.0.0
   logo_path: assets/branding/caja_clara_icon_source.png
