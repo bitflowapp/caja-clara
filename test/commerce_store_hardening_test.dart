@@ -1,6 +1,7 @@
 import 'package:b_plus_commerce/app/services/backup_service.dart';
 import 'package:b_plus_commerce/app/services/commerce_persistence.dart';
 import 'package:b_plus_commerce/app/services/commerce_store.dart';
+import 'package:b_plus_commerce/app/services/license_service.dart';
 import 'package:b_plus_commerce/app/models/product.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -241,6 +242,30 @@ void main() {
 
       expect(store.movements.first.paymentMethod, 'Mercado Pago');
       expect(store.lastSalePaymentMethod, 'Mercado Pago');
+    });
+
+    test('blocks operational writes when the Windows trial expired', () async {
+      final now = DateTime(2026, 3, 26, 10, 0);
+      final store = CommerceStore.emptyForTest();
+      final licenseService = LicenseService.forTest(
+        clock: () => now,
+        installationId: 'CCW-TEST-LOCK',
+        trialStartedAt: now.subtract(const Duration(days: 31)),
+      );
+      store.attachLicenseService(licenseService);
+
+      await expectLater(
+        store.recordFreeSale(
+          description: 'Venta mostrador',
+          quantityUnits: 1,
+          unitPricePesos: 2500,
+          paymentMethod: 'Efectivo',
+        ),
+        throwsA(isA<LicenseRestrictionException>()),
+      );
+
+      expect(store.movements, isEmpty);
+      expect(store.cashBalancePesos, 0);
     });
 
     test('undo last sale restores stock and movement count', () async {

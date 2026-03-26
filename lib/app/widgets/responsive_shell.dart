@@ -12,11 +12,14 @@ import '../services/commerce_store.dart';
 import '../services/backup_service.dart';
 import '../services/build_info.dart';
 import '../services/excel_export_service.dart';
+import '../services/license_service.dart';
 import '../theme/bpc_colors.dart';
 import '../utils/user_facing_errors.dart';
 import 'caja_clara_brand.dart';
 import 'commerce_components.dart';
 import 'commerce_scope.dart';
+import 'license_dialogs.dart';
+import 'license_scope.dart';
 import 'operation_dialogs.dart';
 import 'product_form_dialog.dart';
 import 'quick_help_dialog.dart';
@@ -42,6 +45,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
   bool _savingCashEvent = false;
 
   Future<void> _openSale() async {
+    if (!await _ensureFeatureAccess(LockedFeature.sales) || !mounted) {
+      return;
+    }
     final message = await Navigator.of(context).push<String>(
       MaterialPageRoute<String>(builder: (_) => const SaleScreen()),
     );
@@ -52,6 +58,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
   }
 
   Future<void> _openExpense() async {
+    if (!await _ensureFeatureAccess(LockedFeature.expenses) || !mounted) {
+      return;
+    }
     final message = await Navigator.of(context).push<String>(
       MaterialPageRoute<String>(builder: (_) => const ExpenseScreen()),
     );
@@ -73,6 +82,14 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
 
   Future<void> _openQuickHelp() async {
     await showQuickHelpDialog(context);
+  }
+
+  Future<bool> _ensureFeatureAccess(LockedFeature feature) {
+    return ensureLicenseAccess(context, feature);
+  }
+
+  Future<void> _openLicenseManagement() {
+    return showLicenseManagementDialog(context);
   }
 
   void _showMovementSavedFeedback(String message) {
@@ -227,6 +244,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     if (_applyingStarterTemplate) {
       return;
     }
+    if (!await _ensureFeatureAccess(LockedFeature.templates) || !mounted) {
+      return;
+    }
 
     final messenger = ScaffoldMessenger.of(context);
     final store = CommerceScope.of(context);
@@ -272,6 +292,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
 
   Future<void> _loadDemoData() async {
     if (_loadingDemoData) {
+      return;
+    }
+    if (!await _ensureFeatureAccess(LockedFeature.demoData) || !mounted) {
       return;
     }
 
@@ -412,6 +435,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     if (_restoringBackup) {
       return;
     }
+    if (!await _ensureFeatureAccess(LockedFeature.restore) || !mounted) {
+      return;
+    }
 
     final messenger = ScaffoldMessenger.of(context);
     final store = CommerceScope.of(context);
@@ -468,6 +494,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     if (_undoingMovement) {
       return;
     }
+    if (!await _ensureFeatureAccess(LockedFeature.cash) || !mounted) {
+      return;
+    }
 
     final messenger = ScaffoldMessenger.of(context);
     final store = CommerceScope.of(context);
@@ -522,6 +551,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
 
   Future<void> _registerCashOpening() async {
     if (_savingCashEvent) {
+      return;
+    }
+    if (!await _ensureFeatureAccess(LockedFeature.cash) || !mounted) {
       return;
     }
 
@@ -596,6 +628,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     if (_savingCashEvent) {
       return;
     }
+    if (!await _ensureFeatureAccess(LockedFeature.cash) || !mounted) {
+      return;
+    }
 
     final messenger = ScaffoldMessenger.of(context);
     final store = CommerceScope.of(context);
@@ -665,6 +700,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
   @override
   Widget build(BuildContext context) {
     final store = CommerceScope.of(context);
+    final license = LicenseScope.of(context);
     final pages = <CommerceTab, Widget>{
       CommerceTab.home: HomeScreen(
         onNewSale: _openSale,
@@ -840,13 +876,24 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                           ],
                           Align(
                             alignment: Alignment.centerRight,
-                            child: TextButton.icon(
-                              onPressed: _openQuickHelp,
-                              icon: const Icon(Icons.help_outline_rounded),
-                              label: const Text('Ayuda'),
+                            child: _ShellUtilityActions(
+                              showLicenseAction: license.shouldShowLicenseUi,
+                              licenseActionLabel: license.isActivated
+                                  ? 'Licencia'
+                                  : 'Activar',
+                              onLicenseAction: _openLicenseManagement,
+                              onHelp: _openQuickHelp,
                             ),
                           ),
                           const SizedBox(height: 6),
+                          if (license.shouldShowLicenseUi &&
+                              license.status != LicenseStatus.active) ...[
+                            _LicenseStatusBanner(
+                              licenseService: license,
+                              onManage: _openLicenseManagement,
+                            ),
+                            const SizedBox(height: 10),
+                          ],
                           Expanded(child: page),
                         ],
                       ),
@@ -875,13 +922,24 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                   ],
                   Align(
                     alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: _openQuickHelp,
-                      icon: const Icon(Icons.help_outline_rounded),
-                      label: const Text('Ayuda'),
+                    child: _ShellUtilityActions(
+                      showLicenseAction: license.shouldShowLicenseUi,
+                      licenseActionLabel: license.isActivated
+                          ? 'Licencia'
+                          : 'Activar',
+                      onLicenseAction: _openLicenseManagement,
+                      onHelp: _openQuickHelp,
                     ),
                   ),
                   const SizedBox(height: 6),
+                  if (license.shouldShowLicenseUi &&
+                      license.status != LicenseStatus.active) ...[
+                    _LicenseStatusBanner(
+                      licenseService: license,
+                      onManage: _openLicenseManagement,
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   const _BuildInfoStrip(),
                   const SizedBox(height: 8),
                   Expanded(child: page),
@@ -917,6 +975,149 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
           ),
         );
       },
+    );
+  }
+}
+
+class _ShellUtilityActions extends StatelessWidget {
+  const _ShellUtilityActions({
+    required this.showLicenseAction,
+    required this.licenseActionLabel,
+    required this.onLicenseAction,
+    required this.onHelp,
+  });
+
+  final bool showLicenseAction;
+  final String licenseActionLabel;
+  final Future<void> Function() onLicenseAction;
+  final Future<void> Function() onHelp;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: WrapAlignment.end,
+      children: [
+        if (showLicenseAction)
+          TextButton.icon(
+            onPressed: () => onLicenseAction(),
+            icon: const Icon(Icons.verified_user_rounded),
+            label: Text(licenseActionLabel),
+          ),
+        TextButton.icon(
+          onPressed: () => onHelp(),
+          icon: const Icon(Icons.help_outline_rounded),
+          label: const Text('Ayuda'),
+        ),
+      ],
+    );
+  }
+}
+
+class _LicenseStatusBanner extends StatelessWidget {
+  const _LicenseStatusBanner({
+    required this.licenseService,
+    required this.onManage,
+  });
+
+  final LicenseService licenseService;
+  final Future<void> Function() onManage;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final expired = licenseService.isTrialExpired;
+    final accent = expired ? scheme.error : scheme.primary;
+    final chipLabel = expired
+        ? 'Solo lectura'
+        : 'Prueba: ${licenseService.trialDaysRemaining} ${licenseService.trialDaysRemaining == 1 ? 'dia' : 'dias'}';
+
+    return BpcPanel(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      color: expired
+          ? scheme.errorContainer.withValues(alpha: 0.54)
+          : scheme.surfaceContainerLow,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 760;
+          final manageButton = FilledButton.icon(
+            onPressed: () => onManage(),
+            style: compact
+                ? FilledButton.styleFrom(minimumSize: const Size.fromHeight(48))
+                : null,
+            icon: const Icon(Icons.key_rounded),
+            label: Text(expired ? 'Activar Windows' : 'Ver licencia'),
+          );
+          final body = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    licenseService.statusHeadline,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      chipLabel,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: accent,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                licenseService.statusDescription,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.outline,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                licenseService.positioningMessage,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.outline,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          );
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [body, const SizedBox(height: 14), manageButton],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: body),
+              const SizedBox(width: 16),
+              manageButton,
+            ],
+          );
+        },
+      ),
     );
   }
 }

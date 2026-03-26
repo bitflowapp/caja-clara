@@ -38,6 +38,16 @@ Future<void> showQuickHelpDialog(BuildContext context) async {
                     'Puedes leer con camara, scanner o ingreso manual. Si el codigo no existe, lo das de alta desde ahi.',
               ),
               _HelpBlock(
+                title: 'Windows',
+                text:
+                    'La version Windows es la principal para operar todos los dias. La web sirve como demo o adicional, no como reemplazo de la app local.',
+              ),
+              _HelpBlock(
+                title: 'Licencia',
+                text:
+                    'La app incluye una prueba de 30 dias. Si vence, tus datos siguen visibles y exportables, pero las acciones operativas se bloquean hasta activar.',
+              ),
+              _HelpBlock(
                 title: 'Exportar',
                 text:
                     'Desde Caja puedes exportar Excel o guardar un backup para llevarte la informacion.',

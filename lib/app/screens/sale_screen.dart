@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../models/product.dart';
 import '../services/commerce_store.dart';
+import '../services/license_service.dart';
 import '../utils/formatters.dart';
 import '../utils/payment_methods.dart';
 import '../utils/user_facing_errors.dart';
@@ -11,6 +12,7 @@ import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
 import '../widgets/input_shortcuts.dart';
 import '../widgets/keyboard_aware_form.dart';
+import '../widgets/license_dialogs.dart';
 import '../widgets/mobile_field_editor.dart';
 import '../widgets/product_form_dialog.dart';
 import '../widgets/speech_dictation.dart';
@@ -803,6 +805,10 @@ class _SaleScreenState extends State<SaleScreen> {
   }
 
   Future<void> _loadStarterTemplate(CommerceStore store) async {
+    if (!await ensureLicenseAccess(context, LockedFeature.templates) ||
+        !mounted) {
+      return;
+    }
     final messenger = ScaffoldMessenger.of(context);
     try {
       final result = await store.applyArgentinianKioskTemplate();
@@ -1142,6 +1148,13 @@ class _SaleScreenState extends State<SaleScreen> {
       }
       setState(() => _saving = false);
       messenger.hideCurrentSnackBar();
+      if (error is LicenseRestrictionException) {
+        await showLicenseManagementDialog(
+          context,
+          lockedFeature: LockedFeature.sales,
+        );
+        return;
+      }
       messenger.showSnackBar(
         SnackBar(content: Text(userFacingErrorMessage(error))),
       );

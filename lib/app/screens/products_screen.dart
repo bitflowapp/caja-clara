@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 
 import '../models/product.dart';
 import '../services/commerce_store.dart';
+import '../services/license_service.dart';
 import '../utils/formatters.dart';
 import '../utils/text_field_selection.dart';
 import '../utils/user_facing_errors.dart';
 import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
 import '../widgets/input_shortcuts.dart';
+import '../widgets/license_dialogs.dart';
 import '../widgets/operation_dialogs.dart';
 import '../widgets/product_form_dialog.dart';
 
@@ -318,6 +320,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   Future<void> _addStock(CommerceStore store, Product product) async {
+    if (!await ensureLicenseAccess(context, LockedFeature.stock) || !mounted) {
+      return;
+    }
     final messenger = ScaffoldMessenger.of(context);
     final amount = await showAmountEntryDialog(
       context,
@@ -359,6 +364,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   Future<void> _deleteProduct(CommerceStore store, Product product) async {
+    if (!await ensureLicenseAccess(context, LockedFeature.catalog) ||
+        !mounted) {
+      return;
+    }
     final messenger = ScaffoldMessenger.of(context);
     final confirmed = await showDangerConfirmationDialog(
       context,

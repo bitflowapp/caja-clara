@@ -3,12 +3,14 @@ import 'package:flutter/services.dart';
 
 import '../models/product.dart';
 import '../services/commerce_store.dart';
+import '../services/license_service.dart';
 import '../utils/formatters.dart';
 import '../utils/user_facing_errors.dart';
 import '../utils/text_field_selection.dart';
 import 'commerce_components.dart';
 import 'input_shortcuts.dart';
 import 'keyboard_aware_form.dart';
+import 'license_dialogs.dart';
 import 'mobile_field_editor.dart';
 import 'speech_dictation.dart';
 
@@ -57,6 +59,13 @@ Future<ProductEditorResult?> showProductEditor(
   String? initialBarcode,
   ProductEditorSeed? seed,
 }) async {
+  if (!await ensureLicenseAccess(context, LockedFeature.catalog)) {
+    return null;
+  }
+  if (!context.mounted) {
+    return null;
+  }
+
   if (useFullscreenFormLayout(context)) {
     return Navigator.of(context).push<ProductEditorResult>(
       MaterialPageRoute<ProductEditorResult>(

@@ -5,13 +5,16 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../models/product.dart';
 import '../services/barcode_lookup_service.dart';
 import '../services/commerce_store.dart';
+import '../services/license_service.dart';
 import '../theme/bpc_colors.dart';
 import '../utils/formatters.dart';
+import '../utils/text_field_selection.dart';
 import '../utils/user_facing_errors.dart';
 import '../widgets/barcode_input_dialog.dart';
 import '../widgets/commerce_components.dart';
 import '../widgets/barcode_lookup_scope.dart';
 import '../widgets/commerce_scope.dart';
+import '../widgets/license_dialogs.dart';
 import '../widgets/operation_dialogs.dart';
 import '../widgets/product_form_dialog.dart';
 import 'sale_screen.dart';
@@ -25,6 +28,9 @@ class BarcodeScanScreen extends StatefulWidget {
 
 class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
   late final MobileScannerController _cameraController;
+  final TextEditingController _desktopBarcodeController =
+      TextEditingController();
+  final FocusNode _desktopBarcodeFocusNode = FocusNode();
   String? _currentBarcode;
   bool _cameraRunning = false;
   bool _cameraStarting = false;
@@ -50,6 +56,9 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
     }
   }
 
+  bool get _supportsDesktopScannerInput =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+
   @override
   void initState() {
     super.initState();
@@ -68,6 +77,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
         BarcodeFormat.itf14,
       ],
     );
+    selectAllTextOnFocus(_desktopBarcodeFocusNode, _desktopBarcodeController);
     if (_supportsCamera) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) {
@@ -75,11 +85,20 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
         }
         _startCamera();
       });
+    } else if (_supportsDesktopScannerInput) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        _focusDesktopScannerField();
+      });
     }
   }
 
   @override
   void dispose() {
+    _desktopBarcodeController.dispose();
+    _desktopBarcodeFocusNode.dispose();
     _cameraController.dispose();
     super.dispose();
   }
@@ -107,6 +126,13 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
       await _cameraController.stop();
     }
     final localProduct = store.productByBarcode(normalized);
+    if (_supportsDesktopScannerInput &&
+        _desktopBarcodeController.text != normalized) {
+      _desktopBarcodeController.value = TextEditingValue(
+        text: normalized,
+        selection: TextSelection.collapsed(offset: normalized.length),
+      );
+    }
 
     if (!mounted) {
       return;
@@ -127,7 +153,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
     final lookupId = _lookupRequestId;
     setState(() => _lookupInProgress = true);
 
-    final lookupResult = await lookupService.lookup(normalized);
+    final lookupResult = await _safeLookup(lookupService, normalized);
     if (!mounted ||
         lookupId != _lookupRequestId ||
         _currentBarcode != normalized) {
@@ -150,8 +176,12 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
           _currentBarcode = null;
           _lookupInProgress = false;
           _lookupResult = null;
+          _desktopBarcodeController.clear();
         }
       });
+      if (_supportsDesktopScannerInput) {
+        _focusDesktopScannerField();
+      }
       return;
     }
     setState(() {
@@ -187,6 +217,37 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
 
   Future<void> _restartCamera() async {
     await _startCamera(clearSelection: true);
+  }
+
+  Future<BarcodeLookupResult> _safeLookup(
+    BarcodeLookupService lookupService,
+    String normalized,
+  ) async {
+    try {
+      return await lookupService.lookup(normalized);
+    } catch (_) {
+      return const BarcodeLookupResult.failed(
+        message:
+            'No pudimos consultar el catalogo externo ahora. Puedes seguir con alta manual.',
+      );
+    }
+  }
+
+  void _focusDesktopScannerField() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _desktopBarcodeFocusNode.requestFocus();
+    });
+  }
+
+  Future<void> _submitDesktopBarcode() async {
+    await _applyBarcode(_desktopBarcodeController.text);
+    if (!mounted) {
+      return;
+    }
+    _focusDesktopScannerField();
   }
 
   Future<void> _openManualInput() async {
@@ -266,6 +327,9 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
   }
 
   Future<void> _openSale(Product product) async {
+    if (!await ensureLicenseAccess(context, LockedFeature.sales) || !mounted) {
+      return;
+    }
     final message = await Navigator.of(context).push<String>(
       MaterialPageRoute<String>(
         builder: (_) => SaleScreen(initialProduct: product),
@@ -286,6 +350,9 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
 
   Future<void> _addStock(CommerceStore store, Product product) async {
     if (_savingStock) {
+      return;
+    }
+    if (!await ensureLicenseAccess(context, LockedFeature.stock) || !mounted) {
       return;
     }
     final amount = await showAmountEntryDialog(
@@ -467,6 +534,15 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                           ],
                         ),
                       )
+                    else if (_supportsDesktopScannerInput)
+                      _DesktopScannerInputCard(
+                        controller: _desktopBarcodeController,
+                        focusNode: _desktopBarcodeFocusNode,
+                        currentBarcode: _currentBarcode,
+                        onSubmit: _submitDesktopBarcode,
+                        onOpenManualInput: _openManualInput,
+                        onClear: _restartCamera,
+                      )
                     else
                       EmptyCard(
                         title: 'Usar codigo o scanner',
@@ -486,6 +562,8 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                             : 'Esperando codigo',
                         message: _cameraIssue != null
                             ? 'Puedes reintentar la camara o seguir con ingreso manual sin frenar la venta.'
+                            : _supportsDesktopScannerInput
+                            ? 'Escanea con un lector tipo teclado o escribe el codigo y presiona Enter.'
                             : 'Lee o escribe un codigo para encontrar el producto al instante.',
                         icon: _cameraIssue != null
                             ? Icons.warning_amber_rounded
@@ -846,6 +924,112 @@ class _BarcodeProductCard extends StatelessWidget {
                 ],
               );
             },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DesktopScannerInputCard extends StatelessWidget {
+  const _DesktopScannerInputCard({
+    required this.controller,
+    required this.focusNode,
+    required this.currentBarcode,
+    required this.onSubmit,
+    required this.onOpenManualInput,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final String? currentBarcode;
+  final Future<void> Function() onSubmit;
+  final Future<void> Function() onOpenManualInput;
+  final Future<void> Function() onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return BpcPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Scanner USB o ingreso manual',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'En Windows puedes usar un lector tipo teclado: apuntas al campo, escaneas y Enter resuelve el producto al instante.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.outline,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: controller,
+                  builder: (context, value, _) {
+                    return TextField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      autofocus: true,
+                      textInputAction: TextInputAction.search,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: InputDecoration(
+                        labelText: 'Scanner USB o codigo manual',
+                        hintText:
+                            'Escanea o escribe el codigo y presiona Enter',
+                        suffixIcon: value.text.trim().isEmpty
+                            ? null
+                            : IconButton(
+                                tooltip: 'Limpiar codigo',
+                                onPressed: () => onClear(),
+                                icon: const Icon(Icons.close_rounded),
+                              ),
+                      ),
+                      onTapOutside: (_) => focusNode.unfocus(),
+                      onSubmitted: (_) => onSubmit(),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: controller,
+                builder: (context, value, _) {
+                  final hasText = value.text.trim().isNotEmpty;
+                  return FilledButton.icon(
+                    onPressed: hasText ? () => onSubmit() : null,
+                    icon: const Icon(Icons.search_rounded),
+                    label: const Text('Buscar producto'),
+                  );
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              if (currentBarcode != null)
+                TextButton.icon(
+                  onPressed: () => onClear(),
+                  icon: const Icon(Icons.restart_alt_rounded),
+                  label: const Text('Leer otro'),
+                ),
+              TextButton.icon(
+                onPressed: () => onOpenManualInput(),
+                icon: const Icon(Icons.keyboard_alt_rounded),
+                label: const Text('Abrir ingreso asistido'),
+              ),
+            ],
           ),
         ],
       ),

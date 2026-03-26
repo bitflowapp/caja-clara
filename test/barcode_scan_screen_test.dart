@@ -58,7 +58,12 @@ void main() {
       value,
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Buscar producto'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Buscar producto'),
+      ),
+    );
     await tester.pumpAndSettle();
   }
 
@@ -90,6 +95,38 @@ void main() {
       expect(find.text('Ya existe en catalogo'), findsOneWidget);
       expect(find.text('Cable USB-C'), findsOneWidget);
       expect(find.text('Cod. ABC123'), findsOneWidget);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
+  testWidgets(
+    'desktop scanner field resolves a local product with keyboard-wedge flow',
+    (tester) async {
+      final store = CommerceStore.emptyForTest();
+      await store.addProduct(
+        const Product(
+          id: 'p-desktop',
+          name: 'Mouse gamer',
+          stockUnits: 3,
+          minStockUnits: 1,
+          costPesos: 12000,
+          pricePesos: 18900,
+          barcode: 'WIN-123',
+        ),
+      );
+
+      await pumpBarcodeScreen(tester, store);
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Scanner USB o codigo manual'),
+        'win 123',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ya existe en catalogo'), findsOneWidget);
+      expect(find.text('Mouse gamer'), findsOneWidget);
+      expect(find.text('Cod. WIN123'), findsOneWidget);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.windows),
   );
