@@ -72,19 +72,41 @@ class HomeScreen extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 14),
-              _PrimaryActions(
-                onNewSale: onNewSale,
-                onNewExpense: onNewExpense,
-                onScanProduct: onScanProduct,
-              ),
-              const SizedBox(height: 12),
-              _SecondaryActions(
-                lowStockCount: store.lowStockCount,
-                onAddProduct: () => showProductEditor(context, store),
-                onOpenLowStock: onOpenProducts,
-                onExportExcel: onExportExcel,
-                exportingExcel: exportingExcel,
-                hasProducts: store.hasProducts,
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= 1100;
+                  final primary = _PrimaryActions(
+                    onNewSale: onNewSale,
+                    onNewExpense: onNewExpense,
+                    onScanProduct: onScanProduct,
+                  );
+                  final secondary = _SecondaryActions(
+                    lowStockCount: store.lowStockCount,
+                    onAddProduct: () => showProductEditor(context, store),
+                    onOpenLowStock: onOpenProducts,
+                    onExportExcel: onExportExcel,
+                    exportingExcel: exportingExcel,
+                    hasProducts: store.hasProducts,
+                  );
+                  if (!wide) {
+                    return Column(
+                      children: [
+                        primary,
+                        const SizedBox(height: 12),
+                        secondary,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 6, child: primary),
+                      const SizedBox(width: 14),
+                      Expanded(flex: 5, child: secondary),
+                    ],
+                  );
+                },
               ),
               if (store.hasProducts) ...[
                 const SizedBox(height: 16),
@@ -101,65 +123,15 @@ class HomeScreen extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 16),
-              const SectionHeader(
-                title: 'Ultimos movimientos',
-                subtitle: 'Todo lo que movio caja y stock, en una sola lista.',
+              _HomeMovementsPanel(
+                store: store,
+                recent: recent,
+                applyingStarterTemplate: applyingStarterTemplate,
+                onNewSale: onNewSale,
+                onApplyStarterTemplate: onApplyStarterTemplate,
+                onAddProduct: () => showProductEditor(context, store),
+                onCreateProductFromFreeSale: onCreateProductFromFreeSale,
               ),
-              const SizedBox(height: 10),
-              if (recent.isEmpty)
-                EmptyCard(
-                  title: store.hasProducts
-                      ? 'Todavia no registraste movimientos'
-                      : 'Arranca cargando tu negocio',
-                  message: store.hasProducts
-                      ? 'Empieza con una venta o un gasto. Todo queda guardado en este dispositivo.'
-                      : 'Puedes cargar la plantilla kiosco para empezar en minutos o crear tus primeros productos a mano.',
-                  action: Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    alignment: WrapAlignment.center,
-                    children: [
-                      FilledButton(
-                        onPressed: store.hasProducts
-                            ? onNewSale
-                            : onApplyStarterTemplate,
-                        child: Text(
-                          store.hasProducts
-                              ? 'Nueva venta'
-                              : applyingStarterTemplate
-                              ? 'Cargando plantilla...'
-                              : 'Cargar plantilla kiosco',
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () => showProductEditor(context, store),
-                        child: const Text('Agregar producto'),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                BpcPanel(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 6,
-                  ),
-                  child: Column(
-                    children: [
-                      for (var index = 0; index < recent.length; index++)
-                        MovementsListTile(
-                          movement: recent[index],
-                          productName: store
-                              .productById(recent[index].productId ?? '')
-                              ?.name,
-                          onCreateProductFromFreeSale: recent[index].isFreeSale
-                              ? () => onCreateProductFromFreeSale(recent[index])
-                              : null,
-                          showDivider: index != recent.length - 1,
-                        ),
-                    ],
-                  ),
-                ),
               const SizedBox(height: 18),
             ],
           ),
@@ -292,116 +264,428 @@ class _HeaderStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final statusChips = [
+      _HomeStatusChip(
+        label: store.hasCashOpeningToday ? 'Caja abierta' : 'Sin apertura',
+        color: store.hasCashOpeningToday
+            ? BpcColors.income
+            : Theme.of(context).colorScheme.error,
+        icon: store.hasCashOpeningToday
+            ? Icons.verified_outlined
+            : Icons.login_rounded,
+      ),
+      _HomeStatusChip(
+        label: store.lowStockCount == 0
+            ? 'Stock estable'
+            : '${store.lowStockCount} alertas',
+        color: store.lowStockCount == 0
+            ? BpcColors.greenSoft
+            : BpcColors.sandMuted,
+        icon: store.lowStockCount == 0
+            ? Icons.inventory_2_outlined
+            : Icons.warning_amber_rounded,
+      ),
+      _HomeStatusChip(
+        label: store.productsWithBarcodeCount == 0
+            ? 'Barcode pendiente'
+            : '${store.productsWithBarcodeCount} con barcode',
+        color: store.productsWithBarcodeCount == 0
+            ? BpcColors.sandMuted
+            : BpcColors.greenSoft,
+        icon: Icons.qr_code_2_rounded,
+      ),
+    ];
+    final metrics = [
+      _WorkspaceMetric(
+        label: 'Ventas del dia',
+        value: formatMoney(store.todaySalesPesos),
+        helper: '${store.todayMovementCount} movimientos hoy',
+      ),
+      _WorkspaceMetric(
+        label: 'Caja actual',
+        value: formatMoney(store.cashBalancePesos),
+        helper: store.hasCashOpeningToday
+            ? 'Control en curso'
+            : 'Conviene registrar apertura',
+      ),
+      _WorkspaceMetric(
+        label: 'Productos',
+        value: '${store.products.length}',
+        helper: '${store.sellableProductsCount} listos para vender',
+      ),
+    ];
 
     return BpcPanel(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
       color: Colors.white.withValues(alpha: 0.82),
-      child: Wrap(
-        spacing: 18,
-        runSpacing: 10,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 1040;
+          final brandCard = Container(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
             decoration: BoxDecoration(
               color: BpcColors.greenDeep,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(18),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.12),
-                    ),
-                  ),
-                  child: const CajaClaraSymbol(size: 28),
-                ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      'Caja Clara',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.66),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
+                    Container(
+                      width: 48,
+                      height: 48,
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.14),
+                        ),
                       ),
+                      child: const CajaClaraSymbol(size: 30),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Hoy',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.74),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      formatShortDate(now),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                      ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Caja Clara',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.68),
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Panel de trabajo',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
+                const SizedBox(height: 14),
+                Text(
+                  formatShortDate(now),
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Ventas, caja, stock y barcode en un mismo espacio operativo.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.82),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Wrap(spacing: 8, runSpacing: 8, children: statusChips),
               ],
             ),
+          );
+
+          final metricWrap = Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: metrics
+                .map((metric) => _WorkspaceMetricCard(metric: metric))
+                .toList(growable: false),
+          );
+
+          if (!wide) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [brandCard, const SizedBox(height: 14), metricWrap],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 5, child: brandCard),
+              const SizedBox(width: 14),
+              Expanded(flex: 4, child: metricWrap),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _HomeStatusChip extends StatelessWidget {
+  const _HomeStatusChip({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
+
+  final String label;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-          _HeaderMetric(
-            label: 'Ventas del dia',
-            value: formatMoney(store.todaySalesPesos),
-          ),
-          _HeaderMetric(
-            label: 'Caja actual',
-            value: formatMoney(store.cashBalancePesos),
-          ),
-          _HeaderMetric(label: 'Productos', value: '${store.products.length}'),
         ],
       ),
     );
   }
 }
 
-class _HeaderMetric extends StatelessWidget {
-  const _HeaderMetric({required this.label, required this.value});
+class _WorkspaceMetric {
+  const _WorkspaceMetric({
+    required this.label,
+    required this.value,
+    required this.helper,
+  });
 
   final String label;
   final String value;
+  final String helper;
+}
+
+class _WorkspaceMetricCard extends StatelessWidget {
+  const _WorkspaceMetricCard({required this.metric});
+
+  final _WorkspaceMetric metric;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 148),
+      constraints: const BoxConstraints(minWidth: 190, maxWidth: 240),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        decoration: BoxDecoration(
+          color: BpcColors.surfaceStrong,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: BpcColors.line),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              metric.label,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: BpcColors.mutedInk,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              metric.value,
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                color: BpcColors.ink,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              metric.helper,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: BpcColors.subtleInk,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionSupportCard extends StatelessWidget {
+  const _ActionSupportCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: BpcPanel(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+          color: Colors.white.withValues(alpha: 0.78),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: Theme.of(context).colorScheme.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: BpcColors.ink,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: BpcColors.subtleInk,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: BpcColors.mutedInk,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeMovementsPanel extends StatelessWidget {
+  const _HomeMovementsPanel({
+    required this.store,
+    required this.recent,
+    required this.applyingStarterTemplate,
+    required this.onNewSale,
+    required this.onApplyStarterTemplate,
+    required this.onAddProduct,
+    required this.onCreateProductFromFreeSale,
+  });
+
+  final CommerceStore store;
+  final List<Movement> recent;
+  final bool applyingStarterTemplate;
+  final VoidCallback onNewSale;
+  final VoidCallback onApplyStarterTemplate;
+  final VoidCallback onAddProduct;
+  final Future<void> Function(Movement movement) onCreateProductFromFreeSale;
+
+  @override
+  Widget build(BuildContext context) {
+    return BpcPanel(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      color: Colors.white.withValues(alpha: 0.8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: BpcColors.mutedInk,
-              fontWeight: FontWeight.w800,
-              fontSize: 12,
+          SectionHeader(
+            title: 'Ultimos movimientos',
+            subtitle: 'Todo lo que movio caja y stock, en una sola lista.',
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: BpcColors.surfaceStrong,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: BpcColors.line),
+              ),
+              child: Text(
+                recent.isEmpty ? 'Sin actividad' : '${recent.length} recientes',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: BpcColors.ink,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: BpcColors.ink,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.45,
+          const SizedBox(height: 12),
+          if (recent.isEmpty)
+            EmptyCard(
+              title: store.hasProducts
+                  ? 'Todavia no registraste movimientos'
+                  : 'Arranca cargando tu negocio',
+              message: store.hasProducts
+                  ? 'Empieza con una venta o un gasto. Todo queda guardado en este dispositivo.'
+                  : 'Puedes cargar la plantilla kiosco para empezar en minutos o crear tus primeros productos a mano.',
+              action: Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                alignment: WrapAlignment.center,
+                children: [
+                  FilledButton(
+                    onPressed: store.hasProducts
+                        ? onNewSale
+                        : onApplyStarterTemplate,
+                    child: Text(
+                      store.hasProducts
+                          ? 'Nueva venta'
+                          : applyingStarterTemplate
+                          ? 'Cargando plantilla...'
+                          : 'Cargar plantilla kiosco',
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: onAddProduct,
+                    child: const Text('Agregar producto'),
+                  ),
+                ],
+              ),
+            )
+          else
+            Column(
+              children: [
+                for (var index = 0; index < recent.length; index++)
+                  MovementsListTile(
+                    movement: recent[index],
+                    productName: store
+                        .productById(recent[index].productId ?? '')
+                        ?.name,
+                    onCreateProductFromFreeSale: recent[index].isFreeSale
+                        ? () => onCreateProductFromFreeSale(recent[index])
+                        : null,
+                    showDivider: index != recent.length - 1,
+                  ),
+              ],
             ),
-          ),
         ],
       ),
     );
@@ -421,9 +705,10 @@ class _PrimaryActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        ActionCard(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 820;
+        final primary = ActionCard(
           title: 'Nueva venta',
           subtitle: 'Registra una venta y actualiza caja al instante',
           icon: Icons.shopping_bag_rounded,
@@ -431,30 +716,40 @@ class _PrimaryActions extends StatelessWidget {
           fillColor: Theme.of(context).colorScheme.primary,
           contentColor: Theme.of(context).colorScheme.onPrimary,
           emphasized: true,
-        ),
-        const SizedBox(height: 12),
-        BpcPanel(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          color: Colors.white.withValues(alpha: 0.76),
-          child: Column(
-            children: [
-              _InlineActionRow(
-                title: 'Registrar gasto',
-                subtitle: 'Anota una salida y deja la caja al dia',
-                icon: Icons.receipt_long_rounded,
-                onTap: onNewExpense,
-              ),
-              const Divider(height: 1),
-              _InlineActionRow(
-                title: 'Escanear producto',
-                subtitle: 'Camara, scanner o ingreso manual',
-                icon: Icons.qr_code_scanner_rounded,
-                onTap: onScanProduct,
-              ),
-            ],
-          ),
-        ),
-      ],
+        );
+        final support = Column(
+          children: [
+            _ActionSupportCard(
+              title: 'Registrar gasto',
+              subtitle: 'Anota una salida y deja la caja al dia',
+              icon: Icons.receipt_long_rounded,
+              onTap: onNewExpense,
+            ),
+            const SizedBox(height: 12),
+            _ActionSupportCard(
+              title: 'Escanear producto',
+              subtitle: 'Camara, scanner o ingreso manual',
+              icon: Icons.qr_code_scanner_rounded,
+              onTap: onScanProduct,
+            ),
+          ],
+        );
+
+        if (!wide) {
+          return Column(
+            children: [primary, const SizedBox(height: 12), support],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 6, child: primary),
+            const SizedBox(width: 12),
+            Expanded(flex: 5, child: support),
+          ],
+        );
+      },
     );
   }
 }
@@ -478,12 +773,18 @@ class _SecondaryActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BpcPanel(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      color: Colors.white.withValues(alpha: 0.74),
-      child: Column(
-        children: [
-          _InlineActionRow(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 860
+            ? 3
+            : constraints.maxWidth >= 540
+            ? 2
+            : 1;
+        final spacing = 12.0;
+        final totalGap = columns > 1 ? spacing * (columns - 1) : 0.0;
+        final cardWidth = (constraints.maxWidth - totalGap) / columns;
+        final cards = [
+          _ActionSupportCard(
             title: 'Agregar producto',
             subtitle: hasProducts
                 ? 'Carga nombre, stock, precio y codigo de barras'
@@ -491,19 +792,17 @@ class _SecondaryActions extends StatelessWidget {
             icon: Icons.add_box_rounded,
             onTap: onAddProduct,
           ),
-          const Divider(height: 1),
-          _InlineActionRow(
+          _ActionSupportCard(
             title: 'Ver stock bajo',
             subtitle: !hasProducts
                 ? 'Todavia no hay productos cargados'
                 : lowStockCount == 0
-                ? 'Sin alertas'
+                ? 'Sin alertas de reposicion'
                 : '$lowStockCount productos a reponer',
             icon: Icons.warning_amber_rounded,
             onTap: onOpenLowStock,
           ),
-          const Divider(height: 1),
-          _InlineActionRow(
+          _ActionSupportCard(
             title: 'Exportar Excel',
             subtitle: exportingExcel
                 ? 'Preparando archivo'
@@ -513,8 +812,21 @@ class _SecondaryActions extends StatelessWidget {
             icon: Icons.file_download_rounded,
             onTap: onExportExcel,
           ),
-        ],
-      ),
+        ];
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: cards
+              .map(
+                (card) => SizedBox(
+                  width: columns == 1 ? constraints.maxWidth : cardWidth,
+                  child: card,
+                ),
+              )
+              .toList(growable: false),
+        );
+      },
     );
   }
 }
@@ -768,70 +1080,6 @@ class _CatalogReadinessCard extends StatelessWidget {
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _InlineActionRow extends StatelessWidget {
-  const _InlineActionRow({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, color: Theme.of(context).colorScheme.primary),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: BpcColors.ink,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: BpcColors.subtleInk,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Icon(Icons.chevron_right_rounded, color: BpcColors.mutedInk),
-          ],
-        ),
       ),
     );
   }
