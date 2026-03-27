@@ -24,6 +24,7 @@ class CajaClaraLogo extends StatelessWidget {
       width: width,
       height: height,
       fit: fit,
+      isAntiAlias: true,
       filterQuality: FilterQuality.high,
     );
   }
@@ -46,6 +47,7 @@ class CajaClaraSymbol extends StatelessWidget {
       width: size,
       height: size,
       fit: fit,
+      isAntiAlias: true,
       filterQuality: FilterQuality.high,
     );
   }

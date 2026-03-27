@@ -1192,16 +1192,53 @@ class _RailBrand extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const CajaClaraLogo(height: 52),
+        Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: scheme.primary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const CajaClaraSymbol(size: 32),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Caja Clara',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: BpcColors.ink,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Caja, ventas, stock y codigos',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: BpcColors.subtleInk,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 10),
         Text(
-          'Caja, ventas, stock y codigos',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: BpcColors.subtleInk,
-            fontWeight: FontWeight.w700,
+          'Listo para mostrador',
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: BpcColors.mutedInk,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ],
