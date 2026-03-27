@@ -20,7 +20,7 @@ void main() {
     expect(find.text('Nueva venta'), findsOneWidget);
     expect(find.text('Registrar gasto'), findsOneWidget);
     expect(find.text('Escanear producto'), findsOneWidget);
-    expect(find.text('Agregar producto'), findsOneWidget);
+    expect(find.text('Agregar producto'), findsWidgets);
     expect(find.text('Ver stock bajo'), findsOneWidget);
     expect(find.text('Ultimos movimientos'), findsOneWidget);
   });
@@ -35,10 +35,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Lista para demo o primer uso'), findsOneWidget);
-    expect(find.text('Cargar demo comercial'), findsOneWidget);
+    expect(find.text('Primeros pasos'), findsOneWidget);
+    expect(find.text('Ver ejemplo'), findsOneWidget);
     expect(find.text('Cargar Kiosco argentino'), findsOneWidget);
-    expect(find.text('Agregar producto manualmente'), findsOneWidget);
+    expect(find.text('Agregar producto'), findsWidgets);
   });
 
   testWidgets(
@@ -60,9 +60,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Cargar demo comercial'), findsNothing);
+      expect(find.text('Ver ejemplo'), findsNothing);
       expect(find.text('Cargar Kiosco argentino'), findsOneWidget);
-      expect(find.text('Agregar producto manualmente'), findsOneWidget);
+      expect(find.text('Agregar producto'), findsWidgets);
     },
   );
 }

@@ -4,6 +4,7 @@ import '../models/movement.dart';
 import '../models/product.dart';
 import '../theme/bpc_colors.dart';
 import '../utils/formatters.dart';
+import '../utils/payment_methods.dart';
 
 class BpcPanel extends StatelessWidget {
   const BpcPanel({
@@ -275,8 +276,12 @@ class MovementsListTile extends StatelessWidget {
         : movement.isIncome
         ? formatMoney(movement.amountPesos)
         : '-${formatMoney(movement.amountPesos)}';
+    final paymentLabel = displayPaymentMethodLabel(
+      movement.paymentMethod,
+      fallback: 'Sin medio',
+    );
     final subtitle = movement.kind == MovementKind.sale
-        ? '${movement.subtitle ?? productName ?? movement.title} / ${movement.quantityUnits ?? 0} u. / ${movement.paymentMethod ?? 'Caja'}'
+        ? '${movement.subtitle ?? productName ?? movement.title} / ${movement.quantityUnits ?? 0} u. / $paymentLabel'
         : movement.kind == MovementKind.expense
         ? '${movement.originLabel} / ${movement.category ?? 'Gasto'}'
         : movement.subtitle ?? movement.originLabel;
@@ -337,9 +342,9 @@ class MovementsListTile extends StatelessWidget {
                     onCreateProductFromFreeSale != null) ...[
                   const SizedBox(height: 8),
                   TextButton.icon(
-                    onPressed: onCreateProductFromFreeSale,
-                    icon: const Icon(Icons.add_box_rounded, size: 18),
-                    label: const Text('Crear producto desde esta venta'),
+                  onPressed: onCreateProductFromFreeSale,
+                  icon: const Icon(Icons.add_box_rounded, size: 18),
+                    label: const Text('Pasar esta venta al catalogo'),
                     style: TextButton.styleFrom(
                       padding: EdgeInsets.zero,
                       minimumSize: const Size(0, 0),
@@ -445,7 +450,7 @@ class StockBadge extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.16)),
       ),
       child: Text(
-        low ? 'Stock bajo' : 'Stock ok',
+        low ? 'Stock bajo' : 'Stock al dia',
         style: TextStyle(
           color: color,
           fontWeight: FontWeight.w700,

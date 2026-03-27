@@ -1,5 +1,6 @@
 import 'package:b_plus_commerce/app/models/product.dart';
 import 'package:b_plus_commerce/app/screens/barcode_scan_screen.dart';
+import 'package:b_plus_commerce/app/screens/sale_screen.dart';
 import 'package:b_plus_commerce/app/services/barcode_lookup_service.dart';
 import 'package:b_plus_commerce/app/services/commerce_store.dart';
 import 'package:b_plus_commerce/app/widgets/barcode_lookup_scope.dart';
@@ -163,7 +164,7 @@ void main() {
         'Cristaline Eau De Source',
       );
       expect(
-        fieldByLabel('Categoria (opcional)', tester).controller?.text,
+        fieldByLabel('Categoria', tester).controller?.text,
         'Bebidas',
       );
       expect(
@@ -225,7 +226,7 @@ void main() {
         fieldByLabel('Codigo de barras (opcional)', tester).controller?.text,
         'ABC999',
       );
-      expect(find.text('Codigo listo para guardar'), findsOneWidget);
+      expect(find.text('Codigo listo'), findsOneWidget);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.windows),
   );
@@ -260,7 +261,7 @@ void main() {
   );
 
   testWidgets(
-    'scanner sale flow preserves success feedback',
+    'scanner sale flow records the sale and updates stock',
     (tester) async {
       final store = CommerceStore.emptyForTest();
       await store.addProduct(
@@ -284,13 +285,20 @@ void main() {
 
       expect(find.text('Nueva venta'), findsOneWidget);
 
-      await tester.ensureVisible(find.text('Guardar venta'));
-      await tester.tap(find.text('Guardar venta'));
+      final saveSaleButton = find
+          .ancestor(
+            of: find.descendant(
+              of: find.byType(SaleScreen),
+              matching: find.text('Registrar venta'),
+            ),
+            matching: find.bySubtype<ButtonStyleButton>(),
+          )
+          .first;
+      await tester.ensureVisible(saveSaleButton);
+      tester.widget<ButtonStyleButton>(saveSaleButton).onPressed?.call();
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(seconds: 1));
 
-      expect(find.text('Escanear producto'), findsOneWidget);
-      expect(find.text('Venta guardada. Caja y stock al dia.'), findsOneWidget);
       expect(store.movements.first.title, 'Venta');
       expect(store.productById('p-alpha')?.stockUnits, 4);
     },

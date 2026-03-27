@@ -203,7 +203,7 @@ class _SaleScreenState extends State<SaleScreen> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Elige si vendes un producto cargado o un item libre. Guardar impacta caja al instante.',
+                          'Elige un producto cargado o registra una venta libre. Al guardar, la caja se actualiza al momento.',
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
                                 color: Theme.of(context).colorScheme.outline,
@@ -272,12 +272,12 @@ class _SaleScreenState extends State<SaleScreen> {
                               },
                               decoration: InputDecoration(
                                 labelText: 'Buscar producto',
-                                hintText: 'Escribe y toca un resultado',
+                                hintText: 'Nombre, categoria o codigo',
                                 prefixIcon: const Icon(Icons.search_rounded),
                                 suffixIcon: SpeechDictationActionButton(
                                   controller: _productSearchDictation,
                                   textController: _productSearchController,
-                                  tooltip: 'Dictar busqueda',
+                                  tooltip: 'Dictar producto',
                                 ),
                                 errorText: productFieldError,
                                 helperText: productFieldHelper,
@@ -315,7 +315,7 @@ class _SaleScreenState extends State<SaleScreen> {
                               editorContext: 'Venta libre',
                               hintText: 'Ej. Preservativos Durex x3',
                               helperText:
-                                  'Usalo para ventas no cargadas en el catalogo.',
+                                  'Usalo si todavia no cargaste el producto en el catalogo.',
                               emptyDisplayText:
                                   'Toca para cargar la descripcion',
                               keyboardType: TextInputType.text,
@@ -350,7 +350,7 @@ class _SaleScreenState extends State<SaleScreen> {
                                   labelText: 'Descripcion',
                                   hintText: 'Ej. Preservativos Durex x3',
                                   helperText:
-                                      'Usalo para ventas no cargadas en el catalogo.',
+                                      'Usalo si todavia no cargaste el producto en el catalogo.',
                                 ),
                                 validator: (value) {
                                   if (_saleMode != SaleEntryMode.quick) {
@@ -377,7 +377,7 @@ class _SaleScreenState extends State<SaleScreen> {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    'La venta libre suma en caja y reportes, pero no descuenta stock porque no usa un producto del catalogo.',
+                                    'La venta libre suma en caja y reportes, pero no descuenta stock porque no esta asociada a un producto del catalogo.',
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodyMedium
@@ -417,8 +417,8 @@ class _SaleScreenState extends State<SaleScreen> {
                             icon: const Icon(Icons.add_box_rounded),
                             label: Text(
                               exactQuickMatch == null
-                                  ? 'Crear producto con estos datos'
-                                  : 'Usar producto existente',
+                                  ? 'Pasar al catalogo'
+                                  : 'Usar el producto cargado',
                             ),
                           ),
                         ],
@@ -640,7 +640,7 @@ class _SaleScreenState extends State<SaleScreen> {
                                         labelText: 'Medio de pago',
                                         helperText: hasCustomPaymentMethod
                                             ? 'Se recupero el ultimo medio guardado. Puedes cambiarlo si hace falta.'
-                                            : null,
+                                            : 'Efectivo, transferencia, Mercado Pago o tarjeta.',
                                       ),
                                       items: [
                                         for (final paymentMethod
@@ -676,7 +676,7 @@ class _SaleScreenState extends State<SaleScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Resumen',
+                                'Resumen de la venta',
                                 style: Theme.of(context).textTheme.titleMedium,
                               ),
                               const SizedBox(height: 12),
@@ -711,7 +711,13 @@ class _SaleScreenState extends State<SaleScreen> {
                                 value: formatMoney(total),
                               ),
                               _SummaryRow(
-                                label: 'Stock restante',
+                                label: 'Medio de pago',
+                                value: displayPaymentMethodLabel(
+                                  _paymentMethod,
+                                ),
+                              ),
+                              _SummaryRow(
+                                label: 'Stock que queda',
                                 value: _saleMode == SaleEntryMode.quick
                                     ? 'No aplica'
                                     : remaining == null
@@ -757,7 +763,7 @@ class _SaleScreenState extends State<SaleScreen> {
                                     )
                                   : const Icon(Icons.save_rounded),
                               label: Text(
-                                _saving ? 'Guardando' : 'Guardar venta',
+                                _saving ? 'Guardando' : 'Registrar venta',
                               ),
                             );
 
@@ -959,7 +965,7 @@ class _SaleScreenState extends State<SaleScreen> {
       return null;
     }
     if (_selectedProduct != null) {
-      return 'Producto seleccionado. Puedes seguir con la venta o buscar otro.';
+      return 'Producto listo. Puedes seguir con la venta o cambiarlo.';
     }
     if (_normalizedProductQuery.isEmpty) {
       return 'Escribe, dicta o toca un producto para seleccionarlo.';
@@ -1071,8 +1077,8 @@ class _SaleScreenState extends State<SaleScreen> {
       SnackBar(
         content: Text(
           result.kind == ProductEditorResultKind.created
-              ? '"${result.product.name}" ya esta listo en el catalogo.'
-              : 'Usaras "${result.product.name}" que ya estaba en el catalogo.',
+              ? '"${result.product.name}" ya quedo listo en el catalogo.'
+              : 'Usaras "${result.product.name}", que ya estaba en el catalogo.',
         ),
         behavior: SnackBarBehavior.floating,
       ),
@@ -1119,8 +1125,8 @@ class _SaleScreenState extends State<SaleScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     final successMessage = _saleMode == SaleEntryMode.catalog
-        ? 'Venta guardada. Caja y stock al dia.'
-        : 'Venta libre guardada. Caja al dia.';
+        ? 'Venta registrada. Caja y stock al dia.'
+        : 'Venta libre registrada. Caja al dia.';
 
     try {
       if (_saleMode == SaleEntryMode.catalog) {
@@ -1174,7 +1180,7 @@ class _SaleModeSelector extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Modo de carga',
+          'Como cargas la venta',
           style: Theme.of(
             context,
           ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
@@ -1305,7 +1311,7 @@ class _ExactProductSuggestionCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Ya existe en catalogo',
+                  'Ya esta en el catalogo',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     color: scheme.primary,
                     fontWeight: FontWeight.w900,
@@ -1340,7 +1346,7 @@ class _ExactProductSuggestionCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Conviene usar ese producto para no duplicar catalogo ni stock.',
+                  'Conviene usar este producto para no duplicar catalogo ni stock.',
                   style: Theme.of(
                     context,
                   ).textTheme.bodyMedium?.copyWith(color: scheme.outline),
@@ -1393,7 +1399,7 @@ class _SelectedProductCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Producto seleccionado',
+                  'Producto listo',
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: scheme.primary,
                     fontWeight: FontWeight.w800,

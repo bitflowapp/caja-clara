@@ -9,11 +9,11 @@ String formatMoney(int amount) {
   }
 
   final formatted = parts.reversed.join('.');
-  return '${negative ? '-' : ''}\$$formatted';
+  return '${negative ? '-' : ''}\$ $formatted';
 }
 
 String formatDateTimeShort(DateTime value) {
-  return '${_twoDigits(value.day)}/${_twoDigits(value.month)} '
+  return '${_twoDigits(value.day)}/${_twoDigits(value.month)}/${value.year} '
       '${_twoDigits(value.hour)}:${_twoDigits(value.minute)}';
 }
 

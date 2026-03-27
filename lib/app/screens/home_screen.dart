@@ -266,7 +266,7 @@ class _HeaderStrip extends StatelessWidget {
     final theme = Theme.of(context);
     final statusChips = [
       _HomeStatusChip(
-        label: store.hasCashOpeningToday ? 'Caja abierta' : 'Sin apertura',
+        label: store.hasCashOpeningToday ? 'Caja abierta' : 'Abrir caja',
         color: store.hasCashOpeningToday
             ? BpcColors.income
             : Theme.of(context).colorScheme.error,
@@ -276,8 +276,8 @@ class _HeaderStrip extends StatelessWidget {
       ),
       _HomeStatusChip(
         label: store.lowStockCount == 0
-            ? 'Stock estable'
-            : '${store.lowStockCount} alertas',
+            ? 'Stock al dia'
+            : '${store.lowStockCount} con alerta',
         color: store.lowStockCount == 0
             ? BpcColors.greenSoft
             : BpcColors.sandMuted,
@@ -287,8 +287,8 @@ class _HeaderStrip extends StatelessWidget {
       ),
       _HomeStatusChip(
         label: store.productsWithBarcodeCount == 0
-            ? 'Barcode pendiente'
-            : '${store.productsWithBarcodeCount} con barcode',
+            ? 'Sin codigos'
+            : '${store.productsWithBarcodeCount} con codigo',
         color: store.productsWithBarcodeCount == 0
             ? BpcColors.sandMuted
             : BpcColors.greenSoft,
@@ -299,14 +299,14 @@ class _HeaderStrip extends StatelessWidget {
       _WorkspaceMetric(
         label: 'Ventas del dia',
         value: formatMoney(store.todaySalesPesos),
-        helper: '${store.todayMovementCount} movimientos hoy',
+        helper: '${store.todayMovementCount} movimientos del dia',
       ),
       _WorkspaceMetric(
         label: 'Caja actual',
         value: formatMoney(store.cashBalancePesos),
         helper: store.hasCashOpeningToday
-            ? 'Control en curso'
-            : 'Conviene registrar apertura',
+            ? 'Caja en marcha'
+            : 'Conviene abrir caja',
       ),
       _WorkspaceMetric(
         label: 'Productos',
@@ -359,7 +359,7 @@ class _HeaderStrip extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Panel de trabajo',
+                          'Mostrador al dia',
                           style: theme.textTheme.titleMedium?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.w900,
@@ -379,7 +379,7 @@ class _HeaderStrip extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Ventas, caja, stock y barcode en un mismo espacio operativo.',
+                  'Ventas, caja, stock y codigos en un solo lugar.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: Colors.white.withValues(alpha: 0.82),
                     fontWeight: FontWeight.w600,
@@ -642,10 +642,10 @@ class _HomeMovementsPanel extends StatelessWidget {
             EmptyCard(
               title: store.hasProducts
                   ? 'Todavia no registraste movimientos'
-                  : 'Arranca cargando tu negocio',
+                  : 'Arranca con lo basico',
               message: store.hasProducts
-                  ? 'Empieza con una venta o un gasto. Todo queda guardado en este dispositivo.'
-                  : 'Puedes cargar la plantilla kiosco para empezar en minutos o crear tus primeros productos a mano.',
+                  ? 'Empieza con una venta o un gasto. Todo queda guardado en esta PC.'
+                  : 'Puedes cargar una base simple o agregar tus primeros productos a mano.',
               action: Wrap(
                 spacing: 10,
                 runSpacing: 10,
@@ -710,7 +710,7 @@ class _PrimaryActions extends StatelessWidget {
         final wide = constraints.maxWidth >= 820;
         final primary = ActionCard(
           title: 'Nueva venta',
-          subtitle: 'Registra una venta y actualiza caja al instante',
+          subtitle: 'Registra una venta y deja la caja al dia al momento',
           icon: Icons.shopping_bag_rounded,
           onTap: onNewSale,
           fillColor: Theme.of(context).colorScheme.primary,
@@ -721,14 +721,14 @@ class _PrimaryActions extends StatelessWidget {
           children: [
             _ActionSupportCard(
               title: 'Registrar gasto',
-              subtitle: 'Anota una salida y deja la caja al dia',
+              subtitle: 'Anota una salida y deja la caja del dia clara',
               icon: Icons.receipt_long_rounded,
               onTap: onNewExpense,
             ),
             const SizedBox(height: 12),
             _ActionSupportCard(
               title: 'Escanear producto',
-              subtitle: 'Camara, scanner o ingreso manual',
+              subtitle: 'Camara, lector o codigo manual',
               icon: Icons.qr_code_scanner_rounded,
               onTap: onScanProduct,
             ),
@@ -787,7 +787,7 @@ class _SecondaryActions extends StatelessWidget {
           _ActionSupportCard(
             title: 'Agregar producto',
             subtitle: hasProducts
-                ? 'Carga nombre, stock, precio y codigo de barras'
+                ? 'Carga nombre, stock, precio y codigo'
                 : 'Empieza a cargar tu catalogo manualmente',
             icon: Icons.add_box_rounded,
             onTap: onAddProduct,
@@ -807,7 +807,7 @@ class _SecondaryActions extends StatelessWidget {
             subtitle: exportingExcel
                 ? 'Preparando archivo'
                 : hasProducts
-                ? 'Lleva ventas, gastos, productos y movimientos'
+                ? 'Lleva ventas, gastos y productos a un archivo'
                 : 'Disponible cuando empieces a cargar datos',
             icon: Icons.file_download_rounded,
             onTap: onExportExcel,
@@ -853,16 +853,13 @@ class _StarterTemplateCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final title = canLoadDemoData
-        ? 'Lista para demo o primer uso'
-        : 'Falta resolver el catalogo base';
+        ? 'Primeros pasos'
+        : 'Falta completar tu catalogo base';
     final message = canLoadDemoData
-        ? 'Puedes mostrar valor en segundos con una demo comercial ya armada o empezar desde una plantilla kiosco editable. Todo queda local en este dispositivo.'
+        ? 'Puedes arrancar con una base simple del kiosco o abrir un ejemplo corto para recorrer la app sin tocar tus datos.'
         : hasMovements
-        ? 'Ya hay movimientos guardados en este dispositivo, asi que la demo comercial no corresponde sobre este estado. Conviene sumar catalogo real con una plantilla o alta manual.'
-        : 'Conviene sumar catalogo real con una plantilla editable o alta manual para empezar a vender sin estados ambiguos.';
-    final firstStepSubtitle = canLoadDemoData
-        ? 'Demo comercial o plantilla kiosco'
-        : 'Plantilla kiosco o alta manual';
+        ? 'Ya hay movimientos guardados en esta PC, asi que conviene sumar catalogo real sin tocar ese historial.'
+        : 'Conviene sumar catalogo real con una plantilla simple o alta manual para empezar a vender sin vueltas.';
     return BpcPanel(
       padding: const EdgeInsets.all(16),
       color: Theme.of(context).colorScheme.surfaceContainerLow,
@@ -890,18 +887,23 @@ class _StarterTemplateCard extends StatelessWidget {
             children: [
               _OnboardingStepChip(
                 step: '1',
-                title: 'Carga datos',
-                subtitle: firstStepSubtitle,
+                title: 'Abri caja',
+                subtitle: 'Marca el efectivo inicial del dia',
               ),
               _OnboardingStepChip(
                 step: '2',
-                title: 'Registra una venta',
-                subtitle: 'Caja y stock se actualizan al instante',
+                title: 'Agrega un producto',
+                subtitle: 'Nombre, precio y stock basico',
               ),
               _OnboardingStepChip(
                 step: '3',
-                title: 'Muestra control',
-                subtitle: 'Caja, backup y export en el mismo flujo',
+                title: 'Hace una venta',
+                subtitle: 'Elige medio de pago y guarda',
+              ),
+              _OnboardingStepChip(
+                step: '4',
+                title: 'Listo',
+                subtitle: 'Caja y movimientos al dia',
               ),
             ],
           ),
@@ -924,8 +926,8 @@ class _StarterTemplateCard extends StatelessWidget {
                       : const Icon(Icons.play_circle_rounded),
                   label: Text(
                     loadingDemoData
-                        ? 'Cargando demo...'
-                        : 'Cargar demo comercial',
+                        ? 'Cargando ejemplo...'
+                        : 'Ver ejemplo',
                   ),
                 ),
               OutlinedButton.icon(
@@ -948,7 +950,7 @@ class _StarterTemplateCard extends StatelessWidget {
               TextButton.icon(
                 onPressed: onAddProduct,
                 icon: const Icon(Icons.add_box_rounded),
-                label: const Text('Agregar producto manualmente'),
+                label: const Text('Agregar producto'),
               ),
             ],
           ),
@@ -1042,7 +1044,7 @@ class _CatalogReadinessCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Catalogo listo para demo y operacion',
+            'Catalogo listo para vender',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: BpcColors.ink,
               fontWeight: FontWeight.w900,
@@ -1050,7 +1052,7 @@ class _CatalogReadinessCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Estas senales ayudan a mostrar control rapido: productos vendibles, cobertura de barcode y capital inmovilizado en stock.',
+            'Estas senales te muestran rapido si hay precio, stock y codigos para trabajar sin sorpresas.',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
@@ -1065,12 +1067,12 @@ class _CatalogReadinessCard extends StatelessWidget {
                 value: '${store.sellableProductsCount}',
               ),
               _SuggestionMeta(
-                label: 'Con barcode',
+                label: 'Con codigo',
                 value:
                     '${store.productsWithBarcodeCount}/${store.products.length}',
               ),
               _SuggestionMeta(
-                label: 'Stock valorizado',
+                label: 'Stock invertido',
                 value: formatMoney(store.estimatedInventoryCostPesos),
               ),
               _SuggestionMeta(

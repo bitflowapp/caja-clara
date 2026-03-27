@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../models/product.dart';
 import '../services/commerce_store.dart';
 import '../services/license_service.dart';
+import '../services/starter_templates.dart';
 import '../utils/formatters.dart';
 import '../utils/user_facing_errors.dart';
 import '../utils/text_field_selection.dart';
@@ -305,7 +306,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Completa lo basico y guarda. Si todavia no definiste costo o precio, puedes dejarlo en 0 y ajustarlo despues.',
+                'Carga nombre, categoria, stock y precio basico. Si algo falta, puedes dejarlo en 0 y ajustarlo despues.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.outline,
                 ),
@@ -338,7 +339,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
               Text(_title, style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 6),
               Text(
-                'Completa lo basico y guarda. Si todavia no definiste costo o precio, puedes dejarlo en 0 y ajustarlo despues.',
+                'Carga nombre, categoria, stock y precio basico. Si algo falta, puedes dejarlo en 0 y ajustarlo despues.',
                 style: Theme.of(
                   context,
                 ).textTheme.bodyMedium?.copyWith(color: scheme.outline),
@@ -427,8 +428,10 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                 MobileFieldEditorFormField(
                   controller: _categoryController,
                   editorController: _categoryEditorController,
-                  labelText: 'Categoria (opcional)',
+                  labelText: 'Categoria',
                   editorContext: _title,
+                  hintText: 'Ej. Bebidas o Almacen',
+                  helperText: 'Usa una categoria simple para ubicarlo rapido.',
                   emptyDisplayText: 'Toca para cargar la categoria',
                   keyboardType: TextInputType.text,
                   textCapitalization: TextCapitalization.words,
@@ -438,7 +441,17 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                     tooltip: 'Dictar categoria',
                   ),
                   supportingBuilder: () =>
-                      SpeechDictationHint(controller: _categoryDictation),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SpeechDictationHint(controller: _categoryDictation),
+                          const SizedBox(height: 8),
+                          _CategorySuggestionWrap(
+                            selectedCategory: _categoryController.text,
+                            onSelect: _applySuggestedCategory,
+                          ),
+                        ],
+                      ),
                 )
               else ...[
                 EnsureVisibleWhenFocused(
@@ -450,7 +463,10 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                     textInputAction: TextInputAction.next,
                     textCapitalization: TextCapitalization.words,
                     decoration: InputDecoration(
-                      labelText: 'Categoria (opcional)',
+                      labelText: 'Categoria',
+                      hintText: 'Ej. Bebidas o Almacen',
+                      helperText:
+                          'Usa una categoria simple para ubicarlo rapido.',
                       suffixIcon: SpeechDictationActionButton(
                         controller: _categoryDictation,
                         textController: _categoryController,
@@ -465,6 +481,11 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                   ),
                 ),
                 SpeechDictationHint(controller: _categoryDictation),
+                const SizedBox(height: 8),
+                _CategorySuggestionWrap(
+                  selectedCategory: _categoryController.text,
+                  onSelect: _applySuggestedCategory,
+                ),
               ],
             ],
           ),
@@ -669,8 +690,8 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     }
 
     final title = hasLookupAssistance
-        ? 'Datos sugeridos por ${seed!.lookupSourceLabel ?? 'catalogo externo'}'
-        : 'Codigo listo para guardar';
+        ? 'Datos sugeridos por ${seed!.lookupSourceLabel ?? 'fuente externa'}'
+        : 'Codigo listo';
     final message = hasLookupAssistance
         ? (seed!.lookupMessage ??
               'Revisa el nombre, la categoria y el codigo antes de guardar. Si algo no coincide, ajustalo manualmente.')
@@ -753,7 +774,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       animation: Listenable.merge([_nameController, _priceController]),
       builder: (context, _) {
         return Text(
-          'Vista previa: ${_nameController.text.isEmpty ? 'sin nombre' : _nameController.text} / ${formatMoney(_parseInt(_priceController.text))}',
+          'Asi se va a ver: ${_nameController.text.isEmpty ? 'sin nombre' : _nameController.text} / ${formatMoney(_parseInt(_priceController.text))}',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: Theme.of(context).colorScheme.outline,
           ),
@@ -802,7 +823,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
 
   String? _required(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'Campo obligatorio';
+      return 'Escribe un dato.';
     }
     return null;
   }
@@ -926,6 +947,15 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     });
   }
 
+  void _applySuggestedCategory(String category) {
+    setState(() {
+      _categoryController.value = TextEditingValue(
+        text: category,
+        selection: TextSelection.collapsed(offset: category.length),
+      );
+    });
+  }
+
   Product? _findConflictingBarcodeProduct(String? barcode) {
     final normalizedBarcode = CommerceStore.normalizeBarcode(barcode);
     if (normalizedBarcode == null) {
@@ -992,7 +1022,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Ese codigo ya existe'),
+          title: const Text('Ese codigo ya esta en otro producto'),
           content: Text(
             'El codigo de barras ya pertenece a "${existing.name}". Conviene usar ese producto para no duplicar catalogo ni stock.',
           ),
@@ -1016,3 +1046,31 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
 }
 
 enum _DuplicateProductResolution { cancel, useExisting, createDuplicate }
+
+class _CategorySuggestionWrap extends StatelessWidget {
+  const _CategorySuggestionWrap({
+    required this.selectedCategory,
+    required this.onSelect,
+  });
+
+  final String selectedCategory;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = selectedCategory.trim().toLowerCase();
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: suggestedArgentinianProductCategories
+          .map(
+            (category) => ChoiceChip(
+              label: Text(category),
+              selected: selected == category.toLowerCase(),
+              onSelected: (_) => onSelect(category),
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+}

@@ -45,9 +45,9 @@ void main() {
       expect(find.text('Se vendio'), findsOneWidget);
       expect(find.text('3 veces'), findsOneWidget);
       expect(find.text('Total vendido'), findsOneWidget);
-      expect(find.text('\$16.100'), findsWidgets);
+      expect(find.text('\$ 16.100'), findsWidgets);
       expect(find.text('Ultimo precio'), findsOneWidget);
-      expect(find.text('\$4.200'), findsWidgets);
+      expect(find.text('\$ 4.200'), findsWidgets);
 
       await tester.ensureVisible(find.text('Crear producto').first);
       await tester.tap(find.text('Crear producto').first);
@@ -57,7 +57,7 @@ void main() {
       expect(find.text('Agregar producto'), findsWidgets);
       expect(find.text('Cable USB rapido'), findsWidgets);
       expect(
-        find.text('Vista previa: Cable USB rapido / \$4.200'),
+        find.text('Asi se va a ver: Cable USB rapido / \$ 4.200'),
         findsOneWidget,
       );
     },

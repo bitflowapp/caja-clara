@@ -58,11 +58,18 @@ void main() {
 
   ButtonStyleButton saveButton(WidgetTester tester) {
     final finder = find.ancestor(
-      of: find.text('Guardar venta'),
+      of: find.text('Registrar venta'),
       matching: find.bySubtype<ButtonStyleButton>(),
     );
     return tester.widget<ButtonStyleButton>(finder.first);
   }
+
+  Finder saveButtonFinder() => find
+      .ancestor(
+        of: find.text('Registrar venta'),
+        matching: find.bySubtype<ButtonStyleButton>(),
+      )
+      .first;
 
   testWidgets(
     'Nueva venta exige seleccionar un producto y guarda despues del tap explicito',
@@ -91,18 +98,21 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('Producto seleccionado'), findsOneWidget);
+      expect(find.text('Producto listo'), findsOneWidget);
       expect(find.text('Yerba premium'), findsWidgets);
       expect(saveButton(tester).onPressed, isNotNull);
 
-      await tester.ensureVisible(find.text('Guardar venta'));
-      await tester.tap(find.text('Guardar venta'));
+      await tester.ensureVisible(saveButtonFinder());
+      await tester.tap(saveButtonFinder());
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 
       expect(store.movements.length, initialMovements + 1);
       expect(store.productById('p-1')!.stockUnits, initialStock - 1);
-      expect(find.text('Venta guardada. Caja y stock al dia.'), findsOneWidget);
+      expect(
+        find.text('Venta registrada. Caja y stock al dia.'),
+        findsOneWidget,
+      );
     },
   );
 
@@ -121,7 +131,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('Producto seleccionado'), findsOneWidget);
+      expect(find.text('Producto listo'), findsOneWidget);
       expect(saveButton(tester).onPressed, isNotNull);
 
       await tester.enterText(searchField, 'zzzz');
@@ -195,8 +205,8 @@ void main() {
       expect(find.text('No aplica'), findsOneWidget);
       expect(saveButton(tester).onPressed, isNotNull);
 
-      await tester.ensureVisible(find.text('Guardar venta'));
-      await tester.tap(find.text('Guardar venta'));
+      await tester.ensureVisible(saveButtonFinder());
+      await tester.tap(saveButtonFinder());
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 
@@ -204,7 +214,7 @@ void main() {
       expect(store.cashBalancePesos, initialCash + 2500);
       expect(store.movements.first.isFreeSale, isTrue);
       expect(store.movements.first.subtitle, 'Preservativos mostrador');
-      expect(find.text('Venta libre guardada. Caja al dia.'), findsOneWidget);
+      expect(find.text('Venta libre registrada. Caja al dia.'), findsOneWidget);
     },
   );
 
@@ -230,15 +240,15 @@ void main() {
       );
       await tester.pump();
 
-      await tester.ensureVisible(find.text('Crear producto con estos datos'));
-      await tester.tap(find.text('Crear producto con estos datos'));
+      await tester.ensureVisible(find.text('Pasar al catalogo'));
+      await tester.tap(find.text('Pasar al catalogo'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
       expect(find.text('Agregar producto'), findsOneWidget);
       expect(find.text('Cable USB mostrador'), findsWidgets);
       expect(
-        find.text('Vista previa: Cable USB mostrador / \$3.900'),
+        find.text('Asi se va a ver: Cable USB mostrador / \$ 3.900'),
         findsOneWidget,
       );
     },
@@ -263,7 +273,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('Ya existe en catalogo'), findsOneWidget);
+      expect(find.text('Ya esta en el catalogo'), findsOneWidget);
       expect(find.text('Yerba premium'), findsOneWidget);
       expect(find.text('Usar este producto'), findsOneWidget);
 
@@ -272,7 +282,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 150));
 
-      expect(find.text('Producto seleccionado'), findsOneWidget);
+      expect(find.text('Producto listo'), findsOneWidget);
       expect(find.text('Stock 8'), findsOneWidget);
       expect(
         find.widgetWithText(TextFormField, 'Buscar producto'),
@@ -288,7 +298,10 @@ void main() {
 
       await pumpSaleScreen(tester, store);
 
-      expect(find.text('Efectivo'), findsOneWidget);
+      final paymentField = tester.widget<DropdownButtonFormField<String>>(
+        find.byType(DropdownButtonFormField<String>),
+      );
+      expect(paymentField.initialValue, 'Efectivo');
       expect(find.widgetWithText(TextFormField, 'Cantidad'), findsOneWidget);
     },
   );
@@ -306,10 +319,13 @@ void main() {
 
       await pumpSaleScreen(tester, store);
 
-      expect(find.text('Mercado Pago'), findsOneWidget);
+      final paymentField = tester.widget<DropdownButtonFormField<String>>(
+        find.byType(DropdownButtonFormField<String>),
+      );
+      expect(paymentField.initialValue, 'Mercado Pago');
       expect(
         find.text(
-          'Se recupero el ultimo medio guardado. Puedes cambiarlo si hace falta.',
+          'Efectivo, transferencia, Mercado Pago o tarjeta.',
         ),
         findsOneWidget,
       );

@@ -35,17 +35,14 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(
-        find.text('Caja Clara Windows en modo solo lectura'),
-        findsOneWidget,
-      );
+      expect(find.text('Activacion necesaria'), findsOneWidget);
 
       await tester.ensureVisible(find.text('Nueva venta'));
       await tester.tap(find.text('Nueva venta'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Codigo de activacion'), findsOneWidget);
-      expect(find.text('ID de instalacion'), findsOneWidget);
+      expect(find.text('Activar Caja Clara'), findsWidgets);
+      expect(find.text('ID de esta PC'), findsOneWidget);
       expect(find.text('Registrar venta'), findsNothing);
     },
   );

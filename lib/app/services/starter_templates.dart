@@ -17,78 +17,43 @@ class StarterTemplateProductSeed {
 }
 
 const String argentinianKioskTemplateName = 'Kiosco argentino';
+const List<String> suggestedArgentinianProductCategories = <String>[
+  'Bebidas',
+  'Golosinas',
+  'Galletitas',
+  'Almacen',
+  'Limpieza',
+  'Perfumeria',
+  'Cigarrillos',
+  'Otros',
+];
 
 const List<StarterTemplateProductSeed> argentinianKioskTemplateProducts =
     <StarterTemplateProductSeed>[
-      StarterTemplateProductSeed(
-        name: 'Agua 500 ml',
-        category: 'Bebidas sin alcohol',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Agua 1.5 L',
-        category: 'Bebidas sin alcohol',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Coca-Cola 500 ml',
-        category: 'Bebidas sin alcohol',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Coca-Cola 1.5 L',
-        category: 'Bebidas sin alcohol',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Pepsi 500 ml',
-        category: 'Bebidas sin alcohol',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Sprite 500 ml',
-        category: 'Bebidas sin alcohol',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Fanta 500 ml',
-        category: 'Bebidas sin alcohol',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Speed lata',
-        category: 'Bebidas sin alcohol',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Monster lata',
-        category: 'Bebidas sin alcohol',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Jugo individual',
-        category: 'Bebidas sin alcohol',
-      ),
+      StarterTemplateProductSeed(name: 'Agua 500 ml', category: 'Bebidas'),
+      StarterTemplateProductSeed(name: 'Agua 1.5 L', category: 'Bebidas'),
+      StarterTemplateProductSeed(name: 'Coca-Cola 500 ml', category: 'Bebidas'),
+      StarterTemplateProductSeed(name: 'Coca-Cola 1.5 L', category: 'Bebidas'),
+      StarterTemplateProductSeed(name: 'Pepsi 500 ml', category: 'Bebidas'),
+      StarterTemplateProductSeed(name: 'Sprite 500 ml', category: 'Bebidas'),
+      StarterTemplateProductSeed(name: 'Fanta 500 ml', category: 'Bebidas'),
+      StarterTemplateProductSeed(name: 'Speed lata', category: 'Bebidas'),
+      StarterTemplateProductSeed(name: 'Monster lata', category: 'Bebidas'),
+      StarterTemplateProductSeed(name: 'Jugo individual', category: 'Bebidas'),
       StarterTemplateProductSeed(
         name: 'Agua saborizada',
-        category: 'Bebidas sin alcohol',
+        category: 'Bebidas',
       ),
       StarterTemplateProductSeed(
         name: 'Cerveza lata 473 ml',
-        category: 'Bebidas alcoholicas',
+        category: 'Bebidas',
       ),
-      StarterTemplateProductSeed(
-        name: 'Cerveza litro',
-        category: 'Bebidas alcoholicas',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Fernet botella',
-        category: 'Bebidas alcoholicas',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Vodka chico',
-        category: 'Bebidas alcoholicas',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Vino botella',
-        category: 'Bebidas alcoholicas',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Vino tetra',
-        category: 'Bebidas alcoholicas',
-      ),
-      StarterTemplateProductSeed(name: 'Hielo bolsa', category: 'Hielo'),
+      StarterTemplateProductSeed(name: 'Cerveza litro', category: 'Bebidas'),
+      StarterTemplateProductSeed(name: 'Fernet botella', category: 'Bebidas'),
+      StarterTemplateProductSeed(name: 'Vodka chico', category: 'Bebidas'),
+      StarterTemplateProductSeed(name: 'Vino botella', category: 'Bebidas'),
+      StarterTemplateProductSeed(name: 'Vino tetra', category: 'Bebidas'),
+      StarterTemplateProductSeed(name: 'Hielo bolsa', category: 'Bebidas'),
       StarterTemplateProductSeed(name: 'Alfajor simple', category: 'Golosinas'),
       StarterTemplateProductSeed(name: 'Alfajor triple', category: 'Golosinas'),
       StarterTemplateProductSeed(
@@ -100,89 +65,89 @@ const List<StarterTemplateProductSeed> argentinianKioskTemplateProducts =
       StarterTemplateProductSeed(name: 'Gomitas', category: 'Golosinas'),
       StarterTemplateProductSeed(name: 'Turron', category: 'Golosinas'),
       StarterTemplateProductSeed(name: 'Oblea', category: 'Golosinas'),
-      StarterTemplateProductSeed(name: 'Papas fritas', category: 'Snacks'),
-      StarterTemplateProductSeed(name: 'Palitos salados', category: 'Snacks'),
-      StarterTemplateProductSeed(name: 'Mani', category: 'Snacks'),
-      StarterTemplateProductSeed(name: 'Mix snack', category: 'Snacks'),
-      StarterTemplateProductSeed(name: 'Nachos', category: 'Snacks'),
+      StarterTemplateProductSeed(name: 'Papas fritas', category: 'Golosinas'),
+      StarterTemplateProductSeed(
+        name: 'Palitos salados',
+        category: 'Golosinas',
+      ),
+      StarterTemplateProductSeed(name: 'Mani', category: 'Golosinas'),
+      StarterTemplateProductSeed(name: 'Mix snack', category: 'Golosinas'),
+      StarterTemplateProductSeed(name: 'Nachos', category: 'Golosinas'),
       StarterTemplateProductSeed(
         name: 'Cigarrillos Marlboro box',
-        category: 'Cigarrillos y tabaco',
+        category: 'Cigarrillos',
       ),
       StarterTemplateProductSeed(
         name: 'Cigarrillos Philip Morris box',
-        category: 'Cigarrillos y tabaco',
+        category: 'Cigarrillos',
       ),
       StarterTemplateProductSeed(
         name: 'Cigarrillos Lucky Strike box',
-        category: 'Cigarrillos y tabaco',
+        category: 'Cigarrillos',
       ),
       StarterTemplateProductSeed(
         name: 'Cigarrillos Chesterfield box',
-        category: 'Cigarrillos y tabaco',
+        category: 'Cigarrillos',
       ),
       StarterTemplateProductSeed(
         name: 'Encendedor comun',
-        category: 'Encendedores',
+        category: 'Cigarrillos',
       ),
       StarterTemplateProductSeed(
         name: 'Encendedor recargable',
-        category: 'Encendedores',
+        category: 'Cigarrillos',
       ),
       StarterTemplateProductSeed(
         name: 'Preservativos x3',
-        category: 'Preservativos',
+        category: 'Perfumeria',
       ),
       StarterTemplateProductSeed(
         name: 'Preservativos x6',
-        category: 'Preservativos',
+        category: 'Perfumeria',
       ),
       StarterTemplateProductSeed(
         name: 'Galletitas dulces',
-        category: 'Galletitas y kiosco dulce',
+        category: 'Galletitas',
       ),
       StarterTemplateProductSeed(
         name: 'Galletitas saladas',
-        category: 'Galletitas y kiosco dulce',
+        category: 'Galletitas',
       ),
-      StarterTemplateProductSeed(
-        name: 'Bizcochos',
-        category: 'Galletitas y kiosco dulce',
-      ),
+      StarterTemplateProductSeed(name: 'Bizcochos', category: 'Galletitas'),
       StarterTemplateProductSeed(
         name: 'Budin individual',
-        category: 'Galletitas y kiosco dulce',
+        category: 'Galletitas',
       ),
-      StarterTemplateProductSeed(
-        name: 'Panuelitos',
-        category: 'Higiene rapida / impulso',
-      ),
+      StarterTemplateProductSeed(name: 'Yerba 1 kg', category: 'Almacen'),
+      StarterTemplateProductSeed(name: 'Azucar 1 kg', category: 'Almacen'),
+      StarterTemplateProductSeed(name: 'Fideos secos', category: 'Almacen'),
+      StarterTemplateProductSeed(name: 'Panuelitos', category: 'Perfumeria'),
       StarterTemplateProductSeed(
         name: 'Toallitas femeninas',
-        category: 'Higiene rapida / impulso',
+        category: 'Perfumeria',
       ),
       StarterTemplateProductSeed(
         name: 'Desodorante chico',
-        category: 'Higiene rapida / impulso',
+        category: 'Perfumeria',
       ),
       StarterTemplateProductSeed(
         name: 'Alcohol en gel chico',
-        category: 'Higiene rapida / impulso',
+        category: 'Perfumeria',
+      ),
+      StarterTemplateProductSeed(name: 'Lavandina 1 L', category: 'Limpieza'),
+      StarterTemplateProductSeed(
+        name: 'Detergente 500 ml',
+        category: 'Limpieza',
       ),
       StarterTemplateProductSeed(
-        name: 'Pilas AA',
-        category: 'Accesorios de mostrador',
+        name: 'Papel higienico x4',
+        category: 'Limpieza',
       ),
-      StarterTemplateProductSeed(
-        name: 'Pilas AAA',
-        category: 'Accesorios de mostrador',
-      ),
+      StarterTemplateProductSeed(name: 'Pilas AA', category: 'Otros'),
+      StarterTemplateProductSeed(name: 'Pilas AAA', category: 'Otros'),
       StarterTemplateProductSeed(
         name: 'Cargador USB basico',
-        category: 'Accesorios de mostrador',
+        category: 'Otros',
       ),
-      StarterTemplateProductSeed(
-        name: 'Cable USB basico',
-        category: 'Accesorios de mostrador',
-      ),
+      StarterTemplateProductSeed(name: 'Cable USB basico', category: 'Otros'),
     ];

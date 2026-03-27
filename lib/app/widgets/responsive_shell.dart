@@ -153,8 +153,8 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       SnackBar(
         content: Text(
           result.kind == ProductEditorResultKind.created
-              ? '"${result.product.name}" ya se sumo al catalogo.'
-              : 'Usaras "${result.product.name}" que ya existia en el catalogo.',
+              ? '"${result.product.name}" ya quedo en el catalogo.'
+              : 'Usaras "${result.product.name}", que ya estaba en el catalogo.',
         ),
         behavior: SnackBarBehavior.floating,
       ),
@@ -328,7 +328,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       messenger.showSnackBar(
         const SnackBar(
           content: Text(
-            'Demo comercial cargada. Ya puedes mostrar ventas, productos y caja.',
+            'Ejemplo cargado. Ya puedes recorrer ventas, productos y caja.',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -416,14 +416,14 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       if (result.saved) {
         messenger.showSnackBar(
           SnackBar(
-            content: Text('Backup guardado en ${result.path}'),
+            content: Text('Respaldo guardado en ${result.path}'),
             behavior: SnackBarBehavior.floating,
           ),
         );
       } else if (result.downloaded) {
         messenger.showSnackBar(
           const SnackBar(
-            content: Text('Descarga de backup iniciada'),
+            content: Text('Descarga del respaldo iniciada'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -435,7 +435,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            'No se pudo exportar el backup: ${userFacingErrorMessage(error)}',
+            'No se pudo guardar el respaldo: ${userFacingErrorMessage(error)}',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -468,7 +468,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
 
       final confirmed = await showDangerConfirmationDialog(
         context,
-        title: 'Restaurar backup',
+        title: 'Restaurar respaldo',
         message:
             'Se reemplazara el estado actual por el contenido de ${importData.fileName}. Esta accion no se puede revertir.',
         confirmLabel: 'Restaurar',
@@ -483,7 +483,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       }
       messenger.showSnackBar(
         SnackBar(
-          content: Text('Backup restaurado desde ${importData.fileName}'),
+          content: Text('Respaldo restaurado desde ${importData.fileName}'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -494,7 +494,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            'No se pudo restaurar el backup: ${userFacingErrorMessage(error)}',
+            'No se pudo restaurar el respaldo: ${userFacingErrorMessage(error)}',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -855,7 +855,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                                         ? 'Guardado con problema'
                                         : store.isSaving
                                         ? 'Guardando'
-                                        : 'Local listo',
+                                        : 'Todo guardado',
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodyMedium
@@ -897,7 +897,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                               showLicenseAction: license.shouldShowLicenseUi,
                               licenseActionLabel: license.isActivated
                                   ? 'Licencia'
-                                  : 'Activar',
+                                  : 'Activar Caja Clara',
                               onLicenseAction: _openLicenseManagement,
                               onHelp: _openQuickHelp,
                             ),
@@ -943,7 +943,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                       showLicenseAction: license.shouldShowLicenseUi,
                       licenseActionLabel: license.isActivated
                           ? 'Licencia'
-                          : 'Activar',
+                          : 'Activar Caja Clara',
                       onLicenseAction: _openLicenseManagement,
                       onHelp: _openQuickHelp,
                     ),
@@ -1065,7 +1065,9 @@ class _LicenseStatusBanner extends StatelessWidget {
                 ? FilledButton.styleFrom(minimumSize: const Size.fromHeight(48))
                 : null,
             icon: const Icon(Icons.key_rounded),
-            label: Text(expired ? 'Activar Windows' : 'Ver licencia'),
+            label: Text(
+              expired ? 'Activar Caja Clara' : 'Ver activacion',
+            ),
           );
           final body = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1196,7 +1198,7 @@ class _RailBrand extends StatelessWidget {
         const CajaClaraLogo(height: 52),
         const SizedBox(height: 10),
         Text(
-          'Caja, ventas, stock y barcode',
+          'Caja, ventas, stock y codigos',
           style: theme.textTheme.bodySmall?.copyWith(
             color: BpcColors.subtleInk,
             fontWeight: FontWeight.w700,
@@ -1315,7 +1317,7 @@ class _BuildInfoStrip extends StatelessWidget {
           }
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Build copiado: $text'),
+              content: Text('Datos de soporte copiados: $text'),
               behavior: SnackBarBehavior.floating,
             ),
           );

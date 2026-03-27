@@ -130,22 +130,22 @@ class _SummaryWorkspaceDeck extends StatelessWidget {
     final actions = [
       _SummaryCommand(
         title: exportingExcel ? 'Exportando Excel' : 'Exportar Excel',
-        subtitle: 'Compartir resumen, productos y movimientos',
+        subtitle: 'Llevar ventas, productos y movimientos',
         icon: Icons.file_download_rounded,
         onTap: exportingExcel ? null : onExportExcel,
         emphasized: true,
         loading: exportingExcel,
       ),
       _SummaryCommand(
-        title: exportingBackup ? 'Exportando backup' : 'Exportar backup',
-        subtitle: 'Guardar el estado completo local',
+        title: exportingBackup ? 'Guardando respaldo' : 'Guardar respaldo',
+        subtitle: 'Guardar una copia completa de la app',
         icon: Icons.save_alt_rounded,
         onTap: exportingBackup ? null : onExportBackup,
         loading: exportingBackup,
       ),
       _SummaryCommand(
-        title: restoringBackup ? 'Restaurando' : 'Restaurar backup',
-        subtitle: 'Recuperar un estado anterior',
+        title: restoringBackup ? 'Restaurando respaldo' : 'Restaurar respaldo',
+        subtitle: 'Recuperar una copia anterior',
         icon: Icons.restore_page_rounded,
         onTap: restoringBackup ? null : onRestoreBackup,
         loading: restoringBackup,
@@ -153,7 +153,7 @@ class _SummaryWorkspaceDeck extends StatelessWidget {
       _SummaryCommand(
         title: undoingMovement ? 'Deshaciendo' : 'Deshacer ultimo',
         subtitle: store.canUndoLastMovement
-            ? 'Revertir el ultimo movimiento guardado'
+            ? 'Volver atras el ultimo movimiento guardado'
             : 'No hay movimientos reversibles',
         icon: Icons.undo_rounded,
         onTap: undoingMovement || !store.canUndoLastMovement
@@ -162,14 +162,14 @@ class _SummaryWorkspaceDeck extends StatelessWidget {
         loading: undoingMovement,
       ),
       _SummaryCommand(
-        title: store.hasCashOpeningToday ? 'Editar apertura' : 'Apertura',
-        subtitle: 'Registrar caja inicial del dia',
+        title: store.hasCashOpeningToday ? 'Editar apertura' : 'Abrir caja',
+        subtitle: 'Registrar el efectivo inicial del dia',
         icon: Icons.login_rounded,
         onTap: savingCashEvent ? null : onRegisterCashOpening,
       ),
       _SummaryCommand(
-        title: store.hasCashClosingToday ? 'Editar cierre' : 'Cierre',
-        subtitle: 'Comparar caja contada con la esperada',
+        title: store.hasCashClosingToday ? 'Editar cierre' : 'Cerrar caja',
+        subtitle: 'Comparar lo contado con lo esperado',
         icon: Icons.logout_rounded,
         onTap: savingCashEvent ? null : onRegisterCashClosing,
       ),
@@ -183,8 +183,8 @@ class _SummaryWorkspaceDeck extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SectionHeader(
-              title: 'Caja / Resumen',
-              subtitle: 'Control diario, exportacion y respaldo local',
+              title: 'Caja del dia',
+              subtitle: 'Apertura, cierre y respaldo en el mismo lugar',
               trailing: _SectionCountChip(
                 label: store.todayMovementCount == 0
                     ? 'Sin actividad'
@@ -370,41 +370,41 @@ class _SummaryMetricsDeck extends StatelessWidget {
           final wide = constraints.maxWidth >= 1080;
           final cashState = _MetricGroupPanel(
             title: 'Estado de caja',
-            subtitle: 'Lo importante para abrir, operar y cerrar con control.',
+            subtitle: 'Lo justo para abrir, cobrar y cerrar con control.',
             metrics: [
               MetricCard(
-                label: 'Caja acumulada',
+                label: 'Caja total',
                 value: formatMoney(store.cashBalancePesos),
                 helper: 'Saldo total registrado',
               ),
               MetricCard(
-                label: 'Saldo inicial',
+                label: 'Apertura',
                 value: store.todayOpeningCashPesos == null
                     ? 'Sin abrir'
                     : formatMoney(store.todayOpeningCashPesos!),
-                helper: 'Apertura del dia',
+                helper: 'Efectivo inicial del dia',
               ),
               MetricCard(
-                label: 'Caja del dia',
+                label: 'Caja esperada',
                 value: store.todayExpectedCashPesos == null
                     ? 'Sin apertura'
                     : formatMoney(store.todayExpectedCashPesos!),
-                helper: 'Saldo inicial + ventas - gastos',
+                helper: 'Apertura + ventas - gastos',
               ),
               MetricCard(
-                label: 'Cierre registrado',
+                label: 'Cierre contado',
                 value: store.todayClosingCashPesos == null
                     ? 'Sin cierre'
                     : formatMoney(store.todayClosingCashPesos!),
                 helper: store.todayClosingDifferencePesos == null
-                    ? 'Caja contada al cierre'
+                    ? 'Monto contado al cierre'
                     : 'Diferencia: ${formatMoney(store.todayClosingDifferencePesos!)}',
               ),
             ],
           );
           final operations = _MetricGroupPanel(
             title: 'Actividad del dia',
-            subtitle: 'Ingresos, egresos y senales operativas del turno.',
+            subtitle: 'Ventas, gastos y una foto clara del movimiento.',
             metrics: [
               MetricCard(
                 label: 'Ventas del dia',
@@ -426,7 +426,7 @@ class _SummaryMetricsDeck extends StatelessWidget {
                 helper: 'Ventas, gastos y ajustes',
               ),
               MetricCard(
-                label: 'Margen estimado hoy',
+                label: 'Ganancia estimada',
                 value: formatMoney(store.todayEstimatedProfitPesos),
                 helper: 'Ventas menos costo estimado',
               ),
@@ -440,7 +440,7 @@ class _SummaryMetricsDeck extends StatelessWidget {
                 const SectionHeader(
                   title: 'Resumen de caja',
                   subtitle:
-                      'Una vista operativa del dia con formula, caja esperada y actividad real.',
+                      'Una vista clara del dia con formula, caja esperada y movimiento real.',
                 ),
                 const SizedBox(height: 12),
                 _CashFormulaCard(store: store),
@@ -458,7 +458,7 @@ class _SummaryMetricsDeck extends StatelessWidget {
               const SectionHeader(
                 title: 'Resumen de caja',
                 subtitle:
-                    'Una vista operativa del dia con formula, caja esperada y actividad real.',
+                    'Una vista clara del dia con formula, caja esperada y movimiento real.',
               ),
               const SizedBox(height: 12),
               _CashFormulaCard(store: store),
@@ -565,11 +565,11 @@ class _SummaryMovementsPanel extends StatelessWidget {
         children: [
           SectionHeader(
             title: 'Movimientos recientes',
-            subtitle: 'Todo lo que impacta en caja y stock',
+            subtitle: 'Todo lo que movio la caja y el stock',
             trailing: _SectionCountChip(
               label: recent.isEmpty
                   ? 'Sin movimientos'
-                  : '${recent.length} items',
+                  : '${recent.length} movimientos',
             ),
           ),
           const SizedBox(height: 12),
@@ -577,7 +577,7 @@ class _SummaryMovementsPanel extends StatelessWidget {
             const EmptyCard(
               title: 'Sin movimientos',
               message:
-                  'Cuando registres ventas, gastos o ajustes, se veran aqui.',
+                  'Cuando registres ventas, gastos o ajustes, se van a ver aqui.',
             )
           else
             Column(
@@ -652,29 +652,29 @@ class _OperationalSnapshotBanner extends StatelessWidget {
       surface = scheme.surfaceContainerLow;
       title = 'Falta apertura de caja';
       message =
-          'Registra la caja inicial para controlar el dia y detectar diferencias antes del cierre.';
+          'Registra el efectivo inicial para arrancar el dia con una referencia clara.';
     } else if (closing == null) {
       icon = Icons.timelapse_rounded;
       accent = scheme.primary;
       surface = scheme.surfaceContainerLow;
-      title = 'Caja abierta y bajo seguimiento';
+      title = 'Caja abierta';
       message = expected == null
-          ? 'Ya registraste la apertura. Cuando cierres, podras comparar contra el esperado.'
-          : 'Ya registraste la apertura. Si cerraras ahora, la caja esperada seria ${formatMoney(expected)}.';
+          ? 'La apertura ya quedo registrada. Cuando cierres, podras comparar lo contado con lo esperado.'
+          : 'La apertura ya quedo registrada. Si cerraras ahora, deberia darte ${formatMoney(expected)}.';
     } else if (difference == 0) {
       icon = Icons.verified_rounded;
       accent = Colors.white;
       surface = const Color(0xFF184D41);
-      title = 'Cierre cuadrado';
+      title = 'Caja cerrada, todo en orden';
       message =
-          'La caja contada coincide con la caja esperada. Es una buena senal para demo y operacion real.';
+          'La caja contada coincide con la esperada. Puedes cerrar el dia con tranquilidad.';
     } else {
       icon = Icons.warning_amber_rounded;
       accent = scheme.error;
       surface = scheme.errorContainer.withValues(alpha: 0.72);
       title = 'Diferencia a revisar';
       message =
-          'La caja esperada y la caja contada no coinciden. Revisa movimientos o el conteo antes de cerrar el dia.';
+          'La caja contada no coincide con la esperada. Revisa movimientos o vuelve a contar antes de dar el dia por cerrado.';
     }
 
     final onAccent = isBalanced ? Colors.white : null;
@@ -784,7 +784,7 @@ class _DataConfidenceNote extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Excel sirve para compartir o revisar fuera de la app. El backup guarda el estado completo para moverlo o restaurarlo sin depender de internet.',
+              'Excel te sirve para revisar o compartir. El respaldo guarda todo para volver atras o mover la app sin perder datos.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.outline,
                 fontWeight: FontWeight.w700,
@@ -822,7 +822,7 @@ class _CashFormulaCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Formula del dia',
+              'Formula de la caja del dia',
               style: theme.textTheme.labelLarge?.copyWith(
                 color: outline,
                 fontWeight: FontWeight.w900,
@@ -830,7 +830,7 @@ class _CashFormulaCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Registra una apertura para ver la formula del dia: saldo inicial + ventas - gastos = caja del dia.',
+              'Registra una apertura para ver la cuenta del dia: apertura + ventas - gastos = caja esperada.',
               style: theme.textTheme.bodyMedium?.copyWith(color: outline),
             ),
           ],
@@ -852,7 +852,7 @@ class _CashFormulaCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Formula visual de caja',
+            'Cuenta visual de caja',
             style: theme.textTheme.labelLarge?.copyWith(
               color: outline,
               fontWeight: FontWeight.w900,
@@ -860,7 +860,7 @@ class _CashFormulaCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Saldo inicial + ventas - gastos = caja del dia',
+            'Apertura + ventas - gastos = caja esperada',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: BpcColors.subtleInk,
               fontWeight: FontWeight.w600,
@@ -872,7 +872,7 @@ class _CashFormulaCard extends StatelessWidget {
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              _FormulaChip(label: 'Saldo inicial', value: formatMoney(opening)),
+              _FormulaChip(label: 'Apertura', value: formatMoney(opening)),
               const Text('+'),
               _FormulaChip(
                 label: 'Ventas',
@@ -885,7 +885,7 @@ class _CashFormulaCard extends StatelessWidget {
               ),
               const Text('='),
               _FormulaChip(
-                label: 'Caja del dia',
+                label: 'Caja esperada',
                 value: formatMoney(store.todayExpectedCashPesos ?? 0),
                 emphasized: true,
               ),

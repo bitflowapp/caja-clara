@@ -198,27 +198,27 @@ class LicenseService extends ChangeNotifier {
   String get statusHeadline {
     switch (status) {
       case LicenseStatus.active:
-        return 'Caja Clara Windows activa';
+        return 'Caja Clara activada';
       case LicenseStatus.trialActive:
-        return 'Prueba activa de Caja Clara Windows';
+        return 'Prueba activa';
       case LicenseStatus.trialExpired:
-        return 'Caja Clara Windows en modo solo lectura';
+        return 'Activacion necesaria';
     }
   }
 
   String get statusDescription {
     switch (status) {
       case LicenseStatus.active:
-        return 'La instalacion de Windows quedo activa para operar normalmente. La version web queda como demo o adicional, no como reemplazo de esta app local.';
+        return 'Caja Clara ya quedo lista para trabajar todos los dias en esta PC.';
       case LicenseStatus.trialActive:
-        return 'Te quedan $trialDaysRemaining ${trialDaysRemaining == 1 ? 'dia' : 'dias'} de prueba. Puedes seguir operando normal y activar despues sin perder datos.';
+        return 'Te quedan $trialDaysRemaining ${trialDaysRemaining == 1 ? 'dia' : 'dias'} de prueba. Puedes vender, registrar gastos y ordenar el catalogo sin perder tus datos.';
       case LicenseStatus.trialExpired:
-        return 'La prueba vencio. Puedes seguir viendo datos, exportando y haciendo backup, pero las funciones operativas quedan bloqueadas hasta activar.';
+        return 'La prueba termino. Tus datos siguen aca: puedes verlos, exportar y guardar un respaldo. Para volver a operar, activa Caja Clara.';
     }
   }
 
   String get positioningMessage {
-    return 'Windows es el producto principal para operar todos los dias. GitHub Pages queda como demo, landing o adicional comercial.';
+    return 'Tus datos quedan guardados en esta PC. Si necesitas ayuda para activar o seguir, puedes usar los contactos de soporte.';
   }
 
   bool canUse(LockedFeature feature) {
@@ -237,7 +237,7 @@ class LicenseService extends ChangeNotifier {
       LockedFeature.demoData => 'cargar la demo comercial',
     };
 
-    return 'La prueba de Caja Clara Windows vencio. Puedes seguir consultando tus datos, pero para $featureLabel necesitas activar la licencia.';
+    return 'La prueba termino, pero tus datos siguen aca. Para $featureLabel necesitas activar Caja Clara.';
   }
 
   Future<void> activate(String rawCode) async {

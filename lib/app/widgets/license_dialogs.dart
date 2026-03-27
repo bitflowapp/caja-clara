@@ -127,7 +127,7 @@ class _LicenseManagementDialogState extends State<_LicenseManagementDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Windows principal',
+                        'Tus datos quedan guardados',
                         style: theme.textTheme.labelLarge?.copyWith(
                           color: statusColor,
                           fontWeight: FontWeight.w900,
@@ -155,26 +155,26 @@ class _LicenseManagementDialogState extends State<_LicenseManagementDialog> {
                 ),
                 const SizedBox(height: 14),
                 _InfoBlock(
-                  title: 'ID de instalacion',
+                  title: 'ID de esta PC',
                   value: licenseService.installationId,
                   actionLabel: 'Copiar ID',
                   onAction: () => _copyValue(
                     context,
                     licenseService.installationId,
-                    label: 'ID de instalacion',
+                    label: 'ID de esta PC',
                   ),
                 ),
                 if (licenseService.hasSalesEmail)
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
                     child: _InfoBlock(
-                      title: 'Mail comercial',
+                      title: 'Mail de soporte',
                       value: LicenseService.salesEmail.trim(),
                       actionLabel: 'Copiar mail',
                       onAction: () => _copyValue(
                         context,
                         LicenseService.salesEmail.trim(),
-                        label: 'mail comercial',
+                        label: 'mail de soporte',
                       ),
                     ),
                   ),
@@ -182,20 +182,20 @@ class _LicenseManagementDialogState extends State<_LicenseManagementDialog> {
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
                     child: _InfoBlock(
-                      title: 'WhatsApp comercial',
+                      title: 'WhatsApp de soporte',
                       value: LicenseService.salesWhatsApp.trim(),
                       actionLabel: 'Copiar WhatsApp',
                       onAction: () => _copyValue(
                         context,
                         LicenseService.salesWhatsApp.trim(),
-                        label: 'WhatsApp comercial',
+                        label: 'WhatsApp de soporte',
                       ),
                     ),
                   ),
                 if (!licenseService.isActivated) ...[
                   const SizedBox(height: 18),
                   Text(
-                    'Codigo de activacion',
+                    'Activar Caja Clara',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w900,
                     ),
@@ -206,14 +206,14 @@ class _LicenseManagementDialogState extends State<_LicenseManagementDialog> {
                     textCapitalization: TextCapitalization.characters,
                     textInputAction: TextInputAction.done,
                     decoration: const InputDecoration(
-                      labelText: 'Pega tu codigo',
+                      labelText: 'Pega el codigo',
                       hintText: 'CCW-XXXX-XXXX',
                     ),
                     onSubmitted: (_) => _activate(context, licenseService),
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Comparte el ID de instalacion con tu contacto comercial y pega aqui el codigo que te envien. Tus datos no se borran si la prueba vence.',
+                    'Comparte el ID de esta PC con soporte y pega aqui el codigo que te envien. Aunque la prueba termine, tus datos no se borran.',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: scheme.outline,
                       fontWeight: FontWeight.w700,
@@ -222,7 +222,7 @@ class _LicenseManagementDialogState extends State<_LicenseManagementDialog> {
                 ] else ...[
                   const SizedBox(height: 18),
                   _InfoBlock(
-                    title: 'Licencia aplicada',
+                    title: 'Activacion cargada',
                     value: licenseService.activationCode ?? 'Activa',
                     actionLabel: 'Copiar codigo',
                     onAction: () => _copyValue(
@@ -237,7 +237,7 @@ class _LicenseManagementDialogState extends State<_LicenseManagementDialog> {
                   builder: (context, constraints) {
                     final compact = constraints.maxWidth < 520;
                     final closeLabel = licenseService.isTrialExpired
-                        ? 'Seguir en modo lectura'
+                        ? 'Seguir viendo datos'
                         : 'Cerrar';
                     final closeButton = TextButton(
                       onPressed: () => Navigator.of(context).pop(),
@@ -256,10 +256,10 @@ class _LicenseManagementDialogState extends State<_LicenseManagementDialog> {
                           : const Icon(Icons.verified_rounded),
                       label: Text(
                         licenseService.isActivated
-                            ? 'Licencia activa'
+                            ? 'Caja Clara activada'
                             : _activating
                             ? 'Activando'
-                            : 'Activar Windows',
+                            : 'Activar Caja Clara',
                       ),
                     );
 
@@ -309,7 +309,7 @@ class _LicenseManagementDialogState extends State<_LicenseManagementDialog> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Licencia activada. Caja Clara Windows ya opera normal.',
+            'Caja Clara quedo activada. Ya puedes seguir trabajando normal.',
           ),
           behavior: SnackBarBehavior.floating,
         ),

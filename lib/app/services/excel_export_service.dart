@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 
 import '../models/movement.dart';
 import '../models/product.dart';
+import '../utils/formatters.dart';
+import '../utils/payment_methods.dart';
 import 'commerce_store.dart';
 import 'excel_file_saver.dart';
 
@@ -79,7 +81,7 @@ class ExcelExportService {
 
   @visibleForTesting
   String buildSuggestedFileName(DateTime exportAt) {
-    final suffix = DateFormat('yyyy-MM-dd_HH-mm').format(exportAt);
+    final suffix = DateFormat('dd-MM-yyyy_HH-mm').format(exportAt);
     return 'caja_clara_$suffix.xlsx';
   }
 
@@ -154,7 +156,7 @@ class ExcelExportService {
         TextCellValue(_formatDateTime(sale.createdAt)),
         TextCellValue(productName),
         IntCellValue(sale.quantityUnits ?? 0),
-        TextCellValue(sale.paymentMethod ?? ''),
+        TextCellValue(displayPaymentMethodLabel(sale.paymentMethod, fallback: '')),
         IntCellValue(sale.amountPesos),
       ]);
     }
@@ -234,7 +236,7 @@ class ExcelExportService {
   String _movementDetail(CommerceStore store, Movement movement) {
     if (movement.kind == MovementKind.sale) {
       final productName = _saleLabel(store, movement);
-      final paymentMethod = movement.paymentMethod ?? 'Sin dato';
+      final paymentMethod = displayPaymentMethodLabel(movement.paymentMethod);
       return '$productName / $paymentMethod';
     }
 
@@ -253,6 +255,6 @@ class ExcelExportService {
   }
 
   String _formatDateTime(DateTime value) {
-    return DateFormat('yyyy-MM-dd HH:mm').format(value);
+    return formatDateTimeShort(value);
   }
 }

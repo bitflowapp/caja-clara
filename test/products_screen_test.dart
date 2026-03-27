@@ -76,13 +76,13 @@ void main() {
       ),
     );
 
-    await pumpProductsScreen(
+      await pumpProductsScreen(
       tester,
       store,
       onSellProduct: (_) async {},
     );
 
-    expect(find.text('Sin barcode'), findsAtLeastNWidgets(2));
+    expect(find.text('Sin codigo'), findsAtLeastNWidgets(2));
     expect(find.text('Sin precio'), findsOneWidget);
     expect(find.text('Vender'), findsAtLeastNWidgets(1));
   });

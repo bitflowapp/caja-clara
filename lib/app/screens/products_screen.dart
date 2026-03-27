@@ -142,8 +142,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
                           : 'Sin resultados para ese filtro',
                       message: emptyCatalog
                           ? canLoadDemoData
-                                ? 'Puedes empezar con la plantilla kiosco, cargar una demo comercial o crear productos a mano. Todo queda editable y guardado localmente.'
-                                : 'Ya hay movimientos guardados, asi que conviene sumar catalogo real con una plantilla o alta manual sin pisar ese historial.'
+                                ? 'Puedes empezar con la plantilla del kiosco, abrir un ejemplo corto o cargar productos a mano. Todo queda editable y guardado localmente.'
+                                : 'Ya hay movimientos guardados, asi que conviene sumar catalogo real con una plantilla o alta manual sin tocar ese historial.'
                           : 'No hay productos que coincidan con la busqueda actual. Ajusta filtros o agrega un producto nuevo.',
                       action: Wrap(
                         spacing: 10,
@@ -157,8 +157,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                   : () => widget.onLoadDemoData(),
                               child: Text(
                                 widget.loadingDemoData
-                                    ? 'Cargando demo...'
-                                    : 'Cargar demo comercial',
+                                    ? 'Cargando ejemplo...'
+                                    : 'Ver ejemplo',
                               ),
                             ),
                           if (emptyCatalog)
@@ -220,7 +220,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       parts.add('bajo stock');
     }
     if (_onlyMissingBarcode) {
-      parts.add('sin barcode');
+      parts.add('sin codigo');
     }
     if (_onlyNeedsAttention) {
       parts.add('pendientes');
@@ -300,7 +300,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       title: 'Ajustar stock',
       label: 'Cantidad a sumar',
       confirmLabel: 'Guardar',
-      helper: 'Se registra un ajuste de stock sobre ${product.name}.',
+      helper: 'Se suma stock sobre ${product.name} sin tocar el resto del catalogo.',
     );
     if (amount == null || !mounted) {
       return;
@@ -317,7 +317,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       }
       messenger.showSnackBar(
         SnackBar(
-          content: Text('Stock actualizado para ${product.name}.'),
+          content: Text('Stock guardado para ${product.name}.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -446,15 +446,15 @@ class _CatalogOverviewCard extends StatelessWidget {
         accent: BpcColors.income,
       ),
       _OverviewMetricData(
-        label: 'Sin barcode',
+        label: 'Sin codigo',
         value: '$withoutBarcodeCount',
-        helper: 'pendientes para scanner',
+        helper: 'pendientes para lector',
         accent: BpcColors.sandMuted,
       ),
       _OverviewMetricData(
-        label: 'Pendientes',
+        label: 'Para revisar',
         value: '$needsAttentionCount',
-        helper: 'sin precio o barcode',
+        helper: 'sin precio o sin codigo',
         accent: scheme.error,
       ),
     ];
@@ -471,7 +471,7 @@ class _CatalogOverviewCard extends StatelessWidget {
               const SectionHeader(
                 title: 'Catalogo',
                 subtitle:
-                    'Un panel de productos pensado para escritorio: lectura rapida, control de stock y acciones comerciales sin vueltas.',
+                    'Control rapido de productos, precios y stock sin dar vueltas.',
               ),
               const SizedBox(height: 14),
               Wrap(
@@ -499,7 +499,7 @@ class _CatalogOverviewCard extends StatelessWidget {
                         )
                       : const Icon(Icons.play_circle_rounded),
                   label: Text(
-                    loadingDemoData ? 'Cargando demo' : 'Demo comercial',
+                    loadingDemoData ? 'Cargando ejemplo' : 'Ver ejemplo',
                   ),
                 ),
               OutlinedButton.icon(
@@ -608,8 +608,8 @@ class _CatalogToolbarCard extends StatelessWidget {
             onTapOutside: (_) => searchFocusNode.unfocus(),
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search_rounded),
-              labelText: 'Buscar en catalogo',
-              hintText: 'Nombre, categoria o codigo de barras',
+              labelText: 'Buscar producto',
+              hintText: 'Nombre, categoria o codigo',
               suffixIcon: searchQuery.trim().isEmpty
                   ? null
                   : IconButton(
@@ -633,7 +633,7 @@ class _CatalogToolbarCard extends StatelessWidget {
               FilterChip(
                 selected: onlyMissingBarcode,
                 avatar: const Icon(Icons.qr_code_2_rounded, size: 18),
-                label: Text('Sin barcode ($withoutBarcodeCount)'),
+                label: Text('Sin codigo ($withoutBarcodeCount)'),
                 onSelected: onToggleMissingBarcode,
               ),
               FilterChip(
@@ -821,7 +821,9 @@ class _ProductTile extends StatelessWidget {
                     runSpacing: 8,
                     children: [
                       _ProductStateBadge(
-                        label: product.isLowStock ? 'Stock bajo' : 'Stock ok',
+                        label: product.isLowStock
+                            ? 'Stock bajo'
+                            : 'Stock al dia',
                         color: product.isLowStock
                             ? scheme.error
                             : BpcColors.income,
@@ -831,7 +833,7 @@ class _ProductTile extends StatelessWidget {
                       ),
                       if (!hasBarcode)
                         const _ProductStateBadge(
-                          label: 'Sin barcode',
+                          label: 'Sin codigo',
                           color: BpcColors.sandMuted,
                           icon: Icons.qr_code_2_rounded,
                         ),
@@ -843,7 +845,7 @@ class _ProductTile extends StatelessWidget {
                         ),
                       if (canSell)
                         const _ProductStateBadge(
-                          label: 'Listo para vender',
+                          label: 'Todo listo para vender',
                           color: BpcColors.greenSoft,
                           icon: Icons.shopping_bag_outlined,
                         ),
@@ -881,8 +883,8 @@ class _ProductTile extends StatelessWidget {
                       ),
                       _ProductInfoPanel(
                         label: 'Codigo',
-                        value: hasBarcode ? product.barcode! : 'Manual',
-                        helper: hasBarcode ? 'scanner listo' : 'falta asociar',
+                        value: hasBarcode ? product.barcode! : 'Sin codigo',
+                        helper: hasBarcode ? 'listo para lector' : 'puedes cargarlo despues',
                         icon: Icons.qr_code_rounded,
                         accent: hasBarcode
                             ? BpcColors.greenSoft
@@ -945,8 +947,8 @@ class _ProductTile extends StatelessWidget {
                             const SizedBox(height: 8),
                             Text(
                               hasBarcode
-                                  ? 'Cod. ${product.barcode}'
-                                  : 'Sin codigo cargado',
+                                  ? 'Codigo ${product.barcode}'
+                                  : 'Producto sin codigo',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: hasBarcode
                                     ? BpcColors.greenSoft

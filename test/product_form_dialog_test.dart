@@ -130,7 +130,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text('Ese codigo ya existe'), findsOneWidget);
+    expect(find.text('Ese codigo ya esta en otro producto'), findsOneWidget);
 
     await tester.tap(find.text('Usar existente'));
     await tester.pump();

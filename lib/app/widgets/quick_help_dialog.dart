@@ -17,65 +17,55 @@ Future<void> showQuickHelpDialog(BuildContext context) async {
             16 + MediaQuery.viewInsetsOf(context).bottom,
           ),
           scrollable: true,
-          title: const Text('Como usar Caja Clara'),
+          title: const Text('Ayuda rapida'),
           content: const Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _HelpBlock(
-                title: 'Que es',
+                title: 'Para que sirve',
                 text:
-                    'Caja Clara ayuda a registrar ventas, gastos, productos y caja desde una sola app local.',
+                    'Caja Clara te ayuda a llevar ventas, gastos, productos y caja desde una sola app local.',
               ),
               _HelpBlock(
-                title: 'Empezar',
+                title: 'Primeros pasos',
                 text:
-                    'Primero carga tus productos. Luego registra ventas o gastos y revisa la caja en Resumen.',
+                    'Empieza asi: 1. Abre caja. 2. Agrega un producto. 3. Registra una venta. 4. Revisa la caja del dia.',
               ),
               _HelpBlock(
-                title: 'Barcode',
+                title: 'Cobros',
                 text:
-                    'Puedes leer con camara, scanner o ingreso manual. Si el codigo no existe, lo das de alta desde ahi.',
+                    'Los medios de pago ya vienen pensados para el dia a dia: Efectivo, Transferencia, Mercado Pago, Debito, Credito y Cuenta corriente.',
+              ),
+              _HelpBlock(
+                title: 'Codigos',
+                text:
+                    'Puedes usar camara, lector o ingreso manual. Si un codigo no existe, lo das de alta en el momento sin perder la venta.',
+              ),
+              _HelpBlock(
+                title: 'Activacion',
+                text:
+                    'La app incluye una prueba de 30 dias. Si se termina, tus datos siguen visibles y exportables. Desde Activar Caja Clara puedes copiar el ID de esta PC y seguir el contacto de soporte.',
+              ),
+              _HelpBlock(
+                title: 'Tus datos',
+                text:
+                    'Todo queda guardado localmente. Puedes sacar Excel o guardar un respaldo para quedarte tranquilo.',
+              ),
+              _HelpChecklist(
+                title: 'Checklist rapida',
+                items: [
+                  'Instala desde "Instalar Caja Clara.cmd" o abre la carpeta completa si prefieres usarla portable.',
+                  'Confirma que Inicio cargue bien y que el estado de prueba o activacion quede visible.',
+                  'Prueba Agregar producto o abre Productos para ver que el catalogo responda.',
+                  'Registra una venta o un gasto de prueba y revisa el mensaje en pantalla.',
+                  'Si usas lector tipo teclado, enfoca el campo de codigo, escanea y confirma que Enter resuelve el flujo.',
+                ],
               ),
               _HelpBlock(
                 title: 'Windows',
                 text:
-                    'La version Windows es la principal para operar todos los dias. La web sirve como demo o adicional, no como reemplazo de la app local.',
-              ),
-              _HelpBlock(
-                title: 'Licencia',
-                text:
-                    'La app incluye una prueba de 30 dias. Si vence, tus datos siguen visibles y exportables, pero las acciones operativas se bloquean hasta activar.',
-              ),
-              _HelpBlock(
-                title: 'Primera prueba en Windows',
-                text:
-                    'Para una prueba rapida: revisa que el estado de licencia sea visible, crea o revisa al menos un producto, registra una venta o gasto de prueba y confirma que Caja responda sin cerrarse.',
-              ),
-              _HelpChecklist(
-                title: 'Checklist de validacion manual',
-                items: [
-                  'Abrir Caja Clara desde la carpeta portable completa, no desde un .exe suelto.',
-                  'Confirmar que Inicio cargue sin errores y que el estado de prueba o licencia sea visible.',
-                  'Probar Agregar producto o abrir Productos para verificar que el catalogo responde.',
-                  'Probar Nueva venta o Registrar gasto y revisar que aparezca feedback en pantalla.',
-                  'Si usas scanner tipo teclado, enfocar el campo de barcode, escanear y confirmar que Enter resuelve el flujo.',
-                ],
-              ),
-              _HelpBlock(
-                title: 'Entrega Windows',
-                text:
-                    'La forma recomendada de entrega es la carpeta portable o el .zip extraido. El MSIX queda como opcion adicional y puede requerir confiar un certificado de desarrollo en la PC destino.',
-              ),
-              _HelpBlock(
-                title: 'Exportar',
-                text:
-                    'Desde Caja puedes exportar Excel o guardar un backup para llevarte la informacion.',
-              ),
-              _HelpBlock(
-                title: 'Si algo falla',
-                text:
-                    'Revisa el mensaje en pantalla. La app guarda localmente, asi que conviene exportar o hacer backup con regularidad.',
+                    'La experiencia recomendada en Windows es instalarla desde el paquete portable. El MSIX sigue siendo opcional y puede pedir certificado confiable.',
               ),
             ],
           ),
@@ -145,7 +135,7 @@ class _HelpChecklist extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('• ', style: bodyStyle),
+                  Text('- ', style: bodyStyle),
                   Expanded(child: Text(item, style: bodyStyle)),
                 ],
               ),
