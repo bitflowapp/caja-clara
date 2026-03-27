@@ -54,6 +54,14 @@ Tambien puedes guardar un backup JSON para resguardar el estado completo de la a
 - exporta Excel o backup con regularidad
 - si vendes mucho por scanner, agrega barcode a los productos desde el inicio
 
+## Checklist corta de prueba en Windows
+
+1. Abre Caja Clara desde la carpeta portable completa.
+2. Confirma que la pantalla Inicio cargue y que el estado de prueba o licencia sea visible.
+3. Entra a `Productos` o usa `Agregar producto` para validar que el catalogo responde.
+4. Registra una venta o un gasto de prueba y revisa el mensaje final.
+5. Si usas scanner tipo teclado, enfoca el campo de barcode, escanea y confirma que Enter resuelve el flujo.
+
 ## Errores comunes y como resolverlos
 
 **No encuentro un producto**
