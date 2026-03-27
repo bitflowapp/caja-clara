@@ -1,0 +1,21 @@
+Caja Clara para Windows
+
+Instalacion simple
+1. Descomprime esta carpeta completa.
+2. Haz doble clic en "Instalar Caja Clara.cmd".
+3. Caja Clara se copia a %LocalAppData%\CajaClara.
+4. Se crean accesos directos en Escritorio e Inicio.
+5. La app se abre sola al terminar.
+
+Abrir despues
+- Escritorio: Caja Clara
+- Inicio: Caja Clara
+
+Desinstalar
+- Inicio: Quitar Caja Clara
+- o ejecuta "Quitar Caja Clara.cmd"
+
+Importante
+- No copies solo CajaClara.exe.
+- Si prefieres no instalar, puedes abrir CajaClara.exe desde esta carpeta completa.
+- El paquete .msix sigue siendo opcional y puede requerir un certificado confiable.

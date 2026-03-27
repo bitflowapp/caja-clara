@@ -56,7 +56,7 @@ Tambien puedes guardar un backup JSON para resguardar el estado completo de la a
 
 ## Checklist corta de prueba en Windows
 
-1. Abre Caja Clara desde la carpeta portable completa.
+1. Instala con `Instalar Caja Clara.cmd` o, si no quieres instalar, abre Caja Clara desde la carpeta portable completa.
 2. Confirma que la pantalla Inicio cargue y que el estado de prueba o licencia sea visible.
 3. Entra a `Productos` o usa `Agregar producto` para validar que el catalogo responde.
 4. Registra una venta o un gasto de prueba y revisa el mensaje final.

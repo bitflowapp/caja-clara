@@ -137,18 +137,32 @@ Ese paquete es la via principal para entregar y probar Caja Clara en Windows.
 Entrega recomendada:
 
 1. descomprimir `CajaClara-win64.zip` o copiar la carpeta `dist/windows-portable/CajaClara/`
-2. mantener juntos `CajaClara.exe`, `flutter_windows.dll`, `file_selector_windows_plugin.dll`, `native_assets.json` y la carpeta `data/`
-3. abrir `CajaClara.exe` desde esa carpeta completa
+2. hacer doble clic en `Instalar Caja Clara.cmd`
+3. Caja Clara se copia a `%LocalAppData%\CajaClara`
+4. el script crea `Caja Clara.lnk` en Escritorio y en Inicio
+5. la app se abre sola al terminar
 
-No conviene copiar solo el `.exe` por separado.
+Contenido clave del paquete:
+
+- `Instalar Caja Clara.cmd` y `Instalar Caja Clara.ps1`
+- `Quitar Caja Clara.cmd` y `Quitar Caja Clara.ps1`
+- `LEEME - Windows.txt`
+- `CajaClara.exe`, `flutter_windows.dll`, `file_selector_windows_plugin.dll`, `native_assets.json` y la carpeta `data/`
+
+No conviene copiar solo el `.exe` por separado ni moverlo sin su carpeta completa.
+
+Si no quieres instalar, todavia puedes abrir `CajaClara.exe` desde esa carpeta completa, pero la experiencia recomendada para un comerciante normal es usar `Instalar Caja Clara.cmd`.
 
 Checklist corta de validacion manual:
 
-1. abrir la app y confirmar que Inicio carga sin cerrarse
-2. verificar que el estado de prueba o licencia quede visible
-3. abrir `Productos` o `Agregar producto` y confirmar que el catalogo responde
-4. registrar una venta o gasto de prueba y revisar el feedback en pantalla
-5. si hay scanner tipo teclado, enfocar el campo de barcode, escanear y confirmar que Enter resuelve el flujo
+1. ejecutar `Instalar Caja Clara.cmd`
+2. confirmar que `Caja Clara.lnk` aparece en el Escritorio
+3. confirmar que `Caja Clara.lnk` aparece en Inicio
+4. abrir la app desde un acceso directo y confirmar que `Inicio` carga sin cerrarse
+5. verificar que el estado de prueba o licencia quede visible
+6. abrir `Productos` o `Agregar producto` y confirmar que el catalogo responde
+7. registrar una venta o gasto de prueba y revisar el feedback en pantalla
+8. si hay scanner tipo teclado, enfocar el campo de barcode, escanear y confirmar que Enter resuelve el flujo
 
 Guia corta de entrega:
 
@@ -181,6 +195,7 @@ Notas reales:
 - el script genera un certificado local de desarrollo si hace falta
 - el MSIX queda firmado para pruebas razonables
 - la instalacion puede requerir confiar el certificado segun la politica del equipo
+- el flujo principal para entrega comercial rapida sigue siendo el paquete portable con `Instalar Caja Clara.cmd`
 - en esta PC de prueba, `Add-AppxPackage` fallo con `0x800B0109` porque el certificado raiz de desarrollo no estaba en confianza local
 
 ## CI

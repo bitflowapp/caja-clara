@@ -8,6 +8,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $releaseDir = Join-Path $root "build\\windows\\x64\\runner\\Release"
 $portableRoot = Join-Path $root "dist\\windows-portable"
 $portableDir = Join-Path $portableRoot "CajaClara"
+$portableAssetsDir = Join-Path $root "scripts\\windows-portable-assets"
 $zipPath = Join-Path $portableRoot "CajaClara-win64.zip"
 $exePath = Join-Path $releaseDir "CajaClara.exe"
 
@@ -34,12 +35,17 @@ Write-Host "Copying portable release..."
 New-Item -ItemType Directory -Path $portableDir | Out-Null
 Copy-Item -Path (Join-Path $releaseDir "*") -Destination $portableDir -Recurse
 
+if (Test-Path $portableAssetsDir) {
+  Write-Host "Adding portable install scripts..."
+  Copy-Item -Path (Join-Path $portableAssetsDir "*") -Destination $portableDir -Recurse
+}
+
 if (Test-Path $zipPath) {
   Remove-Item -Force $zipPath
 }
 
 Write-Host "Creating portable zip..."
-Compress-Archive -Path (Join-Path $portableDir "*") -DestinationPath $zipPath
+Compress-Archive -Path $portableDir -DestinationPath $zipPath
 
 Write-Host "Portable folder: $portableDir"
 Write-Host "Portable zip: $zipPath"
