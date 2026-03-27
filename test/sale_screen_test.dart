@@ -109,10 +109,15 @@ void main() {
 
       expect(store.movements.length, initialMovements + 1);
       expect(store.productById('p-1')!.stockUnits, initialStock - 1);
-      expect(
-        find.text('Venta registrada. Caja y stock al dia.'),
-        findsOneWidget,
-      );
+      expect(find.text('Comprobante listo'), findsOneWidget);
+      expect(find.text('Copiar comprobante'), findsOneWidget);
+
+      await tester.ensureVisible(find.text('Listo'));
+      await tester.tap(find.text('Listo'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Abrir venta'), findsOneWidget);
     },
   );
 
@@ -202,7 +207,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('Venta libre'), findsWidgets);
-      expect(find.text('No aplica'), findsOneWidget);
+      expect(find.text('\$ 2.500'), findsWidgets);
       expect(saveButton(tester).onPressed, isNotNull);
 
       await tester.ensureVisible(saveButtonFinder());
@@ -214,7 +219,14 @@ void main() {
       expect(store.cashBalancePesos, initialCash + 2500);
       expect(store.movements.first.isFreeSale, isTrue);
       expect(store.movements.first.subtitle, 'Preservativos mostrador');
-      expect(find.text('Venta libre registrada. Caja al dia.'), findsOneWidget);
+      expect(find.text('Comprobante listo'), findsOneWidget);
+
+      await tester.ensureVisible(find.text('Listo'));
+      await tester.tap(find.text('Listo'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Abrir venta'), findsOneWidget);
     },
   );
 

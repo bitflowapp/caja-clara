@@ -15,6 +15,7 @@ import '../widgets/keyboard_aware_form.dart';
 import '../widgets/license_dialogs.dart';
 import '../widgets/mobile_field_editor.dart';
 import '../widgets/product_form_dialog.dart';
+import '../widgets/sale_receipt_card.dart';
 import '../widgets/speech_dictation.dart';
 
 class SaleScreen extends StatefulWidget {
@@ -166,6 +167,13 @@ class _SaleScreenState extends State<SaleScreen> {
               (_saleMode == SaleEntryMode.catalog
                   ? product != null && saleWarning == null && quantity > 0
                   : saleWarning == null && quantity > 0);
+          final receiptPreview = _buildReceiptData(
+            product: product,
+            quantity: quantity,
+            manualUnitPrice: manualUnitPrice,
+            total: total,
+            remaining: remaining,
+          );
           final paymentMethodOptions = salePaymentMethodOptions(
             selectedValue: _paymentMethod,
           );
@@ -668,77 +676,37 @@ class _SaleScreenState extends State<SaleScreen> {
                           },
                         ),
                         const SizedBox(height: 16),
-                        BpcPanel(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surfaceContainerLow,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Vista del comprobante',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Se ve claro antes de guardar y queda listo para revisar al cerrar la venta.',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: Theme.of(context).colorScheme.outline,
+                                  ),
+                            ),
+                            const SizedBox(height: 12),
+                            SaleReceiptCard(receipt: receiptPreview),
+                            if (saleWarning != null) ...[
+                              const SizedBox(height: 10),
                               Text(
-                                'Resumen de la venta',
-                                style: Theme.of(context).textTheme.titleMedium,
+                                saleWarning,
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.error,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                               ),
-                              const SizedBox(height: 12),
-                              _SummaryRow(
-                                label: _saleMode == SaleEntryMode.catalog
-                                    ? 'Producto'
-                                    : 'Tipo',
-                                value: _saleMode == SaleEntryMode.catalog
-                                    ? product?.name ?? 'Sin seleccionar'
-                                    : 'Venta libre',
-                              ),
-                              if (_saleMode == SaleEntryMode.quick)
-                                _SummaryRow(
-                                  label: 'Descripcion',
-                                  value: manualDescription.isEmpty
-                                      ? 'Sin descripcion'
-                                      : manualDescription,
-                                ),
-                              _SummaryRow(
-                                label: 'Cantidad',
-                                value: quantity.toString(),
-                              ),
-                              if (_saleMode == SaleEntryMode.quick)
-                                _SummaryRow(
-                                  label: 'Precio unitario',
-                                  value: manualUnitPrice <= 0
-                                      ? '-'
-                                      : formatMoney(manualUnitPrice),
-                                ),
-                              _SummaryRow(
-                                label: 'Total',
-                                value: formatMoney(total),
-                              ),
-                              _SummaryRow(
-                                label: 'Medio de pago',
-                                value: displayPaymentMethodLabel(
-                                  _paymentMethod,
-                                ),
-                              ),
-                              _SummaryRow(
-                                label: 'Stock que queda',
-                                value: _saleMode == SaleEntryMode.quick
-                                    ? 'No aplica'
-                                    : remaining == null
-                                    ? '-'
-                                    : remaining.toString(),
-                              ),
-                              if (saleWarning != null) ...[
-                                const SizedBox(height: 8),
-                                Text(
-                                  saleWarning,
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.error,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                ),
-                              ],
                             ],
-                          ),
+                          ],
                         ),
                         const SizedBox(height: 18),
                         LayoutBuilder(
@@ -1123,10 +1091,9 @@ class _SaleScreenState extends State<SaleScreen> {
 
     setState(() => _saving = true);
     final messenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
     final successMessage = _saleMode == SaleEntryMode.catalog
-        ? 'Venta registrada. Caja y stock al dia.'
-        : 'Venta libre registrada. Caja al dia.';
+        ? 'Venta registrada. Comprobante listo.'
+        : 'Venta libre registrada. Comprobante listo.';
 
     try {
       if (_saleMode == SaleEntryMode.catalog) {
@@ -1147,7 +1114,12 @@ class _SaleScreenState extends State<SaleScreen> {
         return;
       }
       messenger.hideCurrentSnackBar();
-      navigator.pop(successMessage);
+      final receipt = _buildSavedReceiptData(store, resolvedProduct, quantity);
+      await showSaleReceiptDialog(context, receipt: receipt);
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pop(successMessage);
     } catch (error) {
       if (!mounted) {
         return;
@@ -1165,6 +1137,88 @@ class _SaleScreenState extends State<SaleScreen> {
         SnackBar(content: Text(userFacingErrorMessage(error))),
       );
     }
+  }
+
+  SaleReceiptData _buildReceiptData({
+    required Product? product,
+    required int quantity,
+    required int manualUnitPrice,
+    required int total,
+    required int? remaining,
+  }) {
+    final itemLabel = _saleMode == SaleEntryMode.catalog
+        ? product?.name ?? 'Sin seleccionar'
+        : _manualDescriptionController.text.trim().isEmpty
+        ? 'Sin descripcion'
+        : _manualDescriptionController.text.trim();
+    final quantityValue = quantity <= 0 ? 0 : quantity;
+    final unitPrice = _saleMode == SaleEntryMode.catalog
+        ? product?.pricePesos
+        : (manualUnitPrice <= 0 ? null : manualUnitPrice);
+    final categoryLabel = _saleMode == SaleEntryMode.catalog
+        ? product?.category
+        : 'Venta libre';
+
+    return SaleReceiptData(
+      issuedAt: DateTime.now(),
+      itemLabel: itemLabel,
+      quantityUnits: quantityValue,
+      totalPesos: total,
+      paymentMethodLabel: displayPaymentMethodLabel(_paymentMethod),
+      saleKindLabel: _saleMode == SaleEntryMode.catalog
+          ? 'Venta de producto'
+          : 'Venta libre',
+      unitPricePesos: unitPrice,
+      stockAfterUnits: _saleMode == SaleEntryMode.catalog ? remaining : null,
+      categoryLabel: categoryLabel,
+    );
+  }
+
+  SaleReceiptData _buildSavedReceiptData(
+    CommerceStore store,
+    Product? resolvedProduct,
+    int quantity,
+  ) {
+    final savedMovement = store.lastMovement;
+    final savedProduct = resolvedProduct == null
+        ? null
+        : store.productById(resolvedProduct.id);
+    final itemLabel = _saleMode == SaleEntryMode.catalog
+        ? savedProduct?.name ?? resolvedProduct?.name ?? 'Producto'
+        : _manualDescriptionController.text.trim();
+    final unitPrice = _saleMode == SaleEntryMode.catalog
+        ? savedProduct?.pricePesos ?? resolvedProduct?.pricePesos
+        : _parseInt(_manualUnitPriceController.text);
+
+    return SaleReceiptData(
+      issuedAt: savedMovement?.createdAt ?? DateTime.now(),
+      itemLabel: itemLabel,
+      quantityUnits: quantity,
+      totalPesos: savedMovement?.amountPesos ?? 0,
+      paymentMethodLabel: displayPaymentMethodLabel(_paymentMethod),
+      saleKindLabel: _saleMode == SaleEntryMode.catalog
+          ? 'Venta de producto'
+          : 'Venta libre',
+      unitPricePesos: unitPrice == null || unitPrice <= 0 ? null : unitPrice,
+      stockAfterUnits: _saleMode == SaleEntryMode.catalog
+          ? savedProduct?.stockUnits
+          : null,
+      categoryLabel: _saleMode == SaleEntryMode.catalog
+          ? savedProduct?.category ?? resolvedProduct?.category
+          : 'Venta libre',
+      referenceLabel: _buildReceiptReference(savedMovement?.id),
+    );
+  }
+
+  String? _buildReceiptReference(String? movementId) {
+    final normalized = (movementId ?? '').trim();
+    if (normalized.isEmpty) {
+      return null;
+    }
+    final tail = normalized.length <= 8
+        ? normalized.toUpperCase()
+        : normalized.substring(normalized.length - 8).toUpperCase();
+    return 'CC-$tail';
   }
 }
 
@@ -1619,34 +1673,6 @@ class _ProductSearchResultTile extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _SummaryRow extends StatelessWidget {
-  const _SummaryRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: scheme.outline),
-            ),
-          ),
-          Text(value, style: Theme.of(context).textTheme.titleMedium),
-        ],
       ),
     );
   }
