@@ -23,15 +23,13 @@ class BpcPanel extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: color ?? scheme.surface,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.34),
-        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
         boxShadow: const [
           BoxShadow(
             color: BpcColors.shadow,
-            blurRadius: 12,
-            offset: Offset(0, 4),
+            blurRadius: 18,
+            offset: Offset(0, 8),
           ),
         ],
       ),
@@ -69,6 +67,7 @@ class SectionHeader extends StatelessWidget {
                   subtitle!,
                   style: textTheme.bodyMedium?.copyWith(
                     color: BpcColors.subtleInk,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -104,8 +103,11 @@ class MetricCard extends StatelessWidget {
       padding: EdgeInsets.all(tight ? 14 : 16),
       decoration: BoxDecoration(
         color:
-            accentColor ?? scheme.surfaceContainerLow.withValues(alpha: 0.64),
+            accentColor ?? scheme.surfaceContainerLow.withValues(alpha: 0.78),
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.42),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -331,7 +333,8 @@ class MovementsListTile extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                if (movement.isFreeSale && onCreateProductFromFreeSale != null) ...[
+                if (movement.isFreeSale &&
+                    onCreateProductFromFreeSale != null) ...[
                   const SizedBox(height: 8),
                   TextButton.icon(
                     onPressed: onCreateProductFromFreeSale,

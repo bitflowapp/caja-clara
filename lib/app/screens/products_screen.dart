@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/product.dart';
 import '../services/commerce_store.dart';
 import '../services/license_service.dart';
+import '../theme/bpc_colors.dart';
 import '../utils/formatters.dart';
 import '../utils/text_field_selection.dart';
 import '../utils/user_facing_errors.dart';
@@ -22,12 +23,14 @@ class ProductsScreen extends StatefulWidget {
     required this.applyingStarterTemplate,
     required this.onLoadDemoData,
     required this.loadingDemoData,
+    this.onSellProduct,
   });
 
   final Future<void> Function() onApplyStarterTemplate;
   final bool applyingStarterTemplate;
   final Future<void> Function() onLoadDemoData;
   final bool loadingDemoData;
+  final Future<void> Function(Product product)? onSellProduct;
 
   @override
   State<ProductsScreen> createState() => _ProductsScreenState();
@@ -40,6 +43,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
   String _searchQuery = '';
   String _debouncedQuery = '';
   bool _onlyLowStock = false;
+  bool _onlyMissingBarcode = false;
+  bool _onlyNeedsAttention = false;
 
   @override
   void initState() {
@@ -66,9 +71,16 @@ class _ProductsScreenState extends State<ProductsScreen> {
         final emptyCatalog = store.products.isEmpty;
         final canLoadDemoData = store.isEmptyState;
         final filteredEmpty = products.isEmpty && !emptyCatalog;
+        final withoutBarcodeCount = _productsWithoutBarcodeCount(
+          store.products,
+        );
+        final needsAttentionCount = _productsNeedingAttentionCount(
+          store.products,
+        );
+
         return InputShortcutScope(
           onCancel: () {
-            if (_searchController.text.isNotEmpty || _onlyLowStock) {
+            if (_hasActiveFilters) {
               _clearFilters();
             }
             _searchFocusNode.unfocus();
@@ -80,100 +92,40 @@ class _ProductsScreenState extends State<ProductsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SectionHeader(
-                    title: 'Productos',
-                    subtitle:
-                        'Carga, busca y corrige productos sin perder de vista stock y precio',
+                  _CatalogOverviewCard(
+                    store: store,
+                    applyingStarterTemplate: widget.applyingStarterTemplate,
+                    loadingDemoData: widget.loadingDemoData,
+                    canLoadDemoData: canLoadDemoData,
+                    onApplyStarterTemplate: widget.onApplyStarterTemplate,
+                    onLoadDemoData: widget.onLoadDemoData,
+                    onAddProduct: () => showProductEditor(context, store),
+                    withoutBarcodeCount: withoutBarcodeCount,
+                    needsAttentionCount: needsAttentionCount,
                   ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      if (emptyCatalog && canLoadDemoData)
-                        FilledButton.icon(
-                          onPressed: widget.loadingDemoData
-                              ? null
-                              : () => widget.onLoadDemoData(),
-                          icon: widget.loadingDemoData
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.play_circle_rounded),
-                          label: Text(
-                            widget.loadingDemoData
-                                ? 'Cargando demo'
-                                : 'Demo comercial',
-                          ),
-                        ),
-                      OutlinedButton.icon(
-                        onPressed:
-                            widget.applyingStarterTemplate ||
-                                widget.loadingDemoData
-                            ? null
-                            : () => widget.onApplyStarterTemplate(),
-                        icon: widget.applyingStarterTemplate
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.storefront_rounded),
-                        label: const Text('Plantilla kiosco'),
-                      ),
-                      FilledButton.icon(
-                        onPressed: () => showProductEditor(context, store),
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('Agregar producto'),
-                      ),
-                    ],
-                  ),
-                  if (!emptyCatalog) ...[
-                    const SizedBox(height: 14),
-                    _CatalogMetricsStrip(store: store),
-                  ],
                   const SizedBox(height: 14),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final wide = constraints.maxWidth >= 700;
-                      return Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: wide
-                                ? constraints.maxWidth - 180
-                                : constraints.maxWidth,
-                            child: TextField(
-                              controller: _searchController,
-                              focusNode: _searchFocusNode,
-                              textInputAction: TextInputAction.search,
-                              onTapOutside: (_) => _searchFocusNode.unfocus(),
-                              decoration: const InputDecoration(
-                                prefixIcon: Icon(Icons.search_rounded),
-                                labelText: 'Buscar producto',
-                                hintText:
-                                    'Nombre, categoria o codigo de barras',
-                              ),
-                            ),
-                          ),
-                          FilterChip(
-                            selected: _onlyLowStock,
-                            label: const Text('Solo bajo stock'),
-                            onSelected: (value) {
-                              setState(() => _onlyLowStock = value);
-                            },
-                          ),
-                        ],
-                      );
+                  _CatalogToolbarCard(
+                    searchController: _searchController,
+                    searchFocusNode: _searchFocusNode,
+                    searchQuery: _searchQuery,
+                    visibleCount: products.length,
+                    totalCount: store.products.length,
+                    onlyLowStock: _onlyLowStock,
+                    onlyMissingBarcode: _onlyMissingBarcode,
+                    onlyNeedsAttention: _onlyNeedsAttention,
+                    lowStockCount: store.lowStockCount,
+                    withoutBarcodeCount: withoutBarcodeCount,
+                    needsAttentionCount: needsAttentionCount,
+                    onToggleLowStock: (value) {
+                      setState(() => _onlyLowStock = value);
                     },
+                    onToggleMissingBarcode: (value) {
+                      setState(() => _onlyMissingBarcode = value);
+                    },
+                    onToggleNeedsAttention: (value) {
+                      setState(() => _onlyNeedsAttention = value);
+                    },
+                    onClearFilters: _clearFilters,
                   ),
                   if (_hasActiveFilters) ...[
                     const SizedBox(height: 10),
@@ -187,12 +139,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     EmptyCard(
                       title: emptyCatalog
                           ? 'Todavia no cargaste productos'
-                          : 'Sin resultados',
+                          : 'Sin resultados para ese filtro',
                       message: emptyCatalog
                           ? canLoadDemoData
-                                ? 'Puedes empezar con la plantilla kiosco o crear tus productos a mano. Todo queda editable y se guarda localmente.'
-                                : 'Ya hay movimientos guardados, asi que conviene sumar catalogo real con una plantilla kiosco o alta manual sin pisar ese historial.'
-                          : 'No hay productos con ese filtro. Ajusta la busqueda o carga uno nuevo.',
+                                ? 'Puedes empezar con la plantilla kiosco, cargar una demo comercial o crear productos a mano. Todo queda editable y guardado localmente.'
+                                : 'Ya hay movimientos guardados, asi que conviene sumar catalogo real con una plantilla o alta manual sin pisar ese historial.'
+                          : 'No hay productos que coincidan con la busqueda actual. Ajusta filtros o agrega un producto nuevo.',
                       action: Wrap(
                         spacing: 10,
                         runSpacing: 10,
@@ -235,23 +187,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       ),
                     )
                   else
-                    Column(
-                      children: [
-                        for (final product in products)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _ProductTile(
-                              product: product,
-                              onTap: () => showProductEditor(
-                                context,
-                                store,
-                                product: product,
-                              ),
-                              onAdjustStock: () => _addStock(store, product),
-                              onDelete: () => _deleteProduct(store, product),
-                            ),
-                          ),
-                      ],
+                    _ProductCollection(
+                      products: products,
+                      onEdit: (product) =>
+                          showProductEditor(context, store, product: product),
+                      onAdjustStock: (product) => _addStock(store, product),
+                      onDelete: (product) => _deleteProduct(store, product),
+                      onSell: widget.onSellProduct,
                     ),
                   const SizedBox(height: 18),
                 ],
@@ -263,7 +205,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
     );
   }
 
-  bool get _hasActiveFilters => _searchQuery.trim().isNotEmpty || _onlyLowStock;
+  bool get _hasActiveFilters =>
+      _searchQuery.trim().isNotEmpty ||
+      _onlyLowStock ||
+      _onlyMissingBarcode ||
+      _onlyNeedsAttention;
 
   String get _activeFilterLabel {
     final parts = <String>[];
@@ -271,7 +217,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
       parts.add('busqueda: "${_searchQuery.trim()}"');
     }
     if (_onlyLowStock) {
-      parts.add('solo bajo stock');
+      parts.add('bajo stock');
+    }
+    if (_onlyMissingBarcode) {
+      parts.add('sin barcode');
+    }
+    if (_onlyNeedsAttention) {
+      parts.add('pendientes');
     }
     return 'Filtro activo: ${parts.join(' + ')}';
   }
@@ -301,12 +253,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
       _searchQuery = '';
       _debouncedQuery = '';
       _onlyLowStock = false;
+      _onlyMissingBarcode = false;
+      _onlyNeedsAttention = false;
     });
   }
 
   List<Product> _filteredProducts(List<Product> products) {
     final query = _debouncedQuery.trim().toLowerCase();
-    return products
+    final filtered = products
         .where((product) {
           final matchesQuery =
               query.isEmpty ||
@@ -314,9 +268,26 @@ class _ProductsScreenState extends State<ProductsScreen> {
               (product.category ?? '').toLowerCase().contains(query) ||
               CommerceStore.barcodeMatchesQuery(product.barcode, query);
           final matchesLowStock = !_onlyLowStock || product.isLowStock;
-          return matchesQuery && matchesLowStock;
+          final matchesMissingBarcode =
+              !_onlyMissingBarcode || !_hasBarcode(product);
+          final matchesAttention =
+              !_onlyNeedsAttention || _needsCatalogAttention(product);
+          return matchesQuery &&
+              matchesLowStock &&
+              matchesMissingBarcode &&
+              matchesAttention;
         })
         .toList(growable: false);
+
+    filtered.sort((left, right) {
+      final leftRank = _productSortRank(left);
+      final rightRank = _productSortRank(right);
+      if (leftRank != rightRank) {
+        return leftRank.compareTo(rightRank);
+      }
+      return left.name.toLowerCase().compareTo(right.name.toLowerCase());
+    });
+    return filtered;
   }
 
   Future<void> _addStock(CommerceStore store, Product product) async {
@@ -405,62 +376,385 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 }
 
-class _CatalogMetricsStrip extends StatelessWidget {
-  const _CatalogMetricsStrip({required this.store});
+bool _hasBarcode(Product product) => (product.barcode ?? '').trim().isNotEmpty;
+
+bool _missingPrice(Product product) => product.pricePesos <= 0;
+
+bool _needsCatalogAttention(Product product) =>
+    !_hasBarcode(product) || _missingPrice(product);
+
+bool _canSellProduct(Product product) =>
+    product.pricePesos > 0 && product.stockUnits > 0;
+
+int _productsWithoutBarcodeCount(Iterable<Product> products) =>
+    products.where((product) => !_hasBarcode(product)).length;
+
+int _productsNeedingAttentionCount(Iterable<Product> products) =>
+    products.where(_needsCatalogAttention).length;
+
+int _productSortRank(Product product) {
+  if (_missingPrice(product)) {
+    return 0;
+  }
+  if (product.isLowStock) {
+    return 1;
+  }
+  if (!_hasBarcode(product)) {
+    return 2;
+  }
+  return 3;
+}
+
+class _CatalogOverviewCard extends StatelessWidget {
+  const _CatalogOverviewCard({
+    required this.store,
+    required this.applyingStarterTemplate,
+    required this.loadingDemoData,
+    required this.canLoadDemoData,
+    required this.onApplyStarterTemplate,
+    required this.onLoadDemoData,
+    required this.onAddProduct,
+    required this.withoutBarcodeCount,
+    required this.needsAttentionCount,
+  });
 
   final CommerceStore store;
+  final bool applyingStarterTemplate;
+  final bool loadingDemoData;
+  final bool canLoadDemoData;
+  final Future<void> Function() onApplyStarterTemplate;
+  final Future<void> Function() onLoadDemoData;
+  final VoidCallback onAddProduct;
+  final int withoutBarcodeCount;
+  final int needsAttentionCount;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final metrics = [
+      _OverviewMetricData(
+        label: 'Catalogo',
+        value: '${store.products.length}',
+        helper: 'productos cargados',
+        accent: BpcColors.greenDark,
+      ),
+      _OverviewMetricData(
+        label: 'Listos para vender',
+        value: '${store.sellableProductsCount}',
+        helper: 'con stock y precio',
+        accent: BpcColors.income,
+      ),
+      _OverviewMetricData(
+        label: 'Sin barcode',
+        value: '$withoutBarcodeCount',
+        helper: 'pendientes para scanner',
+        accent: BpcColors.sandMuted,
+      ),
+      _OverviewMetricData(
+        label: 'Pendientes',
+        value: '$needsAttentionCount',
+        helper: 'sin precio o barcode',
+        accent: scheme.error,
+      ),
+    ];
+
     return BpcPanel(
-      padding: const EdgeInsets.all(14),
-      color: Colors.white.withValues(alpha: 0.78),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+      color: Colors.white.withValues(alpha: 0.86),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final columns = constraints.maxWidth >= 880
-              ? 4
-              : constraints.maxWidth >= 560
-              ? 2
-              : 1;
-          final gaps = columns > 1 ? 10.0 * (columns - 1) : 0.0;
-          final itemWidth = (constraints.maxWidth - gaps) / columns;
-          final cards = <Widget>[
-            MetricCard(
-              label: 'Productos cargados',
-              value: '${store.products.length}',
-              helper: '${store.totalStockUnits} unidades en stock',
-              tight: true,
-            ),
-            MetricCard(
-              label: 'Listos para vender',
-              value: '${store.sellableProductsCount}',
-              helper: 'Con precio y stock positivo',
-              tight: true,
-            ),
-            MetricCard(
-              label: 'Cobertura barcode',
-              value:
-                  '${store.productsWithBarcodeCount}/${store.products.length}',
-              helper: 'Productos listos para scanner',
-              tight: true,
-            ),
-            MetricCard(
-              label: 'Stock valorizado',
-              value: formatMoney(store.estimatedInventoryCostPesos),
-              helper: '${store.lowStockCount} alertas de reposicion',
-              tight: true,
-            ),
-          ];
-
-          return Wrap(
+          final wide = constraints.maxWidth >= 980;
+          final intro = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SectionHeader(
+                title: 'Catalogo',
+                subtitle:
+                    'Un panel de productos pensado para escritorio: lectura rapida, control de stock y acciones comerciales sin vueltas.',
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: metrics
+                    .map((metric) => _CatalogSummaryPill(metric: metric))
+                    .toList(growable: false),
+              ),
+            ],
+          );
+          final actions = Wrap(
             spacing: 10,
             runSpacing: 10,
-            children: cards
-                .map((card) => SizedBox(width: itemWidth, child: card))
-                .toList(growable: false),
+            alignment: WrapAlignment.end,
+            children: [
+              if (canLoadDemoData)
+                FilledButton.icon(
+                  onPressed: loadingDemoData ? null : () => onLoadDemoData(),
+                  icon: loadingDemoData
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.play_circle_rounded),
+                  label: Text(
+                    loadingDemoData ? 'Cargando demo' : 'Demo comercial',
+                  ),
+                ),
+              OutlinedButton.icon(
+                onPressed: applyingStarterTemplate || loadingDemoData
+                    ? null
+                    : () => onApplyStarterTemplate(),
+                icon: applyingStarterTemplate
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.storefront_rounded),
+                label: Text(
+                  applyingStarterTemplate
+                      ? 'Cargando plantilla'
+                      : 'Plantilla kiosco',
+                ),
+              ),
+              FilledButton.icon(
+                onPressed: onAddProduct,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Agregar producto'),
+              ),
+            ],
+          );
+
+          if (!wide) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [intro, const SizedBox(height: 14), actions],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: intro),
+              const SizedBox(width: 18),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 320),
+                child: Align(alignment: Alignment.topRight, child: actions),
+              ),
+            ],
           );
         },
       ),
+    );
+  }
+}
+
+class _CatalogToolbarCard extends StatelessWidget {
+  const _CatalogToolbarCard({
+    required this.searchController,
+    required this.searchFocusNode,
+    required this.searchQuery,
+    required this.visibleCount,
+    required this.totalCount,
+    required this.onlyLowStock,
+    required this.onlyMissingBarcode,
+    required this.onlyNeedsAttention,
+    required this.lowStockCount,
+    required this.withoutBarcodeCount,
+    required this.needsAttentionCount,
+    required this.onToggleLowStock,
+    required this.onToggleMissingBarcode,
+    required this.onToggleNeedsAttention,
+    required this.onClearFilters,
+  });
+
+  final TextEditingController searchController;
+  final FocusNode searchFocusNode;
+  final String searchQuery;
+  final int visibleCount;
+  final int totalCount;
+  final bool onlyLowStock;
+  final bool onlyMissingBarcode;
+  final bool onlyNeedsAttention;
+  final int lowStockCount;
+  final int withoutBarcodeCount;
+  final int needsAttentionCount;
+  final ValueChanged<bool> onToggleLowStock;
+  final ValueChanged<bool> onToggleMissingBarcode;
+  final ValueChanged<bool> onToggleNeedsAttention;
+  final VoidCallback onClearFilters;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return BpcPanel(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      color: Colors.white.withValues(alpha: 0.82),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 840;
+          final resultsChip = _ToolbarCountChip(
+            label: visibleCount == totalCount
+                ? '$visibleCount productos'
+                : '$visibleCount de $totalCount visibles',
+          );
+
+          final field = TextField(
+            controller: searchController,
+            focusNode: searchFocusNode,
+            textInputAction: TextInputAction.search,
+            onTapOutside: (_) => searchFocusNode.unfocus(),
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.search_rounded),
+              labelText: 'Buscar en catalogo',
+              hintText: 'Nombre, categoria o codigo de barras',
+              suffixIcon: searchQuery.trim().isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Limpiar busqueda',
+                      onPressed: onClearFilters,
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+            ),
+          );
+
+          final filters = Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              FilterChip(
+                selected: onlyLowStock,
+                avatar: const Icon(Icons.warning_amber_rounded, size: 18),
+                label: Text('Bajo stock ($lowStockCount)'),
+                onSelected: onToggleLowStock,
+              ),
+              FilterChip(
+                selected: onlyMissingBarcode,
+                avatar: const Icon(Icons.qr_code_2_rounded, size: 18),
+                label: Text('Sin barcode ($withoutBarcodeCount)'),
+                onSelected: onToggleMissingBarcode,
+              ),
+              FilterChip(
+                selected: onlyNeedsAttention,
+                avatar: const Icon(Icons.rule_folder_rounded, size: 18),
+                label: Text('Pendientes ($needsAttentionCount)'),
+                onSelected: onToggleNeedsAttention,
+              ),
+            ],
+          );
+
+          if (!wide) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      'Buscar y filtrar',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: BpcColors.ink,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    resultsChip,
+                  ],
+                ),
+                const SizedBox(height: 12),
+                field,
+                const SizedBox(height: 12),
+                filters,
+              ],
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    'Buscar y filtrar',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: BpcColors.ink,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  resultsChip,
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 3, child: field),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: Align(alignment: Alignment.topLeft, child: filters),
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ProductCollection extends StatelessWidget {
+  const _ProductCollection({
+    required this.products,
+    required this.onEdit,
+    required this.onAdjustStock,
+    required this.onDelete,
+    this.onSell,
+  });
+
+  final List<Product> products;
+  final ValueChanged<Product> onEdit;
+  final ValueChanged<Product> onAdjustStock;
+  final ValueChanged<Product> onDelete;
+  final Future<void> Function(Product product)? onSell;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 1500
+            ? 3
+            : constraints.maxWidth >= 1040
+            ? 2
+            : 1;
+        final spacing = 14.0;
+        final totalGap = columns > 1 ? spacing * (columns - 1) : 0.0;
+        final itemWidth = (constraints.maxWidth - totalGap) / columns;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: products
+              .map(
+                (product) => SizedBox(
+                  width: columns == 1 ? constraints.maxWidth : itemWidth,
+                  child: _ProductTile(
+                    product: product,
+                    onTap: () => onEdit(product),
+                    onAdjustStock: () => onAdjustStock(product),
+                    onDelete: () => onDelete(product),
+                    onSell: onSell == null ? null : () => onSell!(product),
+                  ),
+                ),
+              )
+              .toList(growable: false),
+        );
+      },
     );
   }
 }
@@ -471,140 +765,250 @@ class _ProductTile extends StatelessWidget {
     required this.onTap,
     required this.onAdjustStock,
     required this.onDelete,
+    this.onSell,
   });
 
   final Product product;
   final VoidCallback onTap;
   final VoidCallback onAdjustStock;
   final VoidCallback onDelete;
+  final VoidCallback? onSell;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final hasBarcode = _hasBarcode(product);
+    final missingPrice = _missingPrice(product);
+    final canSell = onSell != null && _canSellProduct(product);
+    final accent = missingPrice
+        ? scheme.error
+        : product.isLowStock
+        ? BpcColors.sandMuted
+        : BpcColors.greenSoft;
+    final borderColor = accent.withValues(alpha: 0.28);
+    final subtitle = product.category?.trim().isNotEmpty == true
+        ? product.category!.trim()
+        : 'Sin categoria';
+
     return Material(
-      color: scheme.surface,
-      borderRadius: BorderRadius.circular(22),
+      color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         onTap: onTap,
-        child: BpcPanel(
+        child: Container(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: borderColor),
+            boxShadow: const [
+              BoxShadow(
+                color: BpcColors.shadow,
+                blurRadius: 14,
+                offset: Offset(0, 6),
+              ),
+            ],
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = constraints.maxWidth >= 760;
+              final detailSection = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          product.name,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          product.category?.isNotEmpty == true
-                              ? product.category!
-                              : 'Sin categoria',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: scheme.outline),
-                        ),
-                        if (product.barcode != null) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            'Cod. ${product.barcode}',
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: scheme.outline,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  PopupMenuButton<_ProductTileAction>(
-                    tooltip: 'Acciones',
-                    onSelected: (value) {
-                      if (value == _ProductTileAction.edit) {
-                        onTap();
-                        return;
-                      }
-                      onDelete();
-                    },
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(
-                        value: _ProductTileAction.edit,
-                        child: Text('Editar'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _ProductStateBadge(
+                        label: product.isLowStock ? 'Stock bajo' : 'Stock ok',
+                        color: product.isLowStock
+                            ? scheme.error
+                            : BpcColors.income,
+                        icon: product.isLowStock
+                            ? Icons.warning_amber_rounded
+                            : Icons.check_circle_outline_rounded,
                       ),
-                      PopupMenuItem(
-                        value: _ProductTileAction.delete,
-                        child: Text('Eliminar'),
+                      if (!hasBarcode)
+                        const _ProductStateBadge(
+                          label: 'Sin barcode',
+                          color: BpcColors.sandMuted,
+                          icon: Icons.qr_code_2_rounded,
+                        ),
+                      if (missingPrice)
+                        _ProductStateBadge(
+                          label: 'Sin precio',
+                          color: scheme.error,
+                          icon: Icons.sell_outlined,
+                        ),
+                      if (canSell)
+                        const _ProductStateBadge(
+                          label: 'Listo para vender',
+                          color: BpcColors.greenSoft,
+                          icon: Icons.shopping_bag_outlined,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      _ProductInfoPanel(
+                        label: 'Stock',
+                        value: '${product.stockUnits}',
+                        helper: product.isLowStock
+                            ? 'debajo del minimo'
+                            : 'unidades disponibles',
+                        icon: Icons.inventory_2_outlined,
+                        accent: product.isLowStock
+                            ? scheme.error
+                            : BpcColors.greenSoft,
+                      ),
+                      _ProductInfoPanel(
+                        label: 'Minimo',
+                        value: '${product.minStockUnits}',
+                        helper: 'alerta de reposicion',
+                        icon: Icons.vertical_align_bottom_rounded,
+                        accent: BpcColors.sandMuted,
+                      ),
+                      _ProductInfoPanel(
+                        label: 'Costo',
+                        value: formatMoney(product.costPesos),
+                        helper: 'base estimada',
+                        icon: Icons.payments_outlined,
+                        accent: BpcColors.mutedInk,
+                      ),
+                      _ProductInfoPanel(
+                        label: 'Codigo',
+                        value: hasBarcode ? product.barcode! : 'Manual',
+                        helper: hasBarcode ? 'scanner listo' : 'falta asociar',
+                        icon: Icons.qr_code_rounded,
+                        accent: hasBarcode
+                            ? BpcColors.greenSoft
+                            : BpcColors.sandMuted,
                       ),
                     ],
                   ),
-                  const SizedBox(width: 6),
-                  StockBadge(product: product),
-                ],
-              ),
-              const SizedBox(height: 14),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final wide = constraints.maxWidth >= 420;
-                  final cells = <Widget>[
-                    _InfoChip(
-                      label: 'Stock',
-                      value: product.stockUnits.toString(),
-                    ),
-                    _InfoChip(
-                      label: 'Minimo',
-                      value: product.minStockUnits.toString(),
-                    ),
-                    _InfoChip(
-                      label: 'Costo',
-                      value: formatMoney(product.costPesos),
-                    ),
-                    _InfoChip(
-                      label: 'Precio',
-                      value: formatMoney(product.pricePesos),
-                    ),
-                  ];
-
-                  return Wrap(
+                  const SizedBox(height: 14),
+                  Wrap(
                     spacing: 10,
                     runSpacing: 10,
-                    children: cells
-                        .map(
-                          (cell) => SizedBox(
-                            width: wide
-                                ? (constraints.maxWidth - 10) / 2
-                                : constraints.maxWidth,
-                            child: cell,
-                          ),
-                        )
-                        .toList(),
-                  );
-                },
-              ),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  FilledButton.tonalIcon(
-                    onPressed: onTap,
-                    icon: const Icon(Icons.edit_rounded),
-                    label: const Text('Editar'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: onAdjustStock,
-                    icon: const Icon(Icons.add_box_rounded),
-                    label: const Text('Ajustar stock'),
+                    children: [
+                      FilledButton.icon(
+                        onPressed: canSell ? onSell : null,
+                        icon: const Icon(Icons.shopping_bag_rounded),
+                        label: const Text('Vender'),
+                      ),
+                      FilledButton.tonalIcon(
+                        onPressed: onTap,
+                        icon: const Icon(Icons.edit_rounded),
+                        label: const Text('Editar'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: onAdjustStock,
+                        icon: const Icon(Icons.add_box_rounded),
+                        label: const Text('Ajustar stock'),
+                      ),
+                    ],
                   ),
                 ],
-              ),
-            ],
+              );
+              final summary = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              product.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                color: BpcColors.ink,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.35,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              subtitle,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: BpcColors.subtleInk,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              hasBarcode
+                                  ? 'Cod. ${product.barcode}'
+                                  : 'Sin codigo cargado',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: hasBarcode
+                                    ? BpcColors.greenSoft
+                                    : BpcColors.sandMuted,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      PopupMenuButton<_ProductTileAction>(
+                        tooltip: 'Acciones',
+                        onSelected: (value) {
+                          if (value == _ProductTileAction.edit) {
+                            onTap();
+                            return;
+                          }
+                          onDelete();
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(
+                            value: _ProductTileAction.edit,
+                            child: Text('Editar'),
+                          ),
+                          PopupMenuItem(
+                            value: _ProductTileAction.delete,
+                            child: Text('Eliminar'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  _ProductPricePanel(
+                    pricePesos: product.pricePesos,
+                    costPesos: product.costPesos,
+                    missingPrice: missingPrice,
+                  ),
+                ],
+              );
+
+              if (!wide) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    summary,
+                    const SizedBox(height: 16),
+                    detailSection,
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 5, child: summary),
+                  const SizedBox(width: 16),
+                  Expanded(flex: 4, child: detailSection),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -631,8 +1035,8 @@ class _ActiveFilterCard extends StatelessWidget {
             child: Text(
               message,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.outline,
-                fontWeight: FontWeight.w700,
+                color: BpcColors.mutedInk,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),
@@ -644,32 +1048,258 @@ class _ActiveFilterCard extends StatelessWidget {
   }
 }
 
-class _InfoChip extends StatelessWidget {
-  const _InfoChip({required this.label, required this.value});
+class _OverviewMetricData {
+  const _OverviewMetricData({
+    required this.label,
+    required this.value,
+    required this.helper,
+    required this.accent,
+  });
 
   final String label;
   final String value;
+  final String helper;
+  final Color accent;
+}
+
+class _CatalogSummaryPill extends StatelessWidget {
+  const _CatalogSummaryPill({required this.metric});
+
+  final _OverviewMetricData metric;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 180),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: metric.accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: metric.accent.withValues(alpha: 0.16)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            metric.label,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: metric.accent,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            metric.value,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: BpcColors.ink,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            metric.helper,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: BpcColors.subtleInk,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ToolbarCountChip extends StatelessWidget {
+  const _ToolbarCountChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: BpcColors.surfaceStrong,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: BpcColors.line),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: BpcColors.ink,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductPricePanel extends StatelessWidget {
+  const _ProductPricePanel({
+    required this.pricePesos,
+    required this.costPesos,
+    required this.missingPrice,
+  });
+
+  final int pricePesos;
+  final int costPesos;
+  final bool missingPrice;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(12),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
+        color: missingPrice
+            ? scheme.errorContainer.withValues(alpha: 0.48)
+            : BpcColors.greenDark,
         borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            label,
-            style: Theme.of(
-              context,
-            ).textTheme.labelLarge?.copyWith(color: scheme.outline),
+            missingPrice ? 'Precio pendiente' : 'Precio de venta',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: missingPrice
+                  ? scheme.error
+                  : Colors.white.withValues(alpha: 0.74),
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            missingPrice ? 'Definir precio' : formatMoney(pricePesos),
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              color: missingPrice ? BpcColors.ink : Colors.white,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Costo ${formatMoney(costPesos)}',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: missingPrice
+                  ? BpcColors.subtleInk
+                  : Colors.white.withValues(alpha: 0.78),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProductInfoPanel extends StatelessWidget {
+  const _ProductInfoPanel({
+    required this.label,
+    required this.value,
+    required this.helper,
+    required this.icon,
+    required this.accent,
+  });
+
+  final String label;
+  final String value;
+  final String helper;
+  final IconData icon;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 140, maxWidth: 180),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accent.withValues(alpha: 0.14)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: accent),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: accent,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: BpcColors.ink,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: 4),
-          Text(value, style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            helper,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: BpcColors.subtleInk,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProductStateBadge extends StatelessWidget {
+  const _ProductStateBadge({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
+
+  final String label;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+              ),
+            ),
+          ),
         ],
       ),
     );

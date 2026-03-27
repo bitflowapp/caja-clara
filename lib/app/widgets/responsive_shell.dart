@@ -8,6 +8,7 @@ import '../screens/barcode_scan_screen.dart';
 import '../screens/sale_screen.dart';
 import '../screens/summary_screen.dart';
 import '../models/movement.dart';
+import '../models/product.dart';
 import '../services/commerce_store.dart';
 import '../services/backup_service.dart';
 import '../services/build_info.dart';
@@ -50,6 +51,21 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     }
     final message = await Navigator.of(context).push<String>(
       MaterialPageRoute<String>(builder: (_) => const SaleScreen()),
+    );
+    if (!mounted || message == null) {
+      return;
+    }
+    _showMovementSavedFeedback(message);
+  }
+
+  Future<void> _openSaleForProduct(Product product) async {
+    if (!await _ensureFeatureAccess(LockedFeature.sales) || !mounted) {
+      return;
+    }
+    final message = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
+        builder: (_) => SaleScreen(initialProduct: product),
+      ),
     );
     if (!mounted || message == null) {
       return;
@@ -722,6 +738,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         applyingStarterTemplate: _applyingStarterTemplate,
         onLoadDemoData: _loadDemoData,
         loadingDemoData: _loadingDemoData,
+        onSellProduct: _openSaleForProduct,
       ),
       CommerceTab.summary: SummaryScreen(
         onExportExcel: _exportExcel,
