@@ -39,6 +39,123 @@ class BpcPanel extends StatelessWidget {
   }
 }
 
+class BpcDialogFrame extends StatelessWidget {
+  const BpcDialogFrame({
+    super.key,
+    required this.child,
+    this.maxWidth = 720,
+    this.padding = EdgeInsets.zero,
+  });
+
+  final Widget child;
+  final double maxWidth;
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.all(20),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: Container(
+          color: BpcColors.surface,
+          child: Padding(padding: padding, child: child),
+        ),
+      ),
+    );
+  }
+}
+
+class BpcDialogHeader extends StatelessWidget {
+  const BpcDialogHeader({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.badgeLabel,
+    this.badgeColor,
+    this.onClose,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String? badgeLabel;
+  final Color? badgeColor;
+  final VoidCallback? onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final accent = badgeColor ?? scheme.primary;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 54,
+          height: 54,
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Icon(icon, color: accent, size: 28),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if ((badgeLabel ?? '').trim().isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    badgeLabel!.trim(),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: accent,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              Text(
+                title,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  color: BpcColors.ink,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.6,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                subtitle,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: BpcColors.subtleInk,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (onClose != null)
+          IconButton(
+            onPressed: onClose,
+            icon: const Icon(Icons.close_rounded),
+          ),
+      ],
+    );
+  }
+}
+
 class SectionHeader extends StatelessWidget {
   const SectionHeader({
     super.key,

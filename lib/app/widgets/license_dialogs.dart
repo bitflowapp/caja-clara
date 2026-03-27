@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../services/license_service.dart';
 import '../utils/user_facing_errors.dart';
+import 'commerce_components.dart';
 import 'license_scope.dart';
 
 Future<bool> ensureLicenseAccess(
@@ -26,11 +27,9 @@ Future<void> showLicenseManagementDialog(
     context: context,
     barrierDismissible: true,
     builder: (dialogContext) {
-      return Dialog(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
-          child: _LicenseManagementDialog(lockedFeature: lockedFeature),
-        ),
+      return BpcDialogFrame(
+        maxWidth: 760,
+        child: _LicenseManagementDialog(lockedFeature: lockedFeature),
       );
     },
   );
@@ -77,52 +76,29 @@ class _LicenseManagementDialogState extends State<_LicenseManagementDialog> {
           LicenseStatus.trialExpired => scheme.error,
         };
         return Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(22),
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            licenseService.statusHeadline,
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            licenseService.statusDescription,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: scheme.outline,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ],
+                BpcDialogHeader(
+                  icon: licenseService.isActivated
+                      ? Icons.verified_rounded
+                      : Icons.lock_open_rounded,
+                  title: licenseService.statusHeadline,
+                  subtitle: licenseService.statusDescription,
+                  badgeLabel: licenseService.isActivated
+                      ? 'Activacion'
+                      : licenseService.isTrialExpired
+                      ? 'Prueba vencida'
+                      : 'Prueba activa',
+                  badgeColor: statusColor,
+                  onClose: () => Navigator.of(context).pop(),
                 ),
-                const SizedBox(height: 16),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: scheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: statusColor.withValues(alpha: 0.24),
-                    ),
-                  ),
+                const SizedBox(height: 18),
+                BpcPanel(
+                  color: scheme.surfaceContainerLow,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -138,6 +114,7 @@ class _LicenseManagementDialogState extends State<_LicenseManagementDialog> {
                         licenseService.positioningMessage,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: scheme.outline,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       if (widget.lockedFeature != null) ...[
@@ -194,29 +171,39 @@ class _LicenseManagementDialogState extends State<_LicenseManagementDialog> {
                   ),
                 if (!licenseService.isActivated) ...[
                   const SizedBox(height: 18),
-                  Text(
-                    'Activar Caja Clara',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _codeController,
-                    textCapitalization: TextCapitalization.characters,
-                    textInputAction: TextInputAction.done,
-                    decoration: const InputDecoration(
-                      labelText: 'Pega el codigo',
-                      hintText: 'CCW-XXXX-XXXX',
-                    ),
-                    onSubmitted: (_) => _activate(context, licenseService),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Comparte el ID de esta PC con soporte y pega aqui el codigo que te envien. Aunque la prueba termine, tus datos no se borran.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: scheme.outline,
-                      fontWeight: FontWeight.w700,
+                  BpcPanel(
+                    color: scheme.surfaceContainerLow,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Activar Caja Clara',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _codeController,
+                          textCapitalization: TextCapitalization.characters,
+                          textInputAction: TextInputAction.done,
+                          decoration: const InputDecoration(
+                            labelText: 'Pega el codigo',
+                            hintText: 'CCW-XXXX-XXXX',
+                            helperText:
+                                'Lo recibes desde soporte despues de compartir el ID de esta PC.',
+                          ),
+                          onSubmitted: (_) => _activate(context, licenseService),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Aunque la prueba termine, tus datos no se borran y siguen disponibles.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.outline,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ] else ...[
@@ -367,13 +354,8 @@ class _InfoBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18),
-      ),
+    return BpcPanel(
+      color: scheme.surfaceContainerLow,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

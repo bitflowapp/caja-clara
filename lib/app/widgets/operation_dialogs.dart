@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../utils/formatters.dart';
 import '../utils/text_field_selection.dart';
 import 'commerce_components.dart';
 import 'input_shortcuts.dart';
@@ -16,28 +17,76 @@ Future<bool> showDangerConfirmationDialog(
     context: context,
     useSafeArea: true,
     builder: (context) {
+      final scheme = Theme.of(context).colorScheme;
       return InputShortcutScope(
         onCancel: () => Navigator.of(context).pop(false),
-        child: AlertDialog(
-          insetPadding: EdgeInsets.fromLTRB(
-            16,
-            24,
-            16,
-            16 + MediaQuery.viewInsetsOf(context).bottom,
+        child: BpcDialogFrame(
+          maxWidth: 520,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              BpcDialogHeader(
+                icon: Icons.warning_amber_rounded,
+                title: title,
+                subtitle:
+                    'Revisa este cambio antes de seguir. Si confirmas, se aplica en el momento.',
+                badgeLabel: 'Confirmacion',
+                badgeColor: scheme.error,
+                onClose: () => Navigator.of(context).pop(false),
+              ),
+              const SizedBox(height: 18),
+              BpcPanel(
+                color: scheme.errorContainer.withValues(alpha: 0.38),
+                child: Text(
+                  message,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF6B2216),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 420;
+                  final cancelButton = TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancelar'),
+                  );
+                  final confirmButton = FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: scheme.error,
+                      foregroundColor: scheme.onError,
+                    ),
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: Text(confirmLabel),
+                  );
+
+                  if (compact) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        confirmButton,
+                        const SizedBox(height: 10),
+                        cancelButton,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      const Spacer(),
+                      cancelButton,
+                      const SizedBox(width: 10),
+                      confirmButton,
+                    ],
+                  );
+                },
+              ),
+            ],
           ),
-          scrollable: true,
-          title: Text(title),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(confirmLabel),
-            ),
-          ],
         ),
       );
     },
@@ -84,24 +133,30 @@ Future<int?> showAmountEntryDialog(
     context: context,
     useSafeArea: true,
     builder: (dialogContext) {
-      return AlertDialog(
-        insetPadding: EdgeInsets.fromLTRB(
-          16,
-          24,
-          16,
-          16 + MediaQuery.viewInsetsOf(dialogContext).bottom,
-        ),
-        scrollable: true,
-        title: Text(title),
-        content: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: _AmountEntryForm(
-            label: label,
-            confirmLabel: confirmLabel,
-            helper: helper,
-            initialValue: initialValue,
-            allowZero: allowZero,
-          ),
+      return BpcDialogFrame(
+        maxWidth: 560,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            BpcDialogHeader(
+              icon: Icons.point_of_sale_rounded,
+              title: title,
+              subtitle:
+                  'Carga el monto y confirma. La caja se actualiza en cuanto guardas.',
+              badgeLabel: 'Movimiento de caja',
+              onClose: () => Navigator.of(dialogContext).pop(),
+            ),
+            const SizedBox(height: 18),
+            _AmountEntryForm(
+              label: label,
+              confirmLabel: confirmLabel,
+              helper: helper,
+              initialValue: initialValue,
+              allowZero: allowZero,
+            ),
+          ],
         ),
       );
     },
@@ -139,10 +194,12 @@ class _AmountEntryFormState extends State<_AmountEntryForm> {
       text: widget.initialValue == null ? '' : widget.initialValue.toString(),
     );
     selectAllTextOnFocus(_focusNode, _controller);
+    _controller.addListener(_handleChanged);
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_handleChanged);
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -151,6 +208,7 @@ class _AmountEntryFormState extends State<_AmountEntryForm> {
   @override
   Widget build(BuildContext context) {
     final compact = MediaQuery.sizeOf(context).width < 640;
+    final parsedValue = _parseInt(_controller.text);
     return InputShortcutScope(
       onCancel: () => Navigator.of(context).pop(),
       onSave: _submit,
@@ -161,8 +219,48 @@ class _AmountEntryFormState extends State<_AmountEntryForm> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              BpcPanel(
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Monto cargado',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      formatMoney(parsedValue < 0 ? 0 : parsedValue),
+                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.6,
+                      ),
+                    ),
+                    if (widget.helper != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.helper!,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.outline,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
               if (widget.helper != null) ...[
-                Text(widget.helper!),
+                Text(
+                  'Confirma el valor antes de guardar para dejar la caja al dia.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.outline,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const SizedBox(height: 12),
               ],
               EnsureVisibleWhenFocused(
@@ -174,7 +272,11 @@ class _AmountEntryFormState extends State<_AmountEntryForm> {
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   autofocus: true,
                   textInputAction: TextInputAction.done,
-                  decoration: InputDecoration(labelText: widget.label),
+                  decoration: InputDecoration(
+                    labelText: widget.label,
+                    prefixText: '\$ ',
+                    helperText: 'Solo numeros. Caja Clara lo guarda en pesos.',
+                  ),
                   onTapOutside: (_) => _focusNode.unfocus(),
                   onFieldSubmitted: (_) => _submit(),
                   validator: (value) {
@@ -230,6 +332,13 @@ class _AmountEntryFormState extends State<_AmountEntryForm> {
     }
     FocusScope.of(context).unfocus();
     Navigator.of(context).pop(_parseInt(_controller.text));
+  }
+
+  void _handleChanged() {
+    if (!mounted) {
+      return;
+    }
+    setState(() {});
   }
 }
 

@@ -88,17 +88,14 @@ Future<ProductEditorResult?> showProductEditor(
     barrierDismissible: false,
     builder: (dialogContext) {
       return KeyboardAwareDialogFrame(
-        child: Dialog(
-          insetPadding: EdgeInsets.zero,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
-            child: _ProductFormDialog(
-              store: store,
-              product: product,
-              initialBarcode: initialBarcode,
-              seed: seed,
-              fullscreen: false,
-            ),
+        child: BpcDialogFrame(
+          maxWidth: 860,
+          child: _ProductFormDialog(
+            store: store,
+            product: product,
+            initialBarcode: initialBarcode,
+            seed: seed,
+            fullscreen: false,
           ),
         ),
       );
@@ -265,7 +262,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
         onSave: _saving ? null : _save,
         onCancel: _saving ? null : () => Navigator.of(context).pop(),
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(24),
           child: FocusTraversalGroup(
             child: Form(
               key: _formKey,
@@ -273,12 +270,30 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildDialogHeader(context),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 18),
+                  if (_buildAssistCard(context) case final assistCard?) ...[
+                    assistCard,
+                    const SizedBox(height: 16),
+                  ],
                   Expanded(
                     child: SingleChildScrollView(
                       keyboardDismissBehavior:
                           ScrollViewKeyboardDismissBehavior.onDrag,
-                      child: _buildFields(context),
+                      child: BpcPanel(
+                        color: Theme.of(context).colorScheme.surfaceContainerLow,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SectionHeader(
+                              title: 'Datos del producto',
+                              subtitle:
+                                  'Carga lo necesario para vender, ordenar stock y encontrarlo rapido.',
+                            ),
+                            const SizedBox(height: 16),
+                            _buildFields(context),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 18),
@@ -305,18 +320,27 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Carga nombre, categoria, stock y precio basico. Si algo falta, puedes dejarlo en 0 y ajustarlo despues.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.outline,
+              _buildDialogHeader(context),
+              const SizedBox(height: 18),
+              if (_buildAssistCard(context) case final assistCard?) ...[
+                assistCard,
+                const SizedBox(height: 16),
+              ],
+              BpcPanel(
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SectionHeader(
+                      title: 'Datos del producto',
+                      subtitle:
+                          'Carga lo necesario para vender, ordenar stock y encontrarlo rapido.',
+                    ),
+                    const SizedBox(height: 16),
+                    _buildFields(context),
+                  ],
                 ),
               ),
-              if (_buildAssistCard(context) case final assistCard?) ...[
-                const SizedBox(height: 16),
-                assistCard,
-              ],
-              const SizedBox(height: 18),
-              _buildFields(context),
               const SizedBox(height: 18),
               _buildPreview(context),
               const SizedBox(height: 16),
@@ -329,33 +353,15 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   }
 
   Widget _buildDialogHeader(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(_title, style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 6),
-              Text(
-                'Carga nombre, categoria, stock y precio basico. Si algo falta, puedes dejarlo en 0 y ajustarlo despues.',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: scheme.outline),
-              ),
-              if (_buildAssistCard(context) case final assistCard?) ...[
-                const SizedBox(height: 14),
-                assistCard,
-              ],
-            ],
-          ),
-        ),
-        IconButton(
-          onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.close_rounded),
-        ),
-      ],
+    return BpcDialogHeader(
+      icon: widget.product == null
+          ? Icons.inventory_2_rounded
+          : Icons.edit_note_rounded,
+      title: _title,
+      subtitle:
+          'Carga nombre, categoria, stock y precio base. Si algo falta, puedes ajustarlo despues sin trabar la venta.',
+      badgeLabel: widget.product == null ? 'Catalogo' : 'Edicion',
+      onClose: _saving ? null : () => Navigator.of(context).pop(),
     );
   }
 
@@ -773,10 +779,37 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     return AnimatedBuilder(
       animation: Listenable.merge([_nameController, _priceController]),
       builder: (context, _) {
-        return Text(
-          'Asi se va a ver: ${_nameController.text.isEmpty ? 'sin nombre' : _nameController.text} / ${formatMoney(_parseInt(_priceController.text))}',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.outline,
+        final previewName = _nameController.text.isEmpty
+            ? 'sin nombre'
+            : _nameController.text;
+        final previewPrice = formatMoney(_parseInt(_priceController.text));
+        return BpcPanel(
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Vista rapida',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '$previewName / $previewPrice',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Asi se va a ver en catalogo y en la venta.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -791,14 +824,17 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
           child: const Text('Cancelar'),
         );
-        final saveButton = FilledButton(
+        final saveButton = FilledButton.icon(
           onPressed: _saving ? null : _save,
-          child: _saving
+          icon: _saving
               ? const SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
+              : const Icon(Icons.save_rounded),
+          label: _saving
+              ? const Text('Guardando')
               : const Text('Guardar'),
         );
 

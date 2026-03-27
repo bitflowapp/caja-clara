@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../models/product.dart';
 import '../services/commerce_store.dart';
 import '../services/license_service.dart';
+import '../theme/bpc_colors.dart';
 import '../utils/formatters.dart';
 import '../utils/payment_methods.dart';
 import '../utils/user_facing_errors.dart';
@@ -39,7 +40,6 @@ class _SaleScreenState extends State<SaleScreen> {
   final _manualDescriptionFocusNode = FocusNode();
   final _quantityFocusNode = FocusNode();
   final _manualUnitPriceFocusNode = FocusNode();
-  final _paymentFocusNode = FocusNode();
   final _manualDescriptionEditorController = MobileFieldEditorController();
   final _quantityEditorController = MobileFieldEditorController();
   final _manualUnitPriceEditorController = MobileFieldEditorController();
@@ -98,7 +98,6 @@ class _SaleScreenState extends State<SaleScreen> {
     _manualDescriptionFocusNode.dispose();
     _quantityFocusNode.dispose();
     _manualUnitPriceFocusNode.dispose();
-    _paymentFocusNode.dispose();
     _productSearchDictation.dispose();
     super.dispose();
   }
@@ -179,6 +178,14 @@ class _SaleScreenState extends State<SaleScreen> {
           );
           final hasCustomPaymentMethod = !supportedSalePaymentMethods.contains(
             _paymentMethod,
+          );
+          final flowStatus = _buildSaleFlowStatus(
+            product: product,
+            quantity: quantity,
+            manualDescription: manualDescription,
+            manualUnitPrice: manualUnitPrice,
+            total: total,
+            saleWarning: saleWarning,
           );
           return KeyboardAwarePageBody(
             child: InputShortcutScope(
@@ -435,12 +442,8 @@ class _SaleScreenState extends State<SaleScreen> {
                           builder: (context, constraints) {
                             final quickColumns =
                                 _saleMode == SaleEntryMode.quick
-                                ? (constraints.maxWidth >= 840
-                                      ? 3
-                                      : constraints.maxWidth >= 560
-                                      ? 2
-                                      : 1)
-                                : (constraints.maxWidth >= 600 ? 2 : 1);
+                                ? (constraints.maxWidth >= 840 ? 2 : 1)
+                                : 1;
                             final gaps = quickColumns > 1
                                 ? 12.0 * (quickColumns - 1)
                                 : 0.0;
@@ -514,6 +517,8 @@ class _SaleScreenState extends State<SaleScreen> {
                                                 TextInputAction.next,
                                             decoration: const InputDecoration(
                                               labelText: 'Cantidad',
+                                              helperText:
+                                                  'Cuantas unidades cobras ahora.',
                                             ),
                                             onTapOutside: (_) =>
                                                 _quantityFocusNode.unfocus(),
@@ -527,7 +532,7 @@ class _SaleScreenState extends State<SaleScreen> {
                                                 );
                                                 return;
                                               }
-                                              _moveFocusTo(_paymentFocusNode);
+                                              _dismissKeyboard();
                                             },
                                             validator: (value) {
                                               final parsed = _parseInt(value);
@@ -610,14 +615,14 @@ class _SaleScreenState extends State<SaleScreen> {
                                               decoration: const InputDecoration(
                                                 labelText: 'Precio unitario',
                                                 prefixText: '\$ ',
+                                                helperText:
+                                                    'Precio por unidad que aparece en el cobro.',
                                               ),
                                               onTapOutside: (_) =>
                                                   _manualUnitPriceFocusNode
                                                       .unfocus(),
                                               onFieldSubmitted: (_) =>
-                                                  _moveFocusTo(
-                                                    _paymentFocusNode,
-                                                  ),
+                                                  _dismissKeyboard(),
                                               validator: (value) {
                                                 if (_saleMode !=
                                                     SaleEntryMode.quick) {
@@ -631,137 +636,81 @@ class _SaleScreenState extends State<SaleScreen> {
                                             ),
                                           ),
                                   ),
-                                SizedBox(
-                                  width: fieldWidth,
-                                  child: EnsureVisibleWhenFocused(
-                                    focusNode: _paymentFocusNode,
-                                    child: DropdownButtonFormField<String>(
-                                      focusNode: _paymentFocusNode,
-                                      initialValue:
-                                          paymentMethodOptions.contains(
-                                            _paymentMethod,
-                                          )
-                                          ? _paymentMethod
-                                          : paymentMethodOptions.first,
-                                      isExpanded: true,
-                                      decoration: InputDecoration(
-                                        labelText: 'Medio de pago',
-                                        helperText: hasCustomPaymentMethod
-                                            ? 'Se recupero el ultimo medio guardado. Puedes cambiarlo si hace falta.'
-                                            : 'Efectivo, transferencia, Mercado Pago o tarjeta.',
-                                      ),
-                                      items: [
-                                        for (final paymentMethod
-                                            in paymentMethodOptions)
-                                          DropdownMenuItem(
-                                            value: paymentMethod,
-                                            child: Text(paymentMethod),
-                                          ),
-                                      ],
-                                      onChanged: (value) {
-                                        if (value == null) {
-                                          return;
-                                        }
-                                        setState(() => _paymentMethod = value);
-                                      },
-                                      onTap: () {
-                                        _dismissKeyboard();
-                                        _paymentFocusNode.requestFocus();
-                                      },
-                                    ),
-                                  ),
-                                ),
                               ],
                             );
                           },
                         ),
                         const SizedBox(height: 16),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Vista del comprobante',
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Se ve claro antes de guardar y queda listo para revisar al cerrar la venta.',
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(
-                                    color: Theme.of(context).colorScheme.outline,
-                                  ),
-                            ),
-                            const SizedBox(height: 12),
-                            SaleReceiptCard(receipt: receiptPreview),
-                            if (saleWarning != null) ...[
-                              const SizedBox(height: 10),
-                              Text(
-                                saleWarning,
-                                style: Theme.of(context).textTheme.bodyMedium
-                                    ?.copyWith(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.error,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                              ),
-                            ],
-                          ],
+                        _PaymentMethodSelectorCard(
+                          options: paymentMethodOptions,
+                          selectedValue: _paymentMethod,
+                          hasCustomSelection: hasCustomPaymentMethod,
+                          onSelect: (value) {
+                            _dismissKeyboard();
+                            setState(() => _paymentMethod = value);
+                          },
                         ),
                         const SizedBox(height: 18),
                         LayoutBuilder(
                           builder: (context, constraints) {
-                            final compact = constraints.maxWidth < 520;
-                            final saveButton = FilledButton.icon(
-                              onPressed: canSaveSale
+                            final wideCheckout = constraints.maxWidth >= 980;
+                            final checkoutOverview = _SaleCheckoutOverviewCard(
+                              status: flowStatus,
+                              receipt: receiptPreview,
+                              canSaveSale: canSaveSale,
+                              saving: _saving,
+                              onSubmit: canSaveSale
                                   ? () => _submitSale(store)
                                   : null,
-                              style: compact
-                                  ? FilledButton.styleFrom(
-                                      minimumSize: const Size.fromHeight(52),
-                                    )
-                                  : null,
-                              icon: _saving
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
+                              onCancel: _saving
+                                  ? null
+                                  : () => Navigator.of(context).pop(),
+                            );
+                            final receiptPanel = Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Vista del comprobante',
+                                  style: Theme.of(context).textTheme.titleMedium,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Se revisa en un vistazo y queda lista para mostrar, copiar o compartir al cerrar la venta.',
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.outline,
                                       ),
-                                    )
-                                  : const Icon(Icons.save_rounded),
-                              label: Text(
-                                _saving ? 'Guardando' : 'Registrar venta',
-                              ),
+                                ),
+                                const SizedBox(height: 12),
+                                SaleReceiptCard(receipt: receiptPreview),
+                              ],
                             );
 
-                            if (compact) {
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                            if (wideCheckout) {
+                              final sidebarWidth = constraints.maxWidth * 0.38;
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  saveButton,
-                                  const SizedBox(height: 10),
-                                  TextButton(
-                                    onPressed: _saving
-                                        ? null
-                                        : () => Navigator.of(context).pop(),
-                                    child: const Text('Cancelar'),
+                                  Expanded(child: checkoutOverview),
+                                  const SizedBox(width: 18),
+                                  SizedBox(
+                                    width: sidebarWidth > 420
+                                        ? 420
+                                        : sidebarWidth,
+                                    child: receiptPanel,
                                   ),
                                 ],
                               );
                             }
 
-                            return Row(
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Spacer(),
-                                TextButton(
-                                  onPressed: _saving
-                                      ? null
-                                      : () => Navigator.of(context).pop(),
-                                  child: const Text('Cancelar'),
-                                ),
-                                const SizedBox(width: 12),
-                                saveButton,
+                                checkoutOverview,
+                                const SizedBox(height: 18),
+                                receiptPanel,
                               ],
                             );
                           },
@@ -775,6 +724,63 @@ class _SaleScreenState extends State<SaleScreen> {
           );
         },
       ),
+    );
+  }
+
+  _SaleFlowStatus _buildSaleFlowStatus({
+    required Product? product,
+    required int quantity,
+    required String manualDescription,
+    required int manualUnitPrice,
+    required int total,
+    required String? saleWarning,
+  }) {
+    if (_saleMode == SaleEntryMode.catalog && product == null) {
+      return const _SaleFlowStatus(
+        title: 'Falta elegir el producto',
+        message: 'Busca y confirma un producto para seguir con la venta.',
+        icon: Icons.inventory_2_rounded,
+        isReady: false,
+      );
+    }
+    if (_saleMode == SaleEntryMode.quick && manualDescription.isEmpty) {
+      return const _SaleFlowStatus(
+        title: 'Falta la descripcion',
+        message: 'Escribe que estas cobrando para que quede claro en caja.',
+        icon: Icons.edit_note_rounded,
+        isReady: false,
+      );
+    }
+    if (quantity <= 0) {
+      return const _SaleFlowStatus(
+        title: 'Falta la cantidad',
+        message: 'Ingresa cuantas unidades vas a cobrar.',
+        icon: Icons.pin_rounded,
+        isReady: false,
+      );
+    }
+    if (_saleMode == SaleEntryMode.quick && manualUnitPrice <= 0) {
+      return const _SaleFlowStatus(
+        title: 'Falta el precio',
+        message: 'Carga el precio unitario antes de registrar la venta.',
+        icon: Icons.sell_rounded,
+        isReady: false,
+      );
+    }
+    if (saleWarning != null) {
+      return _SaleFlowStatus(
+        title: 'Revisa antes de cobrar',
+        message: saleWarning,
+        icon: Icons.warning_amber_rounded,
+        isReady: false,
+      );
+    }
+    return _SaleFlowStatus(
+      title: 'Todo listo para vender',
+      message:
+          'Cobras ${formatMoney(total)} con ${displayPaymentMethodLabel(_paymentMethod)} y la caja se actualiza al momento.',
+      icon: Icons.check_circle_rounded,
+      isReady: true,
     );
   }
 
@@ -1220,6 +1226,356 @@ class _SaleScreenState extends State<SaleScreen> {
         : normalized.substring(normalized.length - 8).toUpperCase();
     return 'CC-$tail';
   }
+}
+
+class _SaleFlowStatus {
+  const _SaleFlowStatus({
+    required this.title,
+    required this.message,
+    required this.icon,
+    required this.isReady,
+  });
+
+  final String title;
+  final String message;
+  final IconData icon;
+  final bool isReady;
+}
+
+class _PaymentMethodSelectorCard extends StatelessWidget {
+  const _PaymentMethodSelectorCard({
+    required this.options,
+    required this.selectedValue,
+    required this.hasCustomSelection,
+    required this.onSelect,
+  });
+
+  final List<String> options;
+  final String selectedValue;
+  final bool hasCustomSelection;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return BpcPanel(
+      color: scheme.surfaceContainerLow,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Como cobras esta venta',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            hasCustomSelection
+                ? 'Se recupero el ultimo medio guardado. Puedes cambiarlo con un toque si hace falta.'
+                : 'Marca el medio de pago para dejar caja y comprobante claros desde el principio.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: scheme.outline,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final option in options)
+                ChoiceChip(
+                  key: _paymentMethodKey(option),
+                  selected: option == selectedValue,
+                  showCheckmark: false,
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _paymentMethodIcon(option),
+                        size: 16,
+                        color: option == selectedValue
+                            ? scheme.primary
+                            : BpcColors.mutedInk,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(option),
+                    ],
+                  ),
+                  labelStyle: theme.textTheme.bodyMedium?.copyWith(
+                    color: option == selectedValue
+                        ? scheme.primary
+                        : BpcColors.ink,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  backgroundColor: scheme.surface,
+                  selectedColor: scheme.primary.withValues(alpha: 0.12),
+                  side: BorderSide(
+                    color: option == selectedValue
+                        ? scheme.primary
+                        : scheme.outlineVariant,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 10,
+                  ),
+                  onSelected: (_) => onSelect(option),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SaleCheckoutOverviewCard extends StatelessWidget {
+  const _SaleCheckoutOverviewCard({
+    required this.status,
+    required this.receipt,
+    required this.canSaveSale,
+    required this.saving,
+    required this.onSubmit,
+    required this.onCancel,
+  });
+
+  final _SaleFlowStatus status;
+  final SaleReceiptData receipt;
+  final bool canSaveSale;
+  final bool saving;
+  final VoidCallback? onSubmit;
+  final VoidCallback? onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final accent = status.isReady ? scheme.primary : scheme.error;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        BpcPanel(
+          color: status.isReady
+              ? scheme.primary.withValues(alpha: 0.06)
+              : scheme.errorContainer.withValues(alpha: 0.22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(status.icon, color: accent),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          status.title,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: status.isReady ? BpcColors.ink : accent,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          status.message,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: BpcColors.subtleInk,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _CheckoutMetaChip(
+                    icon: Icons.receipt_long_rounded,
+                    label: receipt.saleKindLabel,
+                  ),
+                  _CheckoutMetaChip(
+                    icon: Icons.pin_rounded,
+                    label: '${receipt.quantityUnits} u.',
+                  ),
+                  _CheckoutMetaChip(
+                    icon: _paymentMethodIcon(receipt.paymentMethodLabel),
+                    label: receipt.paymentMethodLabel,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: BpcColors.greenDeep,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: const [
+              BoxShadow(
+                color: BpcColors.shadow,
+                blurRadius: 18,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Total a cobrar',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.72),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                formatMoney(receipt.totalPesos),
+                style: theme.textTheme.displaySmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.8,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Detalle: ${receipt.itemLabel}',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.84),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Medio de pago: ${receipt.paymentMethodLabel}',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.84),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: onSubmit,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(54),
+                  backgroundColor: Colors.white,
+                  foregroundColor: BpcColors.greenDeep,
+                ),
+                icon: saving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.point_of_sale_rounded),
+                label: Text(saving ? 'Guardando' : 'Registrar venta'),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      status.isReady
+                          ? 'Caja y comprobante quedan al dia en el momento.'
+                          : 'Completa lo que falta y despues registra la venta.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.74),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  if (onCancel != null) ...[
+                    const SizedBox(width: 12),
+                    TextButton(
+                      onPressed: onCancel,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Cancelar'),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CheckoutMetaChip extends StatelessWidget {
+  const _CheckoutMetaChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.42)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: scheme.primary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: BpcColors.ink,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Key _paymentMethodKey(String method) {
+  final normalized = method
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+      .replaceAll(RegExp(r'^-|-$'), '');
+  return Key('payment-method-$normalized');
+}
+
+IconData _paymentMethodIcon(String method) {
+  return switch (displayPaymentMethodLabel(method)) {
+    'Efectivo' => Icons.payments_rounded,
+    'Transferencia' => Icons.account_balance_rounded,
+    'Mercado Pago' => Icons.qr_code_2_rounded,
+    'Debito' => Icons.credit_score_rounded,
+    'Credito' => Icons.credit_card_rounded,
+    'Cuenta corriente' => Icons.menu_book_rounded,
+    _ => Icons.wallet_rounded,
+  };
 }
 
 class _SaleModeSelector extends StatelessWidget {

@@ -255,7 +255,7 @@ class SaleReceiptCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Detalle',
+                  'Producto',
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: BpcColors.subtleInk,
                     fontWeight: FontWeight.w900,
@@ -319,6 +319,22 @@ class SaleReceiptCard extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.8,
                   ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _DarkReceiptTag(
+                      icon: Icons.payments_rounded,
+                      label: receipt.paymentMethodLabel,
+                    ),
+                    if ((receipt.referenceLabel ?? '').trim().isNotEmpty)
+                      _DarkReceiptTag(
+                        icon: Icons.tag_rounded,
+                        label: receipt.referenceLabel!.trim(),
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -409,6 +425,38 @@ class _ReceiptLine extends StatelessWidget {
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: BpcColors.ink,
               fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DarkReceiptTag extends StatelessWidget {
+  const _DarkReceiptTag({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],

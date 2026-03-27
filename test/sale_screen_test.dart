@@ -259,10 +259,8 @@ void main() {
 
       expect(find.text('Agregar producto'), findsOneWidget);
       expect(find.text('Cable USB mostrador'), findsWidgets);
-      expect(
-        find.text('Asi se va a ver: Cable USB mostrador / \$ 3.900'),
-        findsOneWidget,
-      );
+      expect(find.text('Vista rapida'), findsOneWidget);
+      expect(find.text('Cable USB mostrador / \$ 3.900'), findsOneWidget);
     },
   );
 
@@ -310,10 +308,10 @@ void main() {
 
       await pumpSaleScreen(tester, store);
 
-      final paymentField = tester.widget<DropdownButtonFormField<String>>(
-        find.byType(DropdownButtonFormField<String>),
+      final paymentChip = tester.widget<ChoiceChip>(
+        find.byKey(const Key('payment-method-efectivo')),
       );
-      expect(paymentField.initialValue, 'Efectivo');
+      expect(paymentChip.selected, isTrue);
       expect(find.widgetWithText(TextFormField, 'Cantidad'), findsOneWidget);
     },
   );
@@ -331,13 +329,13 @@ void main() {
 
       await pumpSaleScreen(tester, store);
 
-      final paymentField = tester.widget<DropdownButtonFormField<String>>(
-        find.byType(DropdownButtonFormField<String>),
+      final paymentChip = tester.widget<ChoiceChip>(
+        find.byKey(const Key('payment-method-mercado-pago')),
       );
-      expect(paymentField.initialValue, 'Mercado Pago');
+      expect(paymentChip.selected, isTrue);
       expect(
         find.text(
-          'Efectivo, transferencia, Mercado Pago o tarjeta.',
+          'Marca el medio de pago para dejar caja y comprobante claros desde el principio.',
         ),
         findsOneWidget,
       );

@@ -185,7 +185,7 @@ void main() {
 
       expect(find.byType(Dialog), findsNothing);
       expect(find.byType(AppBar), findsOneWidget);
-      expect(find.text('Agregar producto'), findsOneWidget);
+      expect(find.text('Agregar producto'), findsWidgets);
       expect(find.widgetWithText(TextFormField, 'Nombre'), findsNothing);
       expect(find.text('Toca para cargar el nombre'), findsOneWidget);
 
