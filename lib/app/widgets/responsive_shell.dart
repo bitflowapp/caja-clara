@@ -763,6 +763,32 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         final wide = constraints.maxWidth >= 980;
         final page = pages[_tab]!;
         final lowStockCount = store.lowStockCount;
+        final hasSaveIssue = store.lastError != null;
+        final isLastChangeSaveIssue =
+            store.lastError == 'No se pudo guardar el cambio.';
+        final saveIssueMessage = hasSaveIssue
+            ? isLastChangeSaveIssue
+                  ? 'El ultimo cambio no pudo guardarse. Lo anterior sigue guardado y puedes reintentar ahora.'
+                  : store.lastError!
+            : null;
+        final saveStatusLabel = hasSaveIssue
+            ? isLastChangeSaveIssue
+                  ? 'Ultimo cambio sin guardar'
+                  : 'Revisa el guardado'
+            : store.isSaving
+            ? 'Guardando'
+            : 'Todo guardado';
+        final saveStatusColor = hasSaveIssue
+            ? BpcColors.expenseSoft
+            : store.isSaving
+            ? BpcColors.sandMuted
+            : BpcColors.income;
+        final saveStatusBackground = hasSaveIssue
+            ? Color.alphaBlend(
+                BpcColors.sandSoft.withValues(alpha: 0.54),
+                BpcColors.surface,
+              )
+            : BpcColors.surfaceStrong;
 
         if (wide) {
           return Scaffold(
@@ -835,27 +861,30 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                             width: double.infinity,
                             padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                             decoration: BoxDecoration(
-                              color: BpcColors.surfaceStrong,
+                              color: saveStatusBackground,
                               borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: hasSaveIssue
+                                    ? BpcColors.sandMuted.withValues(
+                                        alpha: 0.34,
+                                      )
+                                    : BpcColors.line.withValues(alpha: 0.56),
+                              ),
                             ),
                             child: Row(
                               children: [
                                 Container(
                                   width: 10,
                                   height: 10,
-                                  decoration: const BoxDecoration(
-                                    color: BpcColors.income,
+                                  decoration: BoxDecoration(
+                                    color: saveStatusColor,
                                     shape: BoxShape.circle,
                                   ),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    store.lastError != null
-                                        ? 'Guardado con problema'
-                                        : store.isSaving
-                                        ? 'Guardando'
-                                        : 'Todo guardado',
+                                    saveStatusLabel,
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodyMedium
@@ -882,10 +911,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                       padding: const EdgeInsets.fromLTRB(20, 16, 18, 16),
                       child: Column(
                         children: [
-                          if (store.lastError != null) ...[
+                          if (saveIssueMessage != null) ...[
                             _SaveErrorBanner(
-                              message:
-                                  'El ultimo cambio no se pudo guardar. Revisa el aviso y vuelve a intentar.',
+                              message: saveIssueMessage,
                               retrying: _retryingSave || store.isSaving,
                               onRetry: _retrySave,
                             ),
@@ -928,10 +956,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
               child: Column(
                 children: [
-                  if (store.lastError != null) ...[
+                  if (saveIssueMessage != null) ...[
                     _SaveErrorBanner(
-                      message:
-                          'El ultimo cambio no se pudo guardar. Puedes reintentar sin perder el control.',
+                      message: saveIssueMessage,
                       retrying: _retryingSave || store.isSaving,
                       onRetry: _retrySave,
                     ),
@@ -1065,9 +1092,7 @@ class _LicenseStatusBanner extends StatelessWidget {
                 ? FilledButton.styleFrom(minimumSize: const Size.fromHeight(48))
                 : null,
             icon: const Icon(Icons.key_rounded),
-            label: Text(
-              expired ? 'Activar Caja Clara' : 'Ver activacion',
-            ),
+            label: Text(expired ? 'Activar Caja Clara' : 'Ver activacion'),
           );
           final body = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1199,14 +1224,30 @@ class _RailBrand extends StatelessWidget {
         Row(
           children: [
             Container(
-              width: 44,
-              height: 44,
-              padding: const EdgeInsets.all(6),
+              width: 46,
+              height: 46,
+              padding: const EdgeInsets.all(5),
               decoration: BoxDecoration(
-                color: scheme.primary.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(14),
+                color: Color.alphaBlend(
+                  scheme.primary.withValues(alpha: 0.07),
+                  BpcColors.surface,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: scheme.primary.withValues(alpha: 0.18),
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: BpcColors.shadow,
+                    blurRadius: 12,
+                    offset: Offset(0, 4),
+                  ),
+                ],
               ),
-              child: const CajaClaraSymbol(size: 32),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: const CajaClaraSymbol(size: 36),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -1259,30 +1300,102 @@ class _SaveErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final panelColor = Color.alphaBlend(
+      BpcColors.sandSoft.withValues(alpha: 0.58),
+      BpcColors.surface,
+    );
     return BpcPanel(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      color: scheme.errorContainer.withValues(alpha: 0.72),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.error_outline_rounded, color: scheme.error),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              message,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: BpcColors.ink,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          FilledButton.tonal(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      color: panelColor,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 620;
+          final action = FilledButton.tonalIcon(
             onPressed: retrying ? null : onRetry,
-            child: Text(retrying ? 'Reintentando' : 'Reintentar'),
-          ),
-        ],
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              foregroundColor: BpcColors.ink,
+              backgroundColor: Colors.white.withValues(alpha: 0.72),
+            ),
+            icon: retrying
+                ? const SizedBox.square(
+                    dimension: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2.2),
+                  )
+                : const Icon(Icons.refresh_rounded, size: 18),
+            label: Text(
+              retrying
+                  ? 'Reintentando'
+                  : compact
+                  ? 'Reintentar'
+                  : 'Reintentar guardado',
+            ),
+          );
+
+          final messageBlock = Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Guardado interrumpido',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: BpcColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  message,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: BpcColors.mutedInk,
+                    fontWeight: FontWeight.w700,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          );
+
+          final leading = Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: BpcColors.sand.withValues(alpha: 0.24),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(
+              Icons.cloud_off_rounded,
+              color: BpcColors.expense,
+              size: 22,
+            ),
+          );
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [leading, const SizedBox(width: 14), messageBlock],
+                ),
+                const SizedBox(height: 14),
+                action,
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              leading,
+              const SizedBox(width: 14),
+              messageBlock,
+              const SizedBox(width: 14),
+              action,
+            ],
+          );
+        },
       ),
     );
   }
