@@ -27,7 +27,8 @@ Future<void> showQuickHelpDialog(BuildContext context) async {
                   onClose: () => Navigator.of(context).pop(),
                 ),
                 const SizedBox(height: 18),
-                const BpcPanel(
+                const SizedBox(
+                  width: double.infinity,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,

@@ -127,15 +127,15 @@ class _SummaryWorkspaceDeck extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actions = [
-      _SummaryCommand(
-        title: exportingExcel ? 'Exportando Excel' : 'Exportar Excel',
-        subtitle: 'Llevar ventas, productos y movimientos',
-        icon: Icons.file_download_rounded,
-        onTap: exportingExcel ? null : onExportExcel,
-        emphasized: true,
-        loading: exportingExcel,
-      ),
+    final primaryCommand = _SummaryCommand(
+      title: exportingExcel ? 'Exportando Excel' : 'Exportar Excel',
+      subtitle: 'Llevar ventas, productos y movimientos',
+      icon: Icons.file_download_rounded,
+      onTap: exportingExcel ? null : onExportExcel,
+      emphasized: true,
+      loading: exportingExcel,
+    );
+    final backupActions = [
       _SummaryCommand(
         title: exportingBackup ? 'Guardando respaldo' : 'Guardar respaldo',
         subtitle: 'Guardar una copia completa de la app',
@@ -150,6 +150,8 @@ class _SummaryWorkspaceDeck extends StatelessWidget {
         onTap: restoringBackup ? null : onRestoreBackup,
         loading: restoringBackup,
       ),
+    ];
+    final cashActions = [
       _SummaryCommand(
         title: undoingMovement ? 'Deshaciendo' : 'Deshacer ultimo',
         subtitle: store.canUndoLastMovement
@@ -178,14 +180,18 @@ class _SummaryWorkspaceDeck extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 1100;
-        final commandGrid = _SummaryCommandGrid(commands: actions);
+        final commandHub = _SummaryCommandHub(
+          primaryCommand: primaryCommand,
+          backupActions: backupActions,
+          cashActions: cashActions,
+        );
         final snapshot = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SectionHeader(
               title: 'Caja del dia',
               subtitle: 'Apertura, cierre y respaldo en el mismo lugar',
-              trailing: _SectionCountChip(
+              trailing: _SectionCountLabel(
                 label: store.todayMovementCount == 0
                     ? 'Sin actividad'
                     : '${store.todayMovementCount} movimientos hoy',
@@ -201,7 +207,7 @@ class _SummaryWorkspaceDeck extends StatelessWidget {
         if (!wide) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [snapshot, const SizedBox(height: 14), commandGrid],
+            children: [snapshot, const SizedBox(height: 16), commandHub],
           );
         }
 
@@ -209,8 +215,8 @@ class _SummaryWorkspaceDeck extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(flex: 6, child: snapshot),
-            const SizedBox(width: 14),
-            Expanded(flex: 5, child: commandGrid),
+            const SizedBox(width: 20),
+            Expanded(flex: 5, child: commandHub),
           ],
         );
       },
@@ -218,33 +224,38 @@ class _SummaryWorkspaceDeck extends StatelessWidget {
   }
 }
 
-class _SummaryCommandGrid extends StatelessWidget {
-  const _SummaryCommandGrid({required this.commands});
+class _SummaryCommandHub extends StatelessWidget {
+  const _SummaryCommandHub({
+    required this.primaryCommand,
+    required this.backupActions,
+    required this.cashActions,
+  });
 
-  final List<_SummaryCommand> commands;
+  final _SummaryCommand primaryCommand;
+  final List<_SummaryCommand> backupActions;
+  final List<_SummaryCommand> cashActions;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 700 ? 2 : 1;
-        final spacing = 12.0;
-        final totalGap = columns > 1 ? spacing * (columns - 1) : 0.0;
-        final cardWidth = (constraints.maxWidth - totalGap) / columns;
-
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: commands
-              .map(
-                (command) => SizedBox(
-                  width: columns == 1 ? constraints.maxWidth : cardWidth,
-                  child: _SummaryCommandCard(command: command),
-                ),
-              )
-              .toList(growable: false),
-        );
-      },
+    return BpcPanel(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+      color: Colors.white.withValues(alpha: 0.8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeader(
+            title: 'Acciones de caja',
+            subtitle:
+                'Exporta, respalda y corrige desde una sola zona de trabajo.',
+          ),
+          const SizedBox(height: 16),
+          _SummaryCommandRow(command: primaryCommand),
+          const SizedBox(height: 18),
+          _SummaryCommandGroup(title: 'Resguardo', commands: backupActions),
+          const SizedBox(height: 20),
+          _SummaryCommandGroup(title: 'Operativa', commands: cashActions),
+        ],
+      ),
     );
   }
 }
@@ -267,18 +278,42 @@ class _SummaryCommand {
   final bool emphasized;
 }
 
-class _SummaryCommandCard extends StatelessWidget {
-  const _SummaryCommandCard({required this.command});
+class _SummaryCommandGroup extends StatelessWidget {
+  const _SummaryCommandGroup({required this.title, required this.commands});
+
+  final String title;
+  final List<_SummaryCommand> commands;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: BpcColors.mutedInk,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 8),
+        for (var index = 0; index < commands.length; index++)
+          _SummaryCommandRow(command: commands[index], showDivider: index != 0),
+      ],
+    );
+  }
+}
+
+class _SummaryCommandRow extends StatelessWidget {
+  const _SummaryCommandRow({required this.command, this.showDivider = false});
 
   final _SummaryCommand command;
+  final bool showDivider;
 
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
     final enabled = command.onTap != null;
-    final fillColor = command.emphasized
-        ? primary
-        : Colors.white.withValues(alpha: enabled ? 0.82 : 0.7);
     final iconColor = command.emphasized ? Colors.white : primary;
     final titleColor = command.emphasized
         ? Colors.white
@@ -294,9 +329,23 @@ class _SummaryCommandCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: command.onTap,
-        child: BpcPanel(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-          color: fillColor,
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.fromLTRB(
+            0,
+            command.emphasized ? 16 : 12,
+            0,
+            command.emphasized ? 16 : 12,
+          ),
+          decoration: BoxDecoration(
+            color: command.emphasized ? primary : Colors.transparent,
+            borderRadius: command.emphasized
+                ? BorderRadius.circular(20)
+                : BorderRadius.circular(16),
+            border: showDivider
+                ? Border(top: BorderSide(color: BpcColors.line))
+                : null,
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -362,96 +411,83 @@ class _SummaryMetricsDeck extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BpcPanel(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-      color: Colors.white.withValues(alpha: 0.8),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 1080;
-          final cashState = _MetricGroupPanel(
-            title: 'Estado de caja',
-            subtitle: 'Lo justo para abrir, cobrar y cerrar con control.',
-            metrics: [
-              MetricCard(
-                label: 'Caja total',
-                value: formatMoney(store.cashBalancePesos),
-                helper: 'Saldo total registrado',
-              ),
-              MetricCard(
-                label: 'Apertura',
-                value: store.todayOpeningCashPesos == null
-                    ? 'Sin abrir'
-                    : formatMoney(store.todayOpeningCashPesos!),
-                helper: 'Efectivo inicial del dia',
-              ),
-              MetricCard(
-                label: 'Caja esperada',
-                value: store.todayExpectedCashPesos == null
-                    ? 'Sin apertura'
-                    : formatMoney(store.todayExpectedCashPesos!),
-                helper: 'Apertura + ventas - gastos',
-              ),
-              MetricCard(
-                label: 'Cierre contado',
-                value: store.todayClosingCashPesos == null
-                    ? 'Sin cierre'
-                    : formatMoney(store.todayClosingCashPesos!),
-                helper: store.todayClosingDifferencePesos == null
-                    ? 'Monto contado al cierre'
-                    : 'Diferencia: ${formatMoney(store.todayClosingDifferencePesos!)}',
-              ),
-            ],
-          );
-          final operations = _MetricGroupPanel(
-            title: 'Actividad del dia',
-            subtitle: 'Ventas, gastos y una foto clara del movimiento.',
-            metrics: [
-              MetricCard(
-                label: 'Ventas del dia',
-                value: formatMoney(store.todaySalesPesos),
-                helper: 'Ingresos de hoy',
-                accentColor: BpcColors.greenSoft.withValues(alpha: 0.18),
-              ),
-              MetricCard(
-                label: 'Gastos del dia',
-                value: formatMoney(store.todayExpensesPesos),
-                helper: 'Egresos de hoy',
-                accentColor: Theme.of(
-                  context,
-                ).colorScheme.errorContainer.withValues(alpha: 0.42),
-              ),
-              MetricCard(
-                label: 'Movimientos hoy',
-                value: '${store.todayMovementCount}',
-                helper: 'Ventas, gastos y ajustes',
-              ),
-              MetricCard(
-                label: 'Ganancia estimada',
-                value: formatMoney(store.todayEstimatedProfitPesos),
-                helper: 'Ventas menos costo estimado',
-              ),
-            ],
-          );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 1080;
+        final cashState = _MetricGroupPanel(
+          title: 'Estado de caja',
+          subtitle: 'Lo justo para abrir, cobrar y cerrar con control.',
+          metrics: [
+            MetricCard(
+              label: 'Caja total',
+              value: formatMoney(store.cashBalancePesos),
+              helper: 'Saldo total registrado',
+              framed: false,
+            ),
+            MetricCard(
+              label: 'Apertura',
+              value: store.todayOpeningCashPesos == null
+                  ? 'Sin abrir'
+                  : formatMoney(store.todayOpeningCashPesos!),
+              helper: 'Efectivo inicial del dia',
+              framed: false,
+            ),
+            MetricCard(
+              label: 'Caja esperada',
+              value: store.todayExpectedCashPesos == null
+                  ? 'Sin apertura'
+                  : formatMoney(store.todayExpectedCashPesos!),
+              helper: 'Apertura + ventas - gastos',
+              framed: false,
+            ),
+            MetricCard(
+              label: 'Cierre contado',
+              value: store.todayClosingCashPesos == null
+                  ? 'Sin cierre'
+                  : formatMoney(store.todayClosingCashPesos!),
+              helper: store.todayClosingDifferencePesos == null
+                  ? 'Monto contado al cierre'
+                  : 'Diferencia: ${formatMoney(store.todayClosingDifferencePesos!)}',
+              framed: false,
+            ),
+          ],
+        );
+        final operations = _MetricGroupPanel(
+          title: 'Actividad del dia',
+          subtitle: 'Ventas, gastos y una foto clara del movimiento.',
+          metrics: [
+            MetricCard(
+              label: 'Ventas del dia',
+              value: formatMoney(store.todaySalesPesos),
+              helper: 'Ingresos de hoy',
+              accentColor: BpcColors.greenSoft.withValues(alpha: 0.18),
+              framed: false,
+            ),
+            MetricCard(
+              label: 'Gastos del dia',
+              value: formatMoney(store.todayExpensesPesos),
+              helper: 'Egresos de hoy',
+              accentColor: Theme.of(
+                context,
+              ).colorScheme.errorContainer.withValues(alpha: 0.42),
+              framed: false,
+            ),
+            MetricCard(
+              label: 'Movimientos hoy',
+              value: '${store.todayMovementCount}',
+              helper: 'Ventas, gastos y ajustes',
+              framed: false,
+            ),
+            MetricCard(
+              label: 'Ganancia estimada',
+              value: formatMoney(store.todayEstimatedProfitPesos),
+              helper: 'Ventas menos costo estimado',
+              framed: false,
+            ),
+          ],
+        );
 
-          if (!wide) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SectionHeader(
-                  title: 'Resumen de caja',
-                  subtitle:
-                      'Una vista clara del dia con formula, caja esperada y movimiento real.',
-                ),
-                const SizedBox(height: 12),
-                _CashFormulaCard(store: store),
-                const SizedBox(height: 14),
-                cashState,
-                const SizedBox(height: 12),
-                operations,
-              ],
-            );
-          }
-
+        if (!wide) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -462,19 +498,36 @@ class _SummaryMetricsDeck extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               _CashFormulaCard(store: store),
-              const SizedBox(height: 14),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: cashState),
-                  const SizedBox(width: 12),
-                  Expanded(child: operations),
-                ],
-              ),
+              const SizedBox(height: 18),
+              cashState,
+              const SizedBox(height: 18),
+              operations,
             ],
           );
-        },
-      ),
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SectionHeader(
+              title: 'Resumen de caja',
+              subtitle:
+                  'Una vista clara del dia con formula, caja esperada y movimiento real.',
+            ),
+            const SizedBox(height: 12),
+            _CashFormulaCard(store: store),
+            const SizedBox(height: 20),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: cashState),
+                const SizedBox(width: 28),
+                Expanded(child: operations),
+              ],
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -493,11 +546,9 @@ class _MetricGroupPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      padding: const EdgeInsets.fromLTRB(0, 14, 0, 0),
       decoration: BoxDecoration(
-        color: BpcColors.surfaceStrong.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: BpcColors.line),
+        border: Border(top: BorderSide(color: BpcColors.line)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -521,12 +572,12 @@ class _MetricGroupPanel extends StatelessWidget {
           LayoutBuilder(
             builder: (context, constraints) {
               final columns = constraints.maxWidth >= 520 ? 2 : 1;
-              final spacing = 10.0;
+              final spacing = 18.0;
               final totalGap = columns > 1 ? spacing * (columns - 1) : 0.0;
               final itemWidth = (constraints.maxWidth - totalGap) / columns;
               return Wrap(
                 spacing: spacing,
-                runSpacing: spacing,
+                runSpacing: 12,
                 children: metrics
                     .map(
                       (metric) => SizedBox(
@@ -566,7 +617,7 @@ class _SummaryMovementsPanel extends StatelessWidget {
           SectionHeader(
             title: 'Movimientos recientes',
             subtitle: 'Todo lo que movio la caja y el stock',
-            trailing: _SectionCountChip(
+            trailing: _SectionCountLabel(
               label: recent.isEmpty
                   ? 'Sin movimientos'
                   : '${recent.length} movimientos',
@@ -578,6 +629,7 @@ class _SummaryMovementsPanel extends StatelessWidget {
               title: 'Sin movimientos',
               message:
                   'Cuando registres ventas, gastos o ajustes, se van a ver aqui.',
+              framed: false,
             )
           else
             Column(
@@ -601,26 +653,18 @@ class _SummaryMovementsPanel extends StatelessWidget {
   }
 }
 
-class _SectionCountChip extends StatelessWidget {
-  const _SectionCountChip({required this.label});
+class _SectionCountLabel extends StatelessWidget {
+  const _SectionCountLabel({required this.label});
 
   final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: BpcColors.surfaceStrong,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: BpcColors.line),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-          color: BpcColors.ink,
-          fontWeight: FontWeight.w900,
-        ),
+    return Text(
+      label,
+      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+        color: BpcColors.mutedInk,
+        fontWeight: FontWeight.w900,
       ),
     );
   }
@@ -680,6 +724,7 @@ class _OperationalSnapshotBanner extends StatelessWidget {
     final onAccent = isBalanced ? Colors.white : null;
     return BpcPanel(
       color: surface,
+      showShadow: false,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -733,24 +778,28 @@ class _OperationalSnapshotBanner extends StatelessWidget {
                   label: 'Apertura',
                   value: formatMoney(opening),
                   emphasized: isBalanced,
+                  framed: true,
                 ),
                 if (expected != null)
                   _FormulaChip(
                     label: 'Esperada',
                     value: formatMoney(expected),
                     emphasized: isBalanced,
+                    framed: true,
                   ),
                 if (closing != null)
                   _FormulaChip(
                     label: 'Contada',
                     value: formatMoney(closing),
                     emphasized: isBalanced,
+                    framed: true,
                   ),
                 if (difference != null)
                   _FormulaChip(
                     label: 'Diferencia',
                     value: formatMoney(difference),
                     emphasized: difference == 0,
+                    framed: true,
                   ),
               ],
             ),
@@ -766,33 +815,25 @@ class _DataConfidenceNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: BpcColors.line),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.shield_outlined,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Excel te sirve para revisar o compartir. El respaldo guarda todo para volver atras o mover la app sin perder datos.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.outline,
-                fontWeight: FontWeight.w700,
-              ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          Icons.shield_outlined,
+          color: Theme.of(context).colorScheme.primary,
+          size: 18,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            'Excel te sirve para revisar o compartir. El respaldo guarda todo para volver atras o mover la app sin perder datos.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.outline,
+              fontWeight: FontWeight.w700,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -810,12 +851,15 @@ class _CashFormulaCard extends StatelessWidget {
     if (opening == null) {
       return Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(0, 12, 0, 12),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.38),
+          border: Border(
+            top: BorderSide(
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.38),
+            ),
+            bottom: BorderSide(
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.38),
+            ),
           ),
         ),
         child: Column(
@@ -840,12 +884,15 @@ class _CashFormulaCard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(0, 12, 0, 12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.38),
+        border: Border(
+          top: BorderSide(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.38),
+          ),
+          bottom: BorderSide(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.38),
+          ),
         ),
       ),
       child: Column(
@@ -868,22 +915,22 @@ class _CashFormulaCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 14,
+            runSpacing: 10,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               _FormulaChip(label: 'Apertura', value: formatMoney(opening)),
-              const Text('+'),
+              const Text('+', style: TextStyle(fontWeight: FontWeight.w800)),
               _FormulaChip(
                 label: 'Ventas',
                 value: formatMoney(store.todaySalesPesos),
               ),
-              const Text('-'),
+              const Text('-', style: TextStyle(fontWeight: FontWeight.w800)),
               _FormulaChip(
                 label: 'Gastos',
                 value: formatMoney(store.todayExpensesPesos),
               ),
-              const Text('='),
+              const Text('=', style: TextStyle(fontWeight: FontWeight.w800)),
               _FormulaChip(
                 label: 'Caja esperada',
                 value: formatMoney(store.todayExpectedCashPesos ?? 0),
@@ -902,15 +949,43 @@ class _FormulaChip extends StatelessWidget {
     required this.label,
     required this.value,
     this.emphasized = false,
+    this.framed = false,
   });
 
   final String label;
   final String value;
   final bool emphasized;
+  final bool framed;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    if (!framed) {
+      return ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 92),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.outline,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: emphasized ? theme.colorScheme.primary : null,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -962,6 +1037,7 @@ class _FreeSaleSuggestionBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return BpcPanel(
       color: Theme.of(context).colorScheme.surfaceContainerLow,
+      showShadow: false,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 560;
@@ -983,8 +1059,8 @@ class _FreeSaleSuggestionBanner extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: 16,
+                runSpacing: 10,
                 children: [
                   _SuggestionMetaChip(
                     label: 'Se vendio',
@@ -1065,12 +1141,8 @@ class _SuggestionMetaChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(14),
-      ),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 108, maxWidth: 160),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,

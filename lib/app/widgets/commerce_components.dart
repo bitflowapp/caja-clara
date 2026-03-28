@@ -12,11 +12,19 @@ class BpcPanel extends StatelessWidget {
     required this.child,
     this.padding = const EdgeInsets.all(18),
     this.color,
+    this.radius = 20,
+    this.showBorder = true,
+    this.showShadow = true,
+    this.borderColor,
   });
 
   final Widget child;
   final EdgeInsets padding;
   final Color? color;
+  final double radius;
+  final bool showBorder;
+  final bool showShadow;
+  final Color? borderColor;
 
   @override
   Widget build(BuildContext context) {
@@ -24,15 +32,23 @@ class BpcPanel extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: color ?? scheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
-        boxShadow: const [
-          BoxShadow(
-            color: BpcColors.shadow,
-            blurRadius: 18,
-            offset: Offset(0, 8),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(radius),
+        border: showBorder
+            ? Border.all(
+                color:
+                    borderColor ??
+                    scheme.outlineVariant.withValues(alpha: 0.34),
+              )
+            : null,
+        boxShadow: showShadow
+            ? const [
+                BoxShadow(
+                  color: BpcColors.shadow,
+                  blurRadius: 12,
+                  offset: Offset(0, 4),
+                ),
+              ]
+            : null,
       ),
       child: Padding(padding: padding, child: child),
     );
@@ -147,10 +163,7 @@ class BpcDialogHeader extends StatelessWidget {
           ),
         ),
         if (onClose != null)
-          IconButton(
-            onPressed: onClose,
-            icon: const Icon(Icons.close_rounded),
-          ),
+          IconButton(onPressed: onClose, icon: const Icon(Icons.close_rounded)),
       ],
     );
   }
@@ -206,6 +219,7 @@ class MetricCard extends StatelessWidget {
     this.helper,
     this.accentColor,
     this.tight = false,
+    this.framed = true,
   });
 
   final String label;
@@ -213,19 +227,25 @@ class MetricCard extends StatelessWidget {
   final String? helper;
   final Color? accentColor;
   final bool tight;
+  final bool framed;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final markerColor =
+        accentColor ?? scheme.primary.withValues(alpha: framed ? 0.12 : 0.24);
     return Container(
-      padding: EdgeInsets.all(tight ? 14 : 16),
+      padding: framed
+          ? EdgeInsets.all(tight ? 14 : 16)
+          : EdgeInsets.fromLTRB(tight ? 0 : 2, tight ? 12 : 14, 0, 0),
       decoration: BoxDecoration(
-        color:
-            accentColor ?? scheme.surfaceContainerLow.withValues(alpha: 0.78),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.42),
-        ),
+        color: framed
+            ? accentColor ?? scheme.surfaceContainerLow.withValues(alpha: 0.74)
+            : Colors.transparent,
+        borderRadius: framed ? BorderRadius.circular(18) : null,
+        border: framed
+            ? Border.all(color: scheme.outlineVariant.withValues(alpha: 0.38))
+            : Border(top: BorderSide(color: markerColor, width: 2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -238,7 +258,7 @@ class MetricCard extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: tight ? 8 : 10),
           Text(
             value,
             style: Theme.of(
@@ -459,8 +479,8 @@ class MovementsListTile extends StatelessWidget {
                     onCreateProductFromFreeSale != null) ...[
                   const SizedBox(height: 8),
                   TextButton.icon(
-                  onPressed: onCreateProductFromFreeSale,
-                  icon: const Icon(Icons.add_box_rounded, size: 18),
+                    onPressed: onCreateProductFromFreeSale,
+                    icon: const Icon(Icons.add_box_rounded, size: 18),
                     label: const Text('Pasar esta venta al catalogo'),
                     style: TextButton.styleFrom(
                       padding: EdgeInsets.zero,
@@ -509,42 +529,49 @@ class EmptyCard extends StatelessWidget {
     required this.message,
     this.icon = Icons.inbox_rounded,
     this.action,
+    this.framed = true,
   });
 
   final String title;
   final String message;
   final IconData icon;
   final Widget? action;
+  final bool framed;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return BpcPanel(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: scheme.primary.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: scheme.primary),
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: scheme.primary.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
           ),
-          const SizedBox(height: 14),
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 6),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
-          ),
-          if (action != null) ...[const SizedBox(height: 14), action!],
-        ],
-      ),
+          child: Icon(icon, color: scheme.primary),
+        ),
+        const SizedBox(height: 14),
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 6),
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
+        ),
+        if (action != null) ...[const SizedBox(height: 14), action!],
+      ],
+    );
+    if (framed) {
+      return BpcPanel(child: content);
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 20),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [content]),
     );
   }
 }
