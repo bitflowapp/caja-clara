@@ -31,36 +31,31 @@ class _QuickHelpDialogState extends State<_QuickHelpDialog> {
   static const List<_TutorialStepData> _steps = <_TutorialStepData>[
     _TutorialStepData(
       title: 'Abri caja',
-      body:
-          'Marca la apertura con el efectivo inicial. Si arrancas en cero, tambien sirve.',
+      body: 'Registra la apertura con el efectivo inicial del dia.',
       icon: Icons.point_of_sale_rounded,
       section: 'Caja',
     ),
     _TutorialStepData(
       title: 'Agrega un producto',
-      body:
-          'Carga nombre, precio y stock. Si quieres ir rapido, usa el catalogo base.',
+      body: 'Carga nombre, precio y stock. Si quieres, usa el catalogo base.',
       icon: Icons.inventory_2_rounded,
       section: 'Productos',
     ),
     _TutorialStepData(
       title: 'Hace una venta',
-      body:
-          'Busca el producto, elige como te pagan y registra el cobro. Si falta, usa venta libre.',
+      body: 'Busca el producto, marca el cobro y guarda la venta.',
       icon: Icons.shopping_cart_checkout_rounded,
       section: 'Ventas',
     ),
     _TutorialStepData(
       title: 'Revisa el resumen',
-      body:
-          'En Caja ves ventas, gastos y el estado del dia para cerrar con control.',
+      body: 'Mira ventas, gastos y caja del dia antes de cerrar.',
       icon: Icons.account_balance_wallet_rounded,
       section: 'Resumen',
     ),
     _TutorialStepData(
       title: 'Listo para usar',
-      body:
-          'Con eso ya puedes trabajar. Si te olvidas algo, abri Ayuda y lo repasas en un minuto.',
+      body: 'Ya puedes trabajar. Si necesitas repasar, abre Ayuda.',
       icon: Icons.check_circle_rounded,
       section: 'Listo',
     ),
@@ -86,8 +81,7 @@ class _QuickHelpDialogState extends State<_QuickHelpDialog> {
           BpcDialogHeader(
             icon: Icons.auto_stories_rounded,
             title: 'Tutorial rapido',
-            subtitle:
-                'Cinco pasos cortos para empezar a usar Caja Clara sin leer de mas.',
+            subtitle: 'Hace esto, despues esto, y listo.',
             badgeLabel: '${_currentStep + 1}/${_steps.length}',
             onClose: () =>
                 Navigator.of(context).pop(QuickHelpDialogResult.dismissed),
