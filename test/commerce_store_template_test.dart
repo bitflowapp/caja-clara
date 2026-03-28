@@ -47,6 +47,27 @@ void main() {
       },
     );
 
+    test('uses neutral products in the starter template', () async {
+      final store = CommerceStore.emptyForTest();
+
+      await store.applyArgentinianKioskTemplate();
+
+      expect(
+        store.products.where(
+          (product) => product.name.toLowerCase().contains('preserv'),
+        ),
+        isEmpty,
+      );
+      expect(
+        store.products.where((product) => product.name == 'Pasta dental chica'),
+        hasLength(1),
+      );
+      expect(
+        store.products.where((product) => product.name == 'Jabon de tocador'),
+        hasLength(1),
+      );
+    });
+
     test('blocks loading demo data when the app already has data', () async {
       final store = CommerceStore.emptyForTest();
 

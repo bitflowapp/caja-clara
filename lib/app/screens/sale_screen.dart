@@ -135,6 +135,9 @@ class _SaleScreenState extends State<SaleScreen> {
           final exactQuickMatch = _saleMode == SaleEntryMode.quick
               ? _exactQuickMatchProduct(store)
               : null;
+          final exactCatalogMatch = _saleMode == SaleEntryMode.catalog
+              ? _exactCatalogMatchProduct(store)
+              : null;
           final filteredProducts = _filteredProducts(store);
           final productFieldError = _saleMode == SaleEntryMode.catalog
               ? _productFieldErrorText(filteredProducts)
@@ -276,6 +279,10 @@ class _SaleScreenState extends State<SaleScreen> {
                                   );
                                   return;
                                 }
+                                if (exactCatalogMatch != null) {
+                                  _commitProductSelection(exactCatalogMatch);
+                                  return;
+                                }
                                 if (_autoValidateMode ==
                                     AutovalidateMode.disabled) {
                                   setState(() {
@@ -328,7 +335,7 @@ class _SaleScreenState extends State<SaleScreen> {
                               nextFieldLabel: 'Cantidad',
                               labelText: 'Descripcion',
                               editorContext: 'Venta libre',
-                              hintText: 'Ej. Preservativos Durex x3',
+                              hintText: 'Ej. Agua mineral 500 ml',
                               helperText:
                                   'Usalo si todavia no cargaste el producto en el catalogo.',
                               emptyDisplayText:
@@ -363,7 +370,7 @@ class _SaleScreenState extends State<SaleScreen> {
                                 ),
                                 decoration: const InputDecoration(
                                   labelText: 'Descripcion',
-                                  hintText: 'Ej. Preservativos Durex x3',
+                                  hintText: 'Ej. Agua mineral 500 ml',
                                   helperText:
                                       'Usalo si todavia no cargaste el producto en el catalogo.',
                                 ),
@@ -671,7 +678,9 @@ class _SaleScreenState extends State<SaleScreen> {
                               children: [
                                 Text(
                                   'Vista del comprobante',
-                                  style: Theme.of(context).textTheme.titleMedium,
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleMedium,
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
@@ -950,13 +959,35 @@ class _SaleScreenState extends State<SaleScreen> {
     return null;
   }
 
-  void _selectProduct(Product product) {
+  Product? _exactCatalogMatchProduct(CommerceStore store) {
+    final rawQuery = _productSearchController.text.trim();
+    if (rawQuery.isEmpty) {
+      return null;
+    }
+    return store.productByBarcode(rawQuery) ??
+        store.productByNormalizedName(rawQuery);
+  }
+
+  void _commitProductSelection(
+    Product product, {
+    bool switchToCatalogMode = false,
+  }) {
     _productSearchController.value = TextEditingValue(
       text: product.name,
       selection: TextSelection.collapsed(offset: product.name.length),
     );
-    setState(() => _selectedProduct = product);
+    setState(() {
+      if (switchToCatalogMode) {
+        _saleMode = SaleEntryMode.catalog;
+        _autoValidateMode = AutovalidateMode.disabled;
+      }
+      _selectedProduct = product;
+    });
     _moveFocusTo(_quantityFocusNode, controller: _quantityController);
+  }
+
+  void _selectProduct(Product product) {
+    _commitProductSelection(product);
   }
 
   void _clearSelectedProduct() {
@@ -977,17 +1008,7 @@ class _SaleScreenState extends State<SaleScreen> {
   }
 
   void _useExistingProductFromQuickSale(Product product) {
-    _dismissKeyboard();
-    _productSearchController.value = TextEditingValue(
-      text: product.name,
-      selection: TextSelection.collapsed(offset: product.name.length),
-    );
-    setState(() {
-      _saleMode = SaleEntryMode.catalog;
-      _selectedProduct = product;
-      _autoValidateMode = AutovalidateMode.disabled;
-    });
-    _moveFocusTo(_quantityFocusNode, controller: _quantityController);
+    _commitProductSelection(product, switchToCatalogMode: true);
   }
 
   void _showBlockedFeedback(String message) {
@@ -1047,12 +1068,13 @@ class _SaleScreenState extends State<SaleScreen> {
 
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
+    _commitProductSelection(result.product, switchToCatalogMode: true);
     messenger.showSnackBar(
       SnackBar(
         content: Text(
           result.kind == ProductEditorResultKind.created
-              ? '"${result.product.name}" ya quedo listo en el catalogo.'
-              : 'Usaras "${result.product.name}", que ya estaba en el catalogo.',
+              ? '"${result.product.name}" ya quedo en el catalogo y seleccionado en la venta.'
+              : '"${result.product.name}" ya estaba en el catalogo y quedo seleccionado.',
         ),
         behavior: SnackBarBehavior.floating,
       ),
@@ -1537,7 +1559,9 @@ class _CheckoutMetaChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.surface,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.42)),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.42),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

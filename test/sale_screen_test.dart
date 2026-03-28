@@ -1,11 +1,16 @@
 import 'package:b_plus_commerce/app/screens/sale_screen.dart';
+import 'package:b_plus_commerce/app/models/product.dart';
 import 'package:b_plus_commerce/app/services/commerce_store.dart';
 import 'package:b_plus_commerce/app/widgets/commerce_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  Future<void> pumpSaleScreen(WidgetTester tester, CommerceStore store) async {
+  Future<void> pumpSaleScreen(
+    WidgetTester tester,
+    CommerceStore store, {
+    Product? initialProduct,
+  }) async {
     final savedMessage = ValueNotifier<String?>(null);
     addTearDown(savedMessage.dispose);
 
@@ -28,7 +33,9 @@ void main() {
                               final result = await Navigator.of(context)
                                   .push<String>(
                                     MaterialPageRoute<String>(
-                                      builder: (_) => const SaleScreen(),
+                                      builder: (_) => SaleScreen(
+                                        initialProduct: initialProduct,
+                                      ),
                                     ),
                                   );
                               savedMessage.value = result;
@@ -198,7 +205,7 @@ void main() {
 
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Descripcion'),
-        'Preservativos mostrador',
+        'Agua mineral 500 ml',
       );
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Precio unitario'),
@@ -218,7 +225,7 @@ void main() {
       expect(store.movements.length, initialMovements + 1);
       expect(store.cashBalancePesos, initialCash + 2500);
       expect(store.movements.first.isFreeSale, isTrue);
-      expect(store.movements.first.subtitle, 'Preservativos mostrador');
+      expect(store.movements.first.subtitle, 'Agua mineral 500 ml');
       expect(find.text('Comprobante listo'), findsOneWidget);
 
       await tester.ensureVisible(find.text('Listo'));
@@ -244,7 +251,7 @@ void main() {
 
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Descripcion'),
-        'Cable USB mostrador',
+        'Galletitas surtidas',
       );
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Precio unitario'),
@@ -258,9 +265,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
 
       expect(find.text('Agregar producto'), findsOneWidget);
-      expect(find.text('Cable USB mostrador'), findsWidgets);
+      expect(find.text('Galletitas surtidas'), findsWidgets);
       expect(find.text('Vista rapida'), findsOneWidget);
-      expect(find.text('Cable USB mostrador / \$ 3.900'), findsOneWidget);
+      expect(find.text('Galletitas surtidas / \$ 3.900'), findsOneWidget);
     },
   );
 
@@ -300,6 +307,119 @@ void main() {
       );
     },
   );
+
+  testWidgets(
+    'buscar por codigo exacto confirma el producto sin reescribirlo',
+    (tester) async {
+      final store = CommerceStore.seededForTest();
+
+      await pumpSaleScreen(tester, store);
+
+      final searchField = find.widgetWithText(TextFormField, 'Buscar producto');
+      await tester.enterText(searchField, '7791234500011');
+      await tester.pump();
+
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 150));
+
+      expect(find.text('Producto listo'), findsOneWidget);
+      expect(find.text('Yerba premium'), findsWidgets);
+      expect(saveButton(tester).onPressed, isNotNull);
+      expect(
+        find.text('Producto listo. Puedes seguir con la venta o cambiarlo.'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'venta abierta desde un producto lo deja seleccionado y lista para cobrar',
+    (tester) async {
+      final store = CommerceStore.seededForTest();
+      final product = store.productById('p-1')!;
+      final initialMovements = store.movements.length;
+      final initialStock = product.stockUnits;
+
+      await pumpSaleScreen(tester, store, initialProduct: product);
+
+      expect(find.text('Producto listo'), findsOneWidget);
+      expect(find.text('Yerba premium'), findsWidgets);
+      expect(saveButton(tester).onPressed, isNotNull);
+
+      await tester.ensureVisible(saveButtonFinder());
+      await tester.tap(saveButtonFinder());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(store.movements.length, initialMovements + 1);
+      expect(store.productById('p-1')!.stockUnits, initialStock - 1);
+      expect(find.text('Comprobante listo'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'pasar venta libre al catalogo deja el producto seleccionado en la venta',
+    (tester) async {
+      final store = CommerceStore.emptyForTest();
+
+      await pumpSaleScreen(tester, store);
+
+      await tester.ensureVisible(find.byKey(const Key('sale-mode-quick')));
+      await tester.tap(find.byKey(const Key('sale-mode-quick')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Descripcion'),
+        'Producto de ejemplo',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Precio unitario'),
+        '3900',
+      );
+      await tester.pump();
+
+      await tester.ensureVisible(find.text('Pasar al catalogo'));
+      await tester.tap(find.text('Pasar al catalogo'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      await tester.ensureVisible(find.text('Guardar'));
+      await tester.tap(find.text('Guardar'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 450));
+
+      expect(find.text('Producto listo'), findsOneWidget);
+      expect(find.text('Producto de ejemplo'), findsWidgets);
+      expect(find.text('Cambiar'), findsOneWidget);
+      expect(
+        find.text(
+          '"Producto de ejemplo" ya quedo en el catalogo y seleccionado en la venta.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.widgetWithText(TextFormField, 'Buscar producto'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('venta libre muestra un ejemplo neutral en la descripcion', (
+    tester,
+  ) async {
+    final store = CommerceStore.emptyForTest();
+
+    await pumpSaleScreen(tester, store);
+
+    await tester.ensureVisible(find.byKey(const Key('sale-mode-quick')));
+    await tester.tap(find.byKey(const Key('sale-mode-quick')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Ej. Agua mineral 500 ml'), findsOneWidget);
+  });
 
   testWidgets(
     'nueva venta usa efectivo por defecto cuando no hay historial previo',
