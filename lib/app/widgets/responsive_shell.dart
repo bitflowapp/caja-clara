@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 
@@ -35,6 +37,8 @@ class ResponsiveShell extends StatefulWidget {
 }
 
 class _ResponsiveShellState extends State<ResponsiveShell> {
+  static const Duration _recoverableSaveBannerDuration = Duration(seconds: 8);
+
   CommerceTab _tab = CommerceTab.home;
   bool _exportingExcel = false;
   bool _applyingStarterTemplate = false;
@@ -46,6 +50,8 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
   bool _savingCashEvent = false;
   String? _trackedSaveIssueMessage;
   bool _recoverableSaveBannerDismissed = false;
+  Timer? _recoverableSaveBannerTimer;
+  bool _recoverableSaveBannerTimerQueued = false;
 
   @override
   void didChangeDependencies() {
@@ -55,8 +61,15 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     );
     if (saveIssueMessage != _trackedSaveIssueMessage) {
       _trackedSaveIssueMessage = saveIssueMessage;
+      _cancelRecoverableSaveBannerTimer();
       _recoverableSaveBannerDismissed = false;
     }
+  }
+
+  @override
+  void dispose() {
+    _cancelRecoverableSaveBannerTimer();
+    super.dispose();
   }
 
   Future<void> _openSale() async {
@@ -288,8 +301,56 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       return null;
     }
     return _isRecoverableSaveIssue(lastError)
-        ? 'El ultimo cambio no pudo guardarse. Lo anterior sigue guardado.'
+        ? 'El ultimo cambio no pudo guardarse. Puedes reintentarlo desde aqui.'
         : lastError;
+  }
+
+  void _cancelRecoverableSaveBannerTimer() {
+    _recoverableSaveBannerTimer?.cancel();
+    _recoverableSaveBannerTimer = null;
+    _recoverableSaveBannerTimerQueued = false;
+  }
+
+  void _dismissRecoverableSaveBanner() {
+    _cancelRecoverableSaveBannerTimer();
+    if (!mounted) {
+      return;
+    }
+    setState(() => _recoverableSaveBannerDismissed = true);
+  }
+
+  void _syncRecoverableSaveBanner({
+    required bool wide,
+    required bool hasIssue,
+    required bool isRecoverable,
+  }) {
+    final shouldAutoDismiss = wide && hasIssue && isRecoverable;
+    if (!shouldAutoDismiss) {
+      _cancelRecoverableSaveBannerTimer();
+      return;
+    }
+    if (_recoverableSaveBannerDismissed ||
+        _recoverableSaveBannerTimer != null ||
+        _recoverableSaveBannerTimerQueued) {
+      return;
+    }
+
+    _recoverableSaveBannerTimerQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _recoverableSaveBannerTimerQueued = false;
+      if (!mounted ||
+          _recoverableSaveBannerDismissed ||
+          _recoverableSaveBannerTimer != null) {
+        return;
+      }
+      _recoverableSaveBannerTimer = Timer(_recoverableSaveBannerDuration, () {
+        if (!mounted) {
+          return;
+        }
+        setState(() => _recoverableSaveBannerDismissed = true);
+        _recoverableSaveBannerTimer = null;
+      });
+    });
   }
 
   Future<void> _applyStarterTemplate() async {
@@ -804,6 +865,11 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         final saveIssueTitle = _saveIssueTitleFor(store.lastError);
         final saveIssueMessage = _saveIssueMessageFor(store.lastError);
         final canCollapseSaveBanner = wide && isRecoverableSaveIssue;
+        _syncRecoverableSaveBanner(
+          wide: wide,
+          hasIssue: saveIssueMessage != null,
+          isRecoverable: isRecoverableSaveIssue,
+        );
         final showSaveIssueBanner =
             saveIssueMessage != null &&
             (!canCollapseSaveBanner || !_recoverableSaveBannerDismissed);
@@ -964,7 +1030,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                               alignment: Alignment.centerLeft,
                               child: ConstrainedBox(
                                 constraints: const BoxConstraints(
-                                  maxWidth: 760,
+                                  maxWidth: 620,
                                 ),
                                 child: _SaveErrorBanner(
                                   title: saveIssueTitle!,
@@ -972,11 +1038,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                                   retrying: _retryingSave || store.isSaving,
                                   onRetry: _retrySave,
                                   onDismiss: canCollapseSaveBanner
-                                      ? () => setState(
-                                          () =>
-                                              _recoverableSaveBannerDismissed =
-                                                  true,
-                                        )
+                                      ? _dismissRecoverableSaveBanner
                                       : null,
                                 ),
                               ),
