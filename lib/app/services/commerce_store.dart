@@ -10,6 +10,8 @@ import '../utils/payment_methods.dart';
 import 'commerce_persistence.dart';
 import 'starter_templates.dart';
 
+enum OnboardingTutorialStatus { unseen, dismissed, completed }
+
 class CommerceStore extends ChangeNotifier {
   static const int freeSaleSuggestionThreshold = 3;
 
@@ -73,6 +75,8 @@ class CommerceStore extends ChangeNotifier {
   bool _ready = false;
   bool _saving = false;
   String? _lastError;
+  OnboardingTutorialStatus _onboardingTutorialStatus =
+      OnboardingTutorialStatus.unseen;
   DateTime? _cashOpeningAt;
   int? _cashOpeningBalancePesos;
   DateTime? _cashClosingAt;
@@ -84,6 +88,11 @@ class CommerceStore extends ChangeNotifier {
   bool get hasProducts => _products.isNotEmpty;
   bool get hasMovements => _movements.isNotEmpty;
   bool get isEmptyState => _products.isEmpty && _movements.isEmpty;
+  OnboardingTutorialStatus get onboardingTutorialStatus =>
+      _onboardingTutorialStatus;
+  bool get shouldPromptOnboardingTutorial =>
+      _onboardingTutorialStatus == OnboardingTutorialStatus.unseen &&
+      isEmptyState;
 
   UnmodifiableListView<Product> get products => UnmodifiableListView(_products);
   UnmodifiableListView<Movement> get movements =>
@@ -398,6 +407,7 @@ class CommerceStore extends ChangeNotifier {
   void _seedEmptyState() {
     _products.clear();
     _movements.clear();
+    _onboardingTutorialStatus = OnboardingTutorialStatus.unseen;
     _cashOpeningAt = null;
     _cashOpeningBalancePesos = null;
     _cashClosingAt = null;
@@ -520,6 +530,7 @@ class CommerceStore extends ChangeNotifier {
     _cashOpeningBalancePesos = null;
     _cashClosingAt = null;
     _cashClosingBalancePesos = null;
+    _onboardingTutorialStatus = OnboardingTutorialStatus.completed;
   }
 
   Future<StarterTemplateApplyResult> applyArgentinianKioskTemplate() async {
@@ -579,6 +590,25 @@ class CommerceStore extends ChangeNotifier {
     }
 
     await _runPersistedMutation(_seedDemoData);
+  }
+
+  Future<void> dismissOnboardingTutorial() {
+    return _setOnboardingTutorialStatus(OnboardingTutorialStatus.dismissed);
+  }
+
+  Future<void> completeOnboardingTutorial() {
+    return _setOnboardingTutorialStatus(OnboardingTutorialStatus.completed);
+  }
+
+  Future<void> _setOnboardingTutorialStatus(
+    OnboardingTutorialStatus status,
+  ) async {
+    if (_onboardingTutorialStatus == status) {
+      return;
+    }
+    await _runPersistedMutation(() {
+      _onboardingTutorialStatus = status;
+    });
   }
 
   Future<void> addProduct(Product product) async {
@@ -937,11 +967,12 @@ class CommerceStore extends ChangeNotifier {
 
   Map<String, dynamic> buildSnapshot({DateTime? generatedAt}) {
     return <String, dynamic>{
-      'version': 2,
+      'version': 3,
       'savedAt': (generatedAt ?? DateTime.now()).toIso8601String(),
       'products': _products.map((product) => product.toJson()).toList(),
       'movements': _movements.map((movement) => movement.toJson()).toList(),
       'dismissedFreeSaleSuggestions': _dismissedFreeSaleSuggestions.toList(),
+      'onboardingTutorialStatus': _onboardingTutorialStatus.name,
       'cashOpeningAt': _cashOpeningAt?.toIso8601String(),
       'cashOpeningBalancePesos': _cashOpeningBalancePesos,
       'cashClosingAt': _cashClosingAt?.toIso8601String(),
@@ -1017,6 +1048,10 @@ class CommerceStore extends ChangeNotifier {
       dismissedFreeSaleSuggestions: _readStringSet(
         snapshot['dismissedFreeSaleSuggestions'],
       ),
+      onboardingTutorialStatus: _readOnboardingTutorialStatus(
+        snapshot['onboardingTutorialStatus'],
+        hasExistingData: validatedProducts.isNotEmpty || movements.isNotEmpty,
+      ),
       cashOpeningAt: _readDate(snapshot['cashOpeningAt']),
       cashOpeningBalancePesos: (snapshot['cashOpeningBalancePesos'] as num?)
           ?.toInt(),
@@ -1055,6 +1090,22 @@ class CommerceStore extends ChangeNotifier {
         .map(normalizeProductName)
         .whereType<String>()
         .toSet();
+  }
+
+  OnboardingTutorialStatus _readOnboardingTutorialStatus(
+    dynamic raw, {
+    required bool hasExistingData,
+  }) {
+    if (raw is String) {
+      for (final status in OnboardingTutorialStatus.values) {
+        if (status.name == raw) {
+          return status;
+        }
+      }
+    }
+    return hasExistingData
+        ? OnboardingTutorialStatus.completed
+        : OnboardingTutorialStatus.unseen;
   }
 
   Product _validateProduct(
@@ -1144,6 +1195,7 @@ class CommerceStore extends ChangeNotifier {
     _dismissedFreeSaleSuggestions
       ..clear()
       ..addAll(snapshot.dismissedFreeSaleSuggestions);
+    _onboardingTutorialStatus = snapshot.onboardingTutorialStatus;
     _cashOpeningAt = snapshot.cashOpeningAt;
     _cashOpeningBalancePesos = snapshot.cashOpeningBalancePesos;
     _cashClosingAt = snapshot.cashClosingAt;
@@ -1216,6 +1268,7 @@ class CommerceStore extends ChangeNotifier {
       dismissedFreeSaleSuggestions: Set<String>.of(
         _dismissedFreeSaleSuggestions,
       ),
+      onboardingTutorialStatus: _onboardingTutorialStatus,
       cashOpeningAt: _cashOpeningAt,
       cashOpeningBalancePesos: _cashOpeningBalancePesos,
       cashClosingAt: _cashClosingAt,
@@ -1233,6 +1286,7 @@ class CommerceStore extends ChangeNotifier {
     _dismissedFreeSaleSuggestions
       ..clear()
       ..addAll(state.dismissedFreeSaleSuggestions);
+    _onboardingTutorialStatus = state.onboardingTutorialStatus;
     _cashOpeningAt = state.cashOpeningAt;
     _cashOpeningBalancePesos = state.cashOpeningBalancePesos;
     _cashClosingAt = state.cashClosingAt;
@@ -1292,6 +1346,7 @@ class _MutableStoreState {
     required this.products,
     required this.movements,
     required this.dismissedFreeSaleSuggestions,
+    required this.onboardingTutorialStatus,
     required this.cashOpeningAt,
     required this.cashOpeningBalancePesos,
     required this.cashClosingAt,
@@ -1301,6 +1356,7 @@ class _MutableStoreState {
   final List<Product> products;
   final List<Movement> movements;
   final Set<String> dismissedFreeSaleSuggestions;
+  final OnboardingTutorialStatus onboardingTutorialStatus;
   final DateTime? cashOpeningAt;
   final int? cashOpeningBalancePesos;
   final DateTime? cashClosingAt;
@@ -1312,6 +1368,7 @@ class _SnapshotData {
     required this.products,
     required this.movements,
     required this.dismissedFreeSaleSuggestions,
+    required this.onboardingTutorialStatus,
     required this.cashOpeningAt,
     required this.cashOpeningBalancePesos,
     required this.cashClosingAt,
@@ -1321,6 +1378,7 @@ class _SnapshotData {
   final List<Product> products;
   final List<Movement> movements;
   final Set<String> dismissedFreeSaleSuggestions;
+  final OnboardingTutorialStatus onboardingTutorialStatus;
   final DateTime? cashOpeningAt;
   final int? cashOpeningBalancePesos;
   final DateTime? cashClosingAt;

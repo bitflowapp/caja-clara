@@ -52,6 +52,8 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
   bool _recoverableSaveBannerDismissed = false;
   Timer? _recoverableSaveBannerTimer;
   bool _recoverableSaveBannerTimerQueued = false;
+  bool _onboardingTutorialQueued = false;
+  bool _autoOnboardingHandled = false;
 
   @override
   void didChangeDependencies() {
@@ -124,7 +126,47 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
   }
 
   Future<void> _openQuickHelp() async {
-    await showQuickHelpDialog(context);
+    final result = await showQuickHelpDialog(context);
+    await _handleQuickHelpResult(result);
+  }
+
+  Future<void> _handleQuickHelpResult(QuickHelpDialogResult? result) async {
+    if (!mounted || result == null) {
+      return;
+    }
+    final store = CommerceScope.of(context);
+    if (result == QuickHelpDialogResult.completed) {
+      if (store.onboardingTutorialStatus !=
+          OnboardingTutorialStatus.completed) {
+        await store.completeOnboardingTutorial();
+      }
+      return;
+    }
+    if (store.onboardingTutorialStatus == OnboardingTutorialStatus.unseen) {
+      await store.dismissOnboardingTutorial();
+    }
+  }
+
+  void _queueOnboardingTutorialIfNeeded(CommerceStore store) {
+    if (!store.shouldPromptOnboardingTutorial ||
+        _autoOnboardingHandled ||
+        _onboardingTutorialQueued) {
+      return;
+    }
+    _onboardingTutorialQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _onboardingTutorialQueued = false;
+      if (!mounted || _autoOnboardingHandled) {
+        return;
+      }
+      final currentStore = CommerceScope.of(context);
+      if (!currentStore.shouldPromptOnboardingTutorial) {
+        return;
+      }
+      _autoOnboardingHandled = true;
+      final result = await showQuickHelpDialog(context);
+      await _handleQuickHelpResult(result);
+    });
   }
 
   Future<bool> _ensureFeatureAccess(LockedFeature feature) {
@@ -814,6 +856,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
   Widget build(BuildContext context) {
     final store = CommerceScope.of(context);
     final license = LicenseScope.of(context);
+    _queueOnboardingTutorialIfNeeded(store);
     final pages = <CommerceTab, Widget>{
       CommerceTab.home: HomeScreen(
         onNewSale: _openSale,

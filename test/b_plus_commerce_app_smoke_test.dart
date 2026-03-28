@@ -6,6 +6,14 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  Future<void> dismissTutorialIfVisible(WidgetTester tester) async {
+    if (find.text('Tutorial rapido').evaluate().isEmpty) {
+      return;
+    }
+    await tester.tap(find.text('Saltear'));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('Home renders branding and primary actions', (tester) async {
     final store = CommerceStore.seededForTest();
     await tester.pumpWidget(
@@ -25,6 +33,36 @@ void main() {
     expect(find.text('Ultimos movimientos'), findsOneWidget);
   });
 
+  testWidgets('first use opens the tutorial and it can be reopened from help', (
+    tester,
+  ) async {
+    final store = CommerceStore.emptyForTest();
+    await tester.pumpWidget(
+      BPlusCommerceApp(
+        store: store,
+        barcodeLookupService: const DisabledBarcodeLookupService(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tutorial rapido'), findsOneWidget);
+    expect(find.text('Abri caja'), findsWidgets);
+    expect(find.text('1/5'), findsOneWidget);
+
+    await tester.tap(find.text('Saltear'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tutorial rapido'), findsNothing);
+    expect(find.text('Primeros pasos'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Ayuda'));
+    await tester.tap(find.text('Ayuda'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tutorial rapido'), findsOneWidget);
+    expect(find.text('Abri caja'), findsWidgets);
+  });
+
   testWidgets('Home guides first use with kiosk template', (tester) async {
     final store = CommerceStore.emptyForTest();
     await tester.pumpWidget(
@@ -34,6 +72,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await dismissTutorialIfVisible(tester);
 
     expect(find.text('Primeros pasos'), findsOneWidget);
     expect(find.text('Ver ejemplo'), findsOneWidget);
@@ -59,6 +98,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await dismissTutorialIfVisible(tester);
 
       expect(find.text('Ver ejemplo'), findsNothing);
       expect(find.text('Cargar Kiosco argentino'), findsOneWidget);

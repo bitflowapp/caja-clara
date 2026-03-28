@@ -3,159 +3,233 @@ import 'package:flutter/material.dart';
 import 'commerce_components.dart';
 import 'input_shortcuts.dart';
 
-Future<void> showQuickHelpDialog(BuildContext context) async {
-  await showDialog<void>(
+enum QuickHelpDialogResult { completed, skipped, dismissed }
+
+Future<QuickHelpDialogResult?> showQuickHelpDialog(BuildContext context) async {
+  return showDialog<QuickHelpDialogResult>(
     context: context,
     useSafeArea: true,
+    barrierDismissible: false,
     builder: (context) {
       return InputShortcutScope(
-        onCancel: () => Navigator.of(context).pop(),
-        child: BpcDialogFrame(
-          maxWidth: 760,
-          padding: const EdgeInsets.all(22),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                BpcDialogHeader(
-                  icon: Icons.help_center_rounded,
-                  title: 'Ayuda rapida',
-                  subtitle:
-                      'Lo justo para arrancar, cobrar y resolver dudas comunes sin perder tiempo.',
-                  badgeLabel: 'Windows',
-                  onClose: () => Navigator.of(context).pop(),
-                ),
-                const SizedBox(height: 18),
-                const SizedBox(
-                  width: double.infinity,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _HelpBlock(
-                        title: 'Para que sirve',
-                        text:
-                            'Caja Clara te ayuda a llevar ventas, gastos, productos y caja desde una sola app local.',
-                      ),
-                      _HelpBlock(
-                        title: 'Primeros pasos',
-                        text:
-                            'Empieza asi: 1. Abre caja. 2. Agrega un producto. 3. Registra una venta. 4. Revisa la caja del dia.',
-                      ),
-                      _HelpBlock(
-                        title: 'Cobros',
-                        text:
-                            'Los medios de pago ya vienen pensados para el dia a dia: Efectivo, Transferencia, Mercado Pago, Debito, Credito y Cuenta corriente.',
-                      ),
-                      _HelpBlock(
-                        title: 'Codigos',
-                        text:
-                            'Puedes usar camara, lector o ingreso manual. Si un codigo no existe, lo das de alta en el momento sin perder la venta.',
-                      ),
-                      _HelpBlock(
-                        title: 'Activacion',
-                        text:
-                            'La app incluye una prueba de 30 dias. Si se termina, tus datos siguen visibles y exportables. Desde Activar Caja Clara puedes copiar el ID de esta PC y seguir el contacto de soporte.',
-                      ),
-                      _HelpBlock(
-                        title: 'Tus datos',
-                        text:
-                            'Todo queda guardado localmente. Puedes sacar Excel o guardar un respaldo para quedarte tranquilo.',
-                      ),
-                      _HelpChecklist(
-                        title: 'Checklist rapida',
-                        items: [
-                          'Instala desde "Instalar Caja Clara.cmd" o abre la carpeta completa si prefieres usarla portable.',
-                          'Confirma que Inicio cargue bien y que el estado de prueba o activacion quede visible.',
-                          'Prueba Agregar producto o abre Productos para ver que el catalogo responda.',
-                          'Registra una venta o un gasto de prueba y revisa el mensaje en pantalla.',
-                          'Si usas lector tipo teclado, enfoca el campo de codigo, escanea y confirma que Enter resuelve el flujo.',
-                        ],
-                      ),
-                      _HelpBlock(
-                        title: 'Windows',
-                        text:
-                            'La experiencia recomendada en Windows es instalarla desde el paquete portable. El MSIX sigue siendo opcional y puede pedir certificado confiable.',
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 18),
-                FilledButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cerrar'),
-                ),
-              ],
-            ),
-          ),
-        ),
+        onCancel: () =>
+            Navigator.of(context).pop(QuickHelpDialogResult.dismissed),
+        child: const _QuickHelpDialog(),
       );
     },
   );
 }
 
-class _HelpBlock extends StatelessWidget {
-  const _HelpBlock({required this.title, required this.text});
+class _QuickHelpDialog extends StatefulWidget {
+  const _QuickHelpDialog();
 
-  final String title;
-  final String text;
+  @override
+  State<_QuickHelpDialog> createState() => _QuickHelpDialogState();
+}
+
+class _QuickHelpDialogState extends State<_QuickHelpDialog> {
+  static const List<_TutorialStepData> _steps = <_TutorialStepData>[
+    _TutorialStepData(
+      title: 'Abri caja',
+      body:
+          'Marca la apertura con el efectivo inicial. Si arrancas en cero, tambien sirve.',
+      icon: Icons.point_of_sale_rounded,
+      section: 'Caja',
+    ),
+    _TutorialStepData(
+      title: 'Agrega un producto',
+      body:
+          'Carga nombre, precio y stock. Si quieres ir rapido, usa el catalogo base.',
+      icon: Icons.inventory_2_rounded,
+      section: 'Productos',
+    ),
+    _TutorialStepData(
+      title: 'Hace una venta',
+      body:
+          'Busca el producto, elige como te pagan y registra el cobro. Si falta, usa venta libre.',
+      icon: Icons.shopping_cart_checkout_rounded,
+      section: 'Ventas',
+    ),
+    _TutorialStepData(
+      title: 'Revisa el resumen',
+      body:
+          'En Caja ves ventas, gastos y el estado del dia para cerrar con control.',
+      icon: Icons.account_balance_wallet_rounded,
+      section: 'Resumen',
+    ),
+    _TutorialStepData(
+      title: 'Listo para usar',
+      body:
+          'Con eso ya puedes trabajar. Si te olvidas algo, abri Ayuda y lo repasas en un minuto.',
+      icon: Icons.check_circle_rounded,
+      section: 'Listo',
+    ),
+  ];
+
+  int _currentStep = 0;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final step = _steps[_currentStep];
+    final isLastStep = _currentStep == _steps.length - 1;
+    final progress = (_currentStep + 1) / _steps.length;
+
+    return BpcDialogFrame(
+      maxWidth: 620,
+      padding: const EdgeInsets.all(22),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: Theme.of(
-              context,
-            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+          BpcDialogHeader(
+            icon: Icons.auto_stories_rounded,
+            title: 'Tutorial rapido',
+            subtitle:
+                'Cinco pasos cortos para empezar a usar Caja Clara sin leer de mas.',
+            badgeLabel: '${_currentStep + 1}/${_steps.length}',
+            onClose: () =>
+                Navigator.of(context).pop(QuickHelpDialogResult.dismissed),
           ),
-          const SizedBox(height: 4),
-          Text(text, style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: 18),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 6,
+              backgroundColor: scheme.surfaceContainerHighest,
+            ),
+          ),
+          const SizedBox(height: 18),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 520;
+              final header = _StepIconHeader(step: step);
+              final copy = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: scheme.primary.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      step.section,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    step.title,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    step.body,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: scheme.outline,
+                      fontWeight: FontWeight.w600,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              );
+
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [header, const SizedBox(height: 16), copy],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  header,
+                  const SizedBox(width: 18),
+                  Expanded(child: copy),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              if (_currentStep > 0)
+                TextButton(
+                  onPressed: () => setState(() => _currentStep -= 1),
+                  child: const Text('Atras'),
+                )
+              else
+                const SizedBox(width: 64),
+              const Spacer(),
+              if (!isLastStep)
+                TextButton(
+                  onPressed: () =>
+                      Navigator.of(context).pop(QuickHelpDialogResult.skipped),
+                  child: const Text('Saltear'),
+                ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: () {
+                  if (isLastStep) {
+                    Navigator.of(context).pop(QuickHelpDialogResult.completed);
+                    return;
+                  }
+                  setState(() => _currentStep += 1);
+                },
+                child: Text(isLastStep ? 'Listo' : 'Siguiente'),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _HelpChecklist extends StatelessWidget {
-  const _HelpChecklist({required this.title, required this.items});
+class _StepIconHeader extends StatelessWidget {
+  const _StepIconHeader({required this.step});
 
-  final String title;
-  final List<String> items;
+  final _TutorialStepData step;
 
   @override
   Widget build(BuildContext context) {
-    final bodyStyle = Theme.of(context).textTheme.bodyMedium;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(
-              context,
-            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 6),
-          for (final item in items)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('- ', style: bodyStyle),
-                  Expanded(child: Text(item, style: bodyStyle)),
-                ],
-              ),
-            ),
-        ],
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: 68,
+      height: 68,
+      decoration: BoxDecoration(
+        color: scheme.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(22),
       ),
+      child: Icon(step.icon, color: scheme.primary, size: 34),
     );
   }
+}
+
+class _TutorialStepData {
+  const _TutorialStepData({
+    required this.title,
+    required this.body,
+    required this.icon,
+    required this.section,
+  });
+
+  final String title;
+  final String body;
+  final IconData icon;
+  final String section;
 }
