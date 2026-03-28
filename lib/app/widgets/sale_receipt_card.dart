@@ -108,11 +108,7 @@ Future<void> showSaleReceiptDialog(
                       }
 
                       return Row(
-                        children: [
-                          copyButton,
-                          const Spacer(),
-                          closeButton,
-                        ],
+                        children: [copyButton, const Spacer(), closeButton],
                       );
                     },
                   ),
@@ -191,7 +187,7 @@ class SaleReceiptCard extends StatelessWidget {
                   color: BpcColors.greenDeep,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const CajaClaraSymbol(size: 28),
+                child: const CajaClaraSmallMark(size: 30),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -342,11 +338,7 @@ class SaleReceiptCard extends StatelessWidget {
           const SizedBox(height: 14),
           Row(
             children: [
-              Icon(
-                Icons.verified_rounded,
-                size: 18,
-                color: scheme.primary,
-              ),
+              Icon(Icons.verified_rounded, size: 18, color: scheme.primary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(

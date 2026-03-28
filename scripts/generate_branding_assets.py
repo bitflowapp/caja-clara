@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PIL import Image, ImageFilter
+from PIL import Image, ImageColor, ImageDraw, ImageFilter
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -11,6 +11,7 @@ WINDOWS_ICON_PATH = ROOT / "windows" / "runner" / "resources" / "app_icon.ico"
 
 ICON_SOURCE_PATH = BRANDING_DIR / "caja_clara_icon_source.png"
 SYMBOL_PATH = BRANDING_DIR / "caja_clara_symbol.png"
+SMALL_MARK_PATH = BRANDING_DIR / "caja_clara_mark_small.png"
 FAVICON_32_PATH = BRANDING_DIR / "favicon-32.png"
 ICON_48_PATH = BRANDING_DIR / "icon-48.png"
 
@@ -32,17 +33,21 @@ def main() -> None:
     symbol = symbol.filter(ImageFilter.UnsharpMask(radius=1.4, percent=135, threshold=2))
     symbol.save(SYMBOL_PATH, optimize=True)
 
-    symbol.resize((32, 32), Image.Resampling.LANCZOS).save(
+    small_mark = _build_small_mark()
+    small_mark.save(SMALL_MARK_PATH, optimize=True)
+
+    small_mark.resize((32, 32), Image.Resampling.LANCZOS).save(
         FAVICON_32_PATH,
         optimize=True,
     )
-    symbol.resize((48, 48), Image.Resampling.LANCZOS).save(
+    small_mark.resize((48, 48), Image.Resampling.LANCZOS).save(
         ICON_48_PATH,
         optimize=True,
     )
-    symbol.save(WINDOWS_ICON_PATH, sizes=ICO_SIZES)
+    small_mark.save(WINDOWS_ICON_PATH, sizes=ICO_SIZES)
 
     print(f"Updated {SYMBOL_PATH.relative_to(ROOT)} -> {symbol.size}")
+    print(f"Updated {SMALL_MARK_PATH.relative_to(ROOT)} -> {small_mark.size}")
     print(f"Updated {FAVICON_32_PATH.relative_to(ROOT)} -> 32x32")
     print(f"Updated {ICON_48_PATH.relative_to(ROOT)} -> 48x48")
     print(
@@ -83,6 +88,28 @@ def _center_on_square(symbol: Image.Image, *, padding: int) -> Image.Image:
     offset = ((side - symbol.width) // 2, (side - symbol.height) // 2)
     square.paste(symbol, offset, mask=symbol)
     return square
+
+
+def _build_small_mark() -> Image.Image:
+    canvas = Image.new("RGBA", (SYMBOL_SIZE, SYMBOL_SIZE), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(canvas)
+
+    blue = ImageColor.getrgb("#005BAF")
+    blue_dark = ImageColor.getrgb("#003A78")
+    green = ImageColor.getrgb("#72B526")
+
+    draw.rounded_rectangle((150, 300, 874, 842), radius=180, fill=blue)
+    draw.rounded_rectangle((220, 150, 470, 410), radius=92, fill=blue)
+    draw.rounded_rectangle((560, 180, 844, 348), radius=76, fill=blue)
+    draw.rounded_rectangle((250, 500, 560, 610), radius=40, fill=blue_dark)
+    draw.line(
+        [(480, 560), (640, 710), (882, 430)],
+        fill=green,
+        width=170,
+        joint="curve",
+    )
+
+    return canvas
 
 
 def _first_index(values: list[int], threshold: int) -> int | None:

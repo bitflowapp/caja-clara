@@ -344,7 +344,7 @@ class _HeaderStrip extends StatelessWidget {
                           color: Colors.white.withValues(alpha: 0.14),
                         ),
                       ),
-                      child: const CajaClaraSymbol(size: 30),
+                      child: const CajaClaraSmallMark(size: 34),
                     ),
                     const SizedBox(width: 12),
                     Column(
@@ -925,9 +925,7 @@ class _StarterTemplateCard extends StatelessWidget {
                         )
                       : const Icon(Icons.play_circle_rounded),
                   label: Text(
-                    loadingDemoData
-                        ? 'Cargando ejemplo...'
-                        : 'Ver ejemplo',
+                    loadingDemoData ? 'Cargando ejemplo...' : 'Ver ejemplo',
                   ),
                 ),
               OutlinedButton.icon(

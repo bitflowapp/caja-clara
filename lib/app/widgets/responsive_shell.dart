@@ -1298,9 +1298,10 @@ class _RailBrand extends StatelessWidget {
                   ),
                 ],
               ),
+              alignment: Alignment.center,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: const CajaClaraSymbol(size: 36),
+                child: const CajaClaraSmallMark(size: 36),
               ),
             ),
             const SizedBox(width: 12),
