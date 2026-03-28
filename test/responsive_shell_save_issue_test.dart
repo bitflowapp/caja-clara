@@ -55,13 +55,13 @@ void main() {
       await tester.pump();
 
       expect(find.text('Guardado pendiente'), findsOneWidget);
-      expect(find.text('Ultimo cambio sin guardar'), findsOneWidget);
+      expect(find.text('Pendiente de guardado'), findsOneWidget);
 
       await tester.pump(const Duration(seconds: 9));
       await tester.pump();
 
       expect(find.text('Guardado pendiente'), findsNothing);
-      expect(find.text('Ultimo cambio sin guardar'), findsOneWidget);
+      expect(find.text('Pendiente de guardado'), findsOneWidget);
     },
   );
 }

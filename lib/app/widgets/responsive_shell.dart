@@ -875,7 +875,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
             (!canCollapseSaveBanner || !_recoverableSaveBannerDismissed);
         final saveStatusLabel = hasSaveIssue
             ? isRecoverableSaveIssue
-                  ? 'Ultimo cambio sin guardar'
+                  ? 'Pendiente de guardado'
                   : 'Revisa el guardado'
             : store.isSaving
             ? 'Guardando'
@@ -885,6 +885,11 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
             : store.isSaving
             ? BpcColors.sandMuted
             : BpcColors.income;
+        final saveStatusIcon = hasSaveIssue
+            ? Icons.sync_problem_rounded
+            : store.isSaving
+            ? Icons.sync_rounded
+            : Icons.check_circle_outline_rounded;
 
         if (wide) {
           return Scaffold(
@@ -942,51 +947,12 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(6, 0, 6, 12),
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              decoration: BoxDecoration(
-                                border: Border(
-                                  top: BorderSide(
-                                    color: hasSaveIssue
-                                        ? BpcColors.sandMuted.withValues(
-                                            alpha: 0.5,
-                                          )
-                                        : BpcColors.line,
-                                  ),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 10,
-                                    height: 10,
-                                    decoration: BoxDecoration(
-                                      color: saveStatusColor,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      saveStatusLabel,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyMedium
-                                          ?.copyWith(
-                                            color: BpcColors.ink,
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            padding: const EdgeInsets.fromLTRB(6, 0, 6, 0),
+                            child: _RailSystemFooter(
+                              saveStatusLabel: saveStatusLabel,
+                              saveStatusColor: saveStatusColor,
+                              saveStatusIcon: saveStatusIcon,
                             ),
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.fromLTRB(6, 0, 6, 0),
-                            child: _BuildInfoStrip(),
                           ),
                         ],
                       ),
@@ -1160,6 +1126,61 @@ class _ShellUtilityActions extends StatelessWidget {
           label: const Text('Ayuda'),
         ),
       ],
+    );
+  }
+}
+
+class _RailSystemFooter extends StatelessWidget {
+  const _RailSystemFooter({
+    required this.saveStatusLabel,
+    required this.saveStatusColor,
+    required this.saveStatusIcon,
+  });
+
+  final String saveStatusLabel;
+  final Color saveStatusColor;
+  final IconData saveStatusIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final text = BuildInfo.footerText;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(0, 10, 0, 6),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.34)),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(saveStatusIcon, size: 14, color: saveStatusColor),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  saveStatusLabel,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: BpcColors.ink,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          _BuildInfoStrip(
+            dense: true,
+            leadingIcon: false,
+            text: text,
+            copySnackLabel: 'Datos de soporte copiados',
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1562,54 +1583,79 @@ class _ActionSnackContent extends StatelessWidget {
 }
 
 class _BuildInfoStrip extends StatelessWidget {
-  const _BuildInfoStrip();
+  const _BuildInfoStrip({
+    this.dense = false,
+    this.leadingIcon = true,
+    this.text,
+    this.copySnackLabel = 'Datos de soporte copiados',
+  });
+
+  final bool dense;
+  final bool leadingIcon;
+  final String? text;
+  final String copySnackLabel;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final text = BuildInfo.footerText;
+    final footerText = text ?? BuildInfo.footerText;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: () async {
-          await Clipboard.setData(ClipboardData(text: text));
+          await Clipboard.setData(ClipboardData(text: footerText));
           if (!context.mounted) {
             return;
           }
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Datos de soporte copiados: $text'),
+              content: Text('$copySnackLabel: $footerText'),
               behavior: SnackBarBehavior.floating,
             ),
           );
         },
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: EdgeInsets.fromLTRB(dense ? 22 : 0, dense ? 2 : 10, 0, 2),
           decoration: BoxDecoration(
-            border: Border(
-              top: BorderSide(
-                color: scheme.outlineVariant.withValues(alpha: 0.4),
-              ),
-            ),
+            border: dense
+                ? null
+                : Border(
+                    top: BorderSide(
+                      color: scheme.outlineVariant.withValues(alpha: 0.4),
+                    ),
+                  ),
           ),
           child: Row(
             children: [
-              Icon(Icons.fingerprint_rounded, size: 16, color: scheme.outline),
-              const SizedBox(width: 8),
+              if (leadingIcon) ...[
+                Icon(
+                  Icons.fingerprint_rounded,
+                  size: dense ? 14 : 16,
+                  color: scheme.outline,
+                ),
+                SizedBox(width: dense ? 6 : 8),
+              ],
               Expanded(
                 child: Text(
-                  text,
+                  footerText,
+                  maxLines: dense ? 2 : 1,
+                  overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: scheme.outline,
-                    fontWeight: FontWeight.w700,
+                    color: scheme.outline.withValues(alpha: dense ? 0.88 : 1),
+                    fontWeight: dense ? FontWeight.w600 : FontWeight.w700,
+                    height: dense ? 1.15 : null,
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Icon(Icons.copy_rounded, size: 16, color: scheme.outline),
+              SizedBox(width: dense ? 6 : 8),
+              Icon(
+                Icons.copy_rounded,
+                size: dense ? 13 : 16,
+                color: scheme.outline.withValues(alpha: dense ? 0.72 : 1),
+              ),
             ],
           ),
         ),
