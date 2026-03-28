@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/movement.dart';
 import '../services/commerce_store.dart';
@@ -71,6 +72,8 @@ class SummaryScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               _SummaryMetricsDeck(store: store),
+              const SizedBox(height: 18),
+              _OwnerSignalsDeck(store: store),
               if (suggestions.isNotEmpty) ...[
                 const SizedBox(height: 18),
                 _FreeSaleSuggestionBanner(
@@ -593,6 +596,488 @@ class _MetricGroupPanel extends StatelessWidget {
       ),
     );
   }
+}
+
+class _OwnerSignalsDeck extends StatelessWidget {
+  const _OwnerSignalsDeck({required this.store});
+
+  final CommerceStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    final daily = store.dailyMovementSummary();
+    final topSelling = store.topSellingProductsToday();
+    final urgentRestock = store.urgentRestockProducts();
+    final lowRotation = store.lowRotationProducts();
+    final shareSummary = _buildDailyShareSummary(
+      daily: daily,
+      topSelling: topSelling,
+      urgentRestock: urgentRestock,
+      lowRotation: lowRotation,
+    );
+
+    Future<void> copySummary() async {
+      await Clipboard.setData(ClipboardData(text: shareSummary));
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Resumen de hoy copiado'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+
+    final movementSection = _OwnerSignalSection(
+      title: 'Movimientos de hoy',
+      subtitle: 'Que paso hoy y con que ritmo se movio la caja.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth >= 420 ? 3 : 1;
+              final spacing = 14.0;
+              final totalGap = columns > 1 ? spacing * (columns - 1) : 0.0;
+              final itemWidth = (constraints.maxWidth - totalGap) / columns;
+              final metrics = <Widget>[
+                MetricCard(
+                  label: 'Movimientos',
+                  value: '${daily.movementCount}',
+                  helper: 'Todo lo registrado hoy',
+                  framed: false,
+                ),
+                MetricCard(
+                  label: 'Ventas',
+                  value: '${daily.salesCount}',
+                  helper: formatMoney(daily.salesPesos),
+                  framed: false,
+                ),
+                MetricCard(
+                  label: 'Gastos',
+                  value: '${daily.expenseCount}',
+                  helper: formatMoney(daily.expensesPesos),
+                  framed: false,
+                ),
+              ];
+              return Wrap(
+                spacing: spacing,
+                runSpacing: 12,
+                children: metrics
+                    .map(
+                      (metric) => SizedBox(
+                        width: columns == 1 ? constraints.maxWidth : itemWidth,
+                        child: metric,
+                      ),
+                    )
+                    .toList(growable: false),
+              );
+            },
+          ),
+          if (daily.recentMovements.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            for (var index = 0; index < daily.recentMovements.length; index++)
+              _MovementDigestRow(
+                movement: daily.recentMovements[index],
+                showDivider: index != 0,
+              ),
+          ],
+        ],
+      ),
+    );
+
+    final topSellingSection = _OwnerSignalSection(
+      title: 'Mas vendidos',
+      subtitle: 'Lo que mas salio hoy para reponer con criterio.',
+      child: topSelling.isEmpty
+          ? const _SignalNote(
+              text: 'Todavia no hay ventas de productos cargadas hoy.',
+            )
+          : Column(
+              children: [
+                for (var index = 0; index < topSelling.length; index++)
+                  _ProductSignalRow(
+                    title: topSelling[index].product.name,
+                    trailing: '${topSelling[index].unitsSold} u.',
+                    detail: formatMoney(topSelling[index].revenuePesos),
+                    showDivider: index != 0,
+                  ),
+              ],
+            ),
+    );
+
+    final urgentRestockSection = _OwnerSignalSection(
+      title: 'Reponer pronto',
+      subtitle: 'Stock bajo, priorizado por lo que ya se esta moviendo.',
+      child: urgentRestock.isEmpty
+          ? const _SignalNote(
+              text: 'Sin urgencias claras de reposicion por ahora.',
+            )
+          : Column(
+              children: [
+                for (var index = 0; index < urgentRestock.length; index++)
+                  _ProductSignalRow(
+                    title: urgentRestock[index].product.name,
+                    trailing:
+                        'Stock ${urgentRestock[index].product.stockUnits}',
+                    detail: _restockDetail(urgentRestock[index]),
+                    showDivider: index != 0,
+                  ),
+              ],
+            ),
+    );
+
+    final lowRotationSection = _OwnerSignalSection(
+      title: 'Poca salida',
+      subtitle: 'Lo que conviene revisar antes de volver a reponer.',
+      child: !lowRotation.hasEnoughHistory
+          ? _SignalNote(
+              text:
+                  lowRotation.message ??
+                  'Todavia no hay suficiente historial para sugerir productos de baja salida.',
+            )
+          : lowRotation.products.isEmpty
+          ? _SignalNote(
+              text:
+                  lowRotation.message ??
+                  'Sin alertas claras de baja salida por ahora.',
+            )
+          : Column(
+              children: [
+                for (
+                  var index = 0;
+                  index < lowRotation.products.length;
+                  index++
+                )
+                  _ProductSignalRow(
+                    title: lowRotation.products[index].product.name,
+                    trailing: lowRotation.products[index].statusLabel,
+                    detail: _lowRotationDetail(lowRotation.products[index]),
+                    showDivider: index != 0,
+                  ),
+              ],
+            ),
+    );
+
+    return BpcPanel(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+      color: Colors.white.withValues(alpha: 0.8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(
+            title: 'Senales para decidir',
+            subtitle:
+                'Lo que conviene mirar antes de comprar, reponer o cerrar el dia.',
+            trailing: TextButton.icon(
+              onPressed: copySummary,
+              icon: const Icon(Icons.copy_rounded),
+              label: const Text('Copiar resumen'),
+            ),
+          ),
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = constraints.maxWidth >= 980;
+              if (!wide) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    movementSection,
+                    const SizedBox(height: 18),
+                    topSellingSection,
+                    const SizedBox(height: 18),
+                    urgentRestockSection,
+                    const SizedBox(height: 18),
+                    lowRotationSection,
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        movementSection,
+                        const SizedBox(height: 18),
+                        topSellingSection,
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        urgentRestockSection,
+                        const SizedBox(height: 18),
+                        lowRotationSection,
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OwnerSignalSection extends StatelessWidget {
+  const _OwnerSignalSection({
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.only(top: 12),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: BpcColors.line)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: BpcColors.ink,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: BpcColors.subtleInk,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _SignalNote extends StatelessWidget {
+  const _SignalNote({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+        color: BpcColors.subtleInk,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+}
+
+class _MovementDigestRow extends StatelessWidget {
+  const _MovementDigestRow({required this.movement, this.showDivider = false});
+
+  final Movement movement;
+  final bool showDivider;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        border: showDivider
+            ? Border(top: BorderSide(color: BpcColors.line))
+            : null,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  movement.title,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: BpcColors.ink,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if ((movement.subtitle ?? '').trim().isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    movement.subtitle!,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: BpcColors.subtleInk,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            formatMoney(movement.cashImpactPesos),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: movement.isIncome
+                  ? BpcColors.income
+                  : BpcColors.expenseSoft,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProductSignalRow extends StatelessWidget {
+  const _ProductSignalRow({
+    required this.title,
+    required this.trailing,
+    required this.detail,
+    this.showDivider = false,
+  });
+
+  final String title;
+  final String trailing;
+  final String detail;
+  final bool showDivider;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        border: showDivider
+            ? Border(top: BorderSide(color: BpcColors.line))
+            : null,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: BpcColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  detail,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: BpcColors.subtleInk,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            trailing,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: BpcColors.mutedInk,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _restockDetail(UrgentRestockProduct product) {
+  final stockText =
+      'Minimo ${product.product.minStockUnits} / faltan ${product.stockGapUnits}';
+  if (!product.hasRecentSales) {
+    return 'Stock bajo / $stockText';
+  }
+  final soldLabel = product.latestSoldAt == null
+      ? 'Venta reciente'
+      : product.latestSoldAt!.year == DateTime.now().year &&
+            product.latestSoldAt!.month == DateTime.now().month &&
+            product.latestSoldAt!.day == DateTime.now().day
+      ? 'Se vendio hoy'
+      : 'Ultima venta ${formatCompactDateLabel(product.latestSoldAt!)}';
+  return '$soldLabel / ${product.recentUnitsSold} u. recientes / $stockText';
+}
+
+String _lowRotationDetail(LowRotationProduct product) {
+  if (product.latestSoldAt == null) {
+    return 'Revisar antes de reponer';
+  }
+  return 'Ultima venta ${formatCompactDateLabel(product.latestSoldAt!)} / Revisar antes de reponer';
+}
+
+String _buildDailyShareSummary({
+  required DailyMovementSummary daily,
+  required List<TopSellingProduct> topSelling,
+  required List<UrgentRestockProduct> urgentRestock,
+  required LowRotationInsight lowRotation,
+}) {
+  final lines = <String>[
+    'Resumen de hoy',
+    'Movimientos: ${daily.movementCount}',
+    'Ventas: ${formatMoney(daily.salesPesos)} en ${daily.salesCount} ventas',
+    'Gastos: ${formatMoney(daily.expensesPesos)} en ${daily.expenseCount} gastos',
+    'Mas vendidos:',
+  ];
+
+  if (topSelling.isEmpty) {
+    lines.add('- Sin ventas destacadas hoy');
+  } else {
+    for (final item in topSelling) {
+      lines.add('- ${item.product.name}: ${item.unitsSold} u.');
+    }
+  }
+
+  lines.add('Reponer pronto:');
+  if (urgentRestock.isEmpty) {
+    lines.add('- Sin alertas urgentes');
+  } else {
+    for (final item in urgentRestock) {
+      lines.add('- ${item.product.name}: stock ${item.product.stockUnits}');
+    }
+  }
+
+  lines.add('Poca salida:');
+  if (!lowRotation.hasEnoughHistory) {
+    lines.add('- ${lowRotation.message}');
+  } else if (lowRotation.products.isEmpty) {
+    lines.add('- ${lowRotation.message ?? 'Sin alertas claras por ahora'}');
+  } else {
+    for (final item in lowRotation.products) {
+      lines.add('- ${item.product.name}: ${item.statusLabel}');
+    }
+  }
+
+  return lines.join('\n');
 }
 
 class _SummaryMovementsPanel extends StatelessWidget {

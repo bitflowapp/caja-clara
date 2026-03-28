@@ -274,6 +274,303 @@ class CommerceStore extends ChangeNotifier {
   List<Movement> recentMovements([int limit = 8]) =>
       _movements.take(limit).toList(growable: false);
 
+  DailyMovementSummary dailyMovementSummary({
+    DateTime? now,
+    int recentLimit = 5,
+  }) {
+    final reference = now ?? DateTime.now();
+    final todayMovements = _movements
+        .where((movement) => _isSameDay(movement.createdAt, reference))
+        .toList(growable: false);
+    final sales = todayMovements
+        .where((movement) => movement.kind == MovementKind.sale)
+        .toList(growable: false);
+    final expenses = todayMovements
+        .where((movement) => movement.kind == MovementKind.expense)
+        .toList(growable: false);
+
+    return DailyMovementSummary(
+      movementCount: todayMovements.length,
+      salesCount: sales.length,
+      salesPesos: sales.fold<int>(
+        0,
+        (sum, movement) => sum + movement.amountPesos,
+      ),
+      expenseCount: expenses.length,
+      expensesPesos: expenses.fold<int>(
+        0,
+        (sum, movement) => sum + movement.amountPesos,
+      ),
+      recentMovements: todayMovements.take(recentLimit).toList(growable: false),
+    );
+  }
+
+  List<TopSellingProduct> topSellingProductsToday({
+    DateTime? now,
+    int limit = 5,
+  }) {
+    if (limit <= 0) {
+      return const <TopSellingProduct>[];
+    }
+    final reference = now ?? DateTime.now();
+    final aggregates = <String, _TopSellingAggregate>{};
+
+    for (final movement in _movements) {
+      if (movement.kind != MovementKind.sale ||
+          movement.isFreeSale ||
+          !_isSameDay(movement.createdAt, reference)) {
+        continue;
+      }
+      final productId = movement.productId;
+      if (productId == null) {
+        continue;
+      }
+      final product = productById(productId);
+      if (product == null) {
+        continue;
+      }
+
+      final aggregate = aggregates.putIfAbsent(
+        productId,
+        () => _TopSellingAggregate(product: product),
+      );
+      aggregate.unitsSold += movement.quantityUnits ?? 0;
+      aggregate.salesCount += 1;
+      aggregate.revenuePesos += movement.amountPesos;
+      if (aggregate.latestSoldAt == null ||
+          movement.createdAt.isAfter(aggregate.latestSoldAt!)) {
+        aggregate.latestSoldAt = movement.createdAt;
+      }
+    }
+
+    final results =
+        aggregates.values
+            .map(
+              (aggregate) => TopSellingProduct(
+                product: aggregate.product,
+                unitsSold: aggregate.unitsSold,
+                salesCount: aggregate.salesCount,
+                revenuePesos: aggregate.revenuePesos,
+                latestSoldAt: aggregate.latestSoldAt ?? reference,
+              ),
+            )
+            .toList(growable: false)
+          ..sort((a, b) {
+            final byUnits = b.unitsSold.compareTo(a.unitsSold);
+            if (byUnits != 0) {
+              return byUnits;
+            }
+            final byRevenue = b.revenuePesos.compareTo(a.revenuePesos);
+            if (byRevenue != 0) {
+              return byRevenue;
+            }
+            return b.latestSoldAt.compareTo(a.latestSoldAt);
+          });
+
+    return results.take(limit).toList(growable: false);
+  }
+
+  List<UrgentRestockProduct> urgentRestockProducts({
+    DateTime? now,
+    int limit = 5,
+  }) {
+    if (limit <= 0) {
+      return const <UrgentRestockProduct>[];
+    }
+    final reference = now ?? DateTime.now();
+    final recentThreshold = reference.subtract(const Duration(days: 7));
+    final items =
+        _products
+            .where((product) => product.isLowStock)
+            .map((product) {
+              var recentUnitsSold = 0;
+              var totalUnitsSold = 0;
+              DateTime? latestSoldAt;
+
+              for (final movement in _movements) {
+                if (movement.kind != MovementKind.sale ||
+                    movement.isFreeSale ||
+                    movement.productId != product.id ||
+                    movement.createdAt.isAfter(reference)) {
+                  continue;
+                }
+                final units = movement.quantityUnits ?? 0;
+                totalUnitsSold += units;
+                if (latestSoldAt == null ||
+                    movement.createdAt.isAfter(latestSoldAt)) {
+                  latestSoldAt = movement.createdAt;
+                }
+                if (!movement.createdAt.isBefore(recentThreshold)) {
+                  recentUnitsSold += units;
+                }
+              }
+
+              return UrgentRestockProduct(
+                product: product,
+                stockGapUnits: product.minStockUnits > product.stockUnits
+                    ? product.minStockUnits - product.stockUnits
+                    : 0,
+                recentUnitsSold: recentUnitsSold,
+                totalUnitsSold: totalUnitsSold,
+                latestSoldAt: latestSoldAt,
+              );
+            })
+            .toList(growable: false)
+          ..sort((a, b) {
+            final byRecentActivity = b.hasRecentSales == a.hasRecentSales
+                ? 0
+                : (b.hasRecentSales ? 1 : -1);
+            if (byRecentActivity != 0) {
+              return byRecentActivity;
+            }
+            final byGap = b.stockGapUnits.compareTo(a.stockGapUnits);
+            if (byGap != 0) {
+              return byGap;
+            }
+            final byStock = a.product.stockUnits.compareTo(
+              b.product.stockUnits,
+            );
+            if (byStock != 0) {
+              return byStock;
+            }
+            final aLatest = a.latestSoldAt;
+            final bLatest = b.latestSoldAt;
+            if (aLatest != null && bLatest != null) {
+              final byLatest = bLatest.compareTo(aLatest);
+              if (byLatest != 0) {
+                return byLatest;
+              }
+            } else if (aLatest == null && bLatest != null) {
+              return 1;
+            } else if (aLatest != null && bLatest == null) {
+              return -1;
+            }
+            return a.product.name.toLowerCase().compareTo(
+              b.product.name.toLowerCase(),
+            );
+          });
+
+    return items.take(limit).toList(growable: false);
+  }
+
+  LowRotationInsight lowRotationProducts({DateTime? now, int limit = 5}) {
+    final reference = now ?? DateTime.now();
+    final sales = _movements
+        .where(
+          (movement) =>
+              movement.kind == MovementKind.sale &&
+              !movement.isFreeSale &&
+              movement.productId != null &&
+              !movement.createdAt.isAfter(reference),
+        )
+        .toList(growable: false);
+
+    if (sales.length < 6) {
+      return const LowRotationInsight(
+        hasEnoughHistory: false,
+        message:
+            'Todavia no hay suficiente historial para sugerir productos de baja salida.',
+        products: <LowRotationProduct>[],
+      );
+    }
+
+    final oldestSaleAt = sales
+        .map((movement) => movement.createdAt)
+        .reduce((a, b) => a.isBefore(b) ? a : b);
+    if (reference.difference(oldestSaleAt).inDays < 7) {
+      return const LowRotationInsight(
+        hasEnoughHistory: false,
+        message:
+            'Todavia no hay suficiente historial para sugerir productos de baja salida.',
+        products: <LowRotationProduct>[],
+      );
+    }
+
+    final recentThreshold = reference.subtract(const Duration(days: 30));
+    final items =
+        _products
+            .where((product) => product.stockUnits > 0)
+            .map((product) {
+              var unitsSoldLast30Days = 0;
+              DateTime? latestSoldAt;
+
+              for (final movement in sales) {
+                if (movement.productId != product.id) {
+                  continue;
+                }
+                final units = movement.quantityUnits ?? 0;
+                if (!movement.createdAt.isBefore(recentThreshold)) {
+                  unitsSoldLast30Days += units;
+                }
+                if (latestSoldAt == null ||
+                    movement.createdAt.isAfter(latestSoldAt)) {
+                  latestSoldAt = movement.createdAt;
+                }
+              }
+
+              LowRotationTag? tag;
+              if (latestSoldAt == null ||
+                  reference.difference(latestSoldAt).inDays >= 21) {
+                tag = LowRotationTag.noRecentMovement;
+              } else if (unitsSoldLast30Days <= 1) {
+                tag = LowRotationTag.lowRotation;
+              }
+
+              if (tag == null) {
+                return null;
+              }
+
+              return LowRotationProduct(
+                product: product,
+                tag: tag,
+                unitsSoldLast30Days: unitsSoldLast30Days,
+                latestSoldAt: latestSoldAt,
+              );
+            })
+            .whereType<LowRotationProduct>()
+            .toList(growable: false)
+          ..sort((a, b) {
+            final byTag = a.tag.index.compareTo(b.tag.index);
+            if (byTag != 0) {
+              return byTag;
+            }
+            final byStock = b.product.stockUnits.compareTo(
+              a.product.stockUnits,
+            );
+            if (byStock != 0) {
+              return byStock;
+            }
+            final byUnits = a.unitsSoldLast30Days.compareTo(
+              b.unitsSoldLast30Days,
+            );
+            if (byUnits != 0) {
+              return byUnits;
+            }
+            final aLatest = a.latestSoldAt;
+            final bLatest = b.latestSoldAt;
+            if (aLatest != null && bLatest != null) {
+              return aLatest.compareTo(bLatest);
+            }
+            if (aLatest == null && bLatest != null) {
+              return -1;
+            }
+            if (aLatest != null && bLatest == null) {
+              return 1;
+            }
+            return a.product.name.toLowerCase().compareTo(
+              b.product.name.toLowerCase(),
+            );
+          });
+
+    return LowRotationInsight(
+      hasEnoughHistory: true,
+      message: items.isEmpty
+          ? 'Sin alertas claras de baja salida por ahora.'
+          : null,
+      products: items.take(limit).toList(growable: false),
+    );
+  }
+
   int get cashBalancePesos => _movements.fold<int>(
     0,
     (sum, movement) => sum + movement.cashImpactPesos,
@@ -1339,6 +1636,100 @@ class StarterTemplateApplyResult {
 
   bool get addedAny => addedCount > 0;
   bool get fullySkipped => addedCount == 0 && skippedCount == totalCount;
+}
+
+class DailyMovementSummary {
+  const DailyMovementSummary({
+    required this.movementCount,
+    required this.salesCount,
+    required this.salesPesos,
+    required this.expenseCount,
+    required this.expensesPesos,
+    required this.recentMovements,
+  });
+
+  final int movementCount;
+  final int salesCount;
+  final int salesPesos;
+  final int expenseCount;
+  final int expensesPesos;
+  final List<Movement> recentMovements;
+}
+
+class TopSellingProduct {
+  const TopSellingProduct({
+    required this.product,
+    required this.unitsSold,
+    required this.salesCount,
+    required this.revenuePesos,
+    required this.latestSoldAt,
+  });
+
+  final Product product;
+  final int unitsSold;
+  final int salesCount;
+  final int revenuePesos;
+  final DateTime latestSoldAt;
+}
+
+class UrgentRestockProduct {
+  const UrgentRestockProduct({
+    required this.product,
+    required this.stockGapUnits,
+    required this.recentUnitsSold,
+    required this.totalUnitsSold,
+    required this.latestSoldAt,
+  });
+
+  final Product product;
+  final int stockGapUnits;
+  final int recentUnitsSold;
+  final int totalUnitsSold;
+  final DateTime? latestSoldAt;
+
+  bool get hasRecentSales => recentUnitsSold > 0;
+}
+
+enum LowRotationTag { noRecentMovement, lowRotation }
+
+class LowRotationProduct {
+  const LowRotationProduct({
+    required this.product,
+    required this.tag,
+    required this.unitsSoldLast30Days,
+    required this.latestSoldAt,
+  });
+
+  final Product product;
+  final LowRotationTag tag;
+  final int unitsSoldLast30Days;
+  final DateTime? latestSoldAt;
+
+  String get statusLabel => tag == LowRotationTag.noRecentMovement
+      ? 'Sin movimiento reciente'
+      : 'Poca salida';
+}
+
+class LowRotationInsight {
+  const LowRotationInsight({
+    required this.hasEnoughHistory,
+    required this.message,
+    required this.products,
+  });
+
+  final bool hasEnoughHistory;
+  final String? message;
+  final List<LowRotationProduct> products;
+}
+
+class _TopSellingAggregate {
+  _TopSellingAggregate({required this.product});
+
+  final Product product;
+  int unitsSold = 0;
+  int salesCount = 0;
+  int revenuePesos = 0;
+  DateTime? latestSoldAt;
 }
 
 class _MutableStoreState {

@@ -244,6 +244,197 @@ void main() {
       expect(store.lastSalePaymentMethod, 'Mercado Pago');
     });
 
+    test(
+      'builds a daily movement summary with today counts and recent items',
+      () async {
+        final store = CommerceStore.emptyForTest();
+        final now = DateTime(2026, 3, 28, 18, 0);
+
+        await store.recordFreeSale(
+          description: 'Venta mostrador',
+          quantityUnits: 1,
+          unitPricePesos: 2500,
+          paymentMethod: 'Efectivo',
+          createdAt: now.subtract(const Duration(hours: 1)),
+        );
+        await store.recordExpense(
+          concept: 'Bolsas',
+          amountPesos: 800,
+          category: 'Insumos',
+          createdAt: now.subtract(const Duration(minutes: 30)),
+        );
+        await store.recordFreeSale(
+          description: 'Venta vieja',
+          quantityUnits: 1,
+          unitPricePesos: 1200,
+          paymentMethod: 'Efectivo',
+          createdAt: now.subtract(const Duration(days: 2)),
+        );
+
+        final summary = store.dailyMovementSummary(now: now, recentLimit: 3);
+
+        expect(summary.movementCount, 2);
+        expect(summary.salesCount, 1);
+        expect(summary.salesPesos, 2500);
+        expect(summary.expenseCount, 1);
+        expect(summary.expensesPesos, 800);
+        expect(summary.recentMovements, hasLength(2));
+        expect(summary.recentMovements.first.originLabel, 'Gasto');
+        expect(summary.recentMovements.first.title, 'Bolsas');
+      },
+    );
+
+    test('ranks top selling products for the day by units sold', () async {
+      final store = CommerceStore.emptyForTest();
+      final now = DateTime(2026, 3, 28, 18, 0);
+
+      await store.addProduct(
+        const Product(
+          id: 'top-1',
+          name: 'Yerba suave',
+          stockUnits: 12,
+          minStockUnits: 2,
+          costPesos: 2200,
+          pricePesos: 3600,
+          category: 'Almacen',
+        ),
+      );
+      await store.addProduct(
+        const Product(
+          id: 'top-2',
+          name: 'Galletitas surtidas',
+          stockUnits: 10,
+          minStockUnits: 2,
+          costPesos: 900,
+          pricePesos: 1700,
+          category: 'Almacen',
+        ),
+      );
+
+      await store.recordSale(
+        productId: 'top-1',
+        quantityUnits: 3,
+        paymentMethod: 'Efectivo',
+        createdAt: now.subtract(const Duration(hours: 2)),
+      );
+      await store.recordSale(
+        productId: 'top-2',
+        quantityUnits: 1,
+        paymentMethod: 'Efectivo',
+        createdAt: now.subtract(const Duration(hours: 1)),
+      );
+      await store.recordSale(
+        productId: 'top-1',
+        quantityUnits: 1,
+        paymentMethod: 'Transferencia',
+        createdAt: now.subtract(const Duration(minutes: 20)),
+      );
+
+      final topSelling = store.topSellingProductsToday(now: now);
+
+      expect(topSelling, hasLength(2));
+      expect(topSelling.first.product.id, 'top-1');
+      expect(topSelling.first.unitsSold, 4);
+      expect(topSelling[1].product.id, 'top-2');
+    });
+
+    test(
+      'prioritizes urgent restock when low stock also moved recently',
+      () async {
+        final store = CommerceStore.emptyForTest();
+        final now = DateTime(2026, 3, 28, 18, 0);
+
+        await store.addProduct(
+          const Product(
+            id: 'restock-hot',
+            name: 'Papas fritas 100 g',
+            stockUnits: 4,
+            minStockUnits: 5,
+            costPesos: 700,
+            pricePesos: 1400,
+            category: 'Golosinas',
+          ),
+        );
+        await store.addProduct(
+          const Product(
+            id: 'restock-cold',
+            name: 'Lavandina 1 L',
+            stockUnits: 0,
+            minStockUnits: 3,
+            costPesos: 1200,
+            pricePesos: 2100,
+            category: 'Limpieza',
+          ),
+        );
+
+        await store.recordSale(
+          productId: 'restock-hot',
+          quantityUnits: 2,
+          paymentMethod: 'Efectivo',
+          createdAt: now.subtract(const Duration(days: 1)),
+        );
+
+        final urgentRestock = store.urgentRestockProducts(now: now);
+
+        expect(urgentRestock, hasLength(2));
+        expect(urgentRestock.first.product.id, 'restock-hot');
+        expect(urgentRestock.first.hasRecentSales, isTrue);
+        expect(urgentRestock.first.recentUnitsSold, 2);
+      },
+    );
+
+    test(
+      'keeps low rotation honest when history is short and flags stale stock later',
+      () async {
+        final store = CommerceStore.emptyForTest();
+        final now = DateTime(2026, 3, 28, 18, 0);
+
+        await store.addProduct(
+          const Product(
+            id: 'rot-fast',
+            name: 'Agua mineral 500 ml',
+            stockUnits: 20,
+            minStockUnits: 4,
+            costPesos: 500,
+            pricePesos: 1100,
+            category: 'Bebidas',
+          ),
+        );
+        await store.addProduct(
+          const Product(
+            id: 'rot-stale',
+            name: 'Bizcochos',
+            stockUnits: 14,
+            minStockUnits: 3,
+            costPesos: 600,
+            pricePesos: 1200,
+            category: 'Galletitas',
+          ),
+        );
+
+        expect(store.lowRotationProducts(now: now).hasEnoughHistory, isFalse);
+
+        for (var i = 0; i < 6; i++) {
+          await store.recordSale(
+            productId: 'rot-fast',
+            quantityUnits: 1,
+            paymentMethod: 'Efectivo',
+            createdAt: now.subtract(Duration(days: 10 + i)),
+          );
+        }
+
+        final lowRotation = store.lowRotationProducts(now: now);
+
+        expect(lowRotation.hasEnoughHistory, isTrue);
+        expect(lowRotation.products, hasLength(1));
+        expect(lowRotation.products.first.product.id, 'rot-stale');
+        expect(
+          lowRotation.products.first.statusLabel,
+          'Sin movimiento reciente',
+        );
+      },
+    );
+
     test('persists dismissed onboarding tutorial state in snapshots', () async {
       final store = CommerceStore.emptyForTest();
 
