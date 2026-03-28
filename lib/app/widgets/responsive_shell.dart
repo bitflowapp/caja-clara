@@ -44,6 +44,20 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
   bool _retryingSave = false;
   bool _undoingMovement = false;
   bool _savingCashEvent = false;
+  String? _trackedSaveIssueMessage;
+  bool _recoverableSaveBannerDismissed = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final saveIssueMessage = _saveIssueMessageFor(
+      CommerceScope.of(context).lastError,
+    );
+    if (saveIssueMessage != _trackedSaveIssueMessage) {
+      _trackedSaveIssueMessage = saveIssueMessage;
+      _recoverableSaveBannerDismissed = false;
+    }
+  }
 
   Future<void> _openSale() async {
     if (!await _ensureFeatureAccess(LockedFeature.sales) || !mounted) {
@@ -254,6 +268,28 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         setState(() => _retryingSave = false);
       }
     }
+  }
+
+  bool _isRecoverableSaveIssue(String? lastError) {
+    return lastError == 'No se pudo guardar el cambio.';
+  }
+
+  String? _saveIssueTitleFor(String? lastError) {
+    if (lastError == null) {
+      return null;
+    }
+    return _isRecoverableSaveIssue(lastError)
+        ? 'Guardado pendiente'
+        : 'Revisa el guardado';
+  }
+
+  String? _saveIssueMessageFor(String? lastError) {
+    if (lastError == null) {
+      return null;
+    }
+    return _isRecoverableSaveIssue(lastError)
+        ? 'El ultimo cambio no pudo guardarse. Lo anterior sigue guardado.'
+        : lastError;
   }
 
   Future<void> _applyStarterTemplate() async {
@@ -764,15 +800,15 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         final page = pages[_tab]!;
         final lowStockCount = store.lowStockCount;
         final hasSaveIssue = store.lastError != null;
-        final isLastChangeSaveIssue =
-            store.lastError == 'No se pudo guardar el cambio.';
-        final saveIssueMessage = hasSaveIssue
-            ? isLastChangeSaveIssue
-                  ? 'El ultimo cambio no pudo guardarse. Lo anterior sigue guardado y puedes reintentar ahora.'
-                  : store.lastError!
-            : null;
+        final isRecoverableSaveIssue = _isRecoverableSaveIssue(store.lastError);
+        final saveIssueTitle = _saveIssueTitleFor(store.lastError);
+        final saveIssueMessage = _saveIssueMessageFor(store.lastError);
+        final canCollapseSaveBanner = wide && isRecoverableSaveIssue;
+        final showSaveIssueBanner =
+            saveIssueMessage != null &&
+            (!canCollapseSaveBanner || !_recoverableSaveBannerDismissed);
         final saveStatusLabel = hasSaveIssue
-            ? isLastChangeSaveIssue
+            ? isRecoverableSaveIssue
                   ? 'Ultimo cambio sin guardar'
                   : 'Revisa el guardado'
             : store.isSaving
@@ -911,14 +947,6 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                       padding: const EdgeInsets.fromLTRB(20, 16, 18, 16),
                       child: Column(
                         children: [
-                          if (saveIssueMessage != null) ...[
-                            _SaveErrorBanner(
-                              message: saveIssueMessage,
-                              retrying: _retryingSave || store.isSaving,
-                              onRetry: _retrySave,
-                            ),
-                            const SizedBox(height: 10),
-                          ],
                           Align(
                             alignment: Alignment.centerRight,
                             child: _ShellUtilityActions(
@@ -930,6 +958,30 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                               onHelp: _openQuickHelp,
                             ),
                           ),
+                          if (showSaveIssueBanner) ...[
+                            const SizedBox(height: 10),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 760,
+                                ),
+                                child: _SaveErrorBanner(
+                                  title: saveIssueTitle!,
+                                  message: saveIssueMessage,
+                                  retrying: _retryingSave || store.isSaving,
+                                  onRetry: _retrySave,
+                                  onDismiss: canCollapseSaveBanner
+                                      ? () => setState(
+                                          () =>
+                                              _recoverableSaveBannerDismissed =
+                                                  true,
+                                        )
+                                      : null,
+                                ),
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 6),
                           if (license.shouldShowLicenseUi &&
                               license.status != LicenseStatus.active) ...[
@@ -956,14 +1008,6 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
               child: Column(
                 children: [
-                  if (saveIssueMessage != null) ...[
-                    _SaveErrorBanner(
-                      message: saveIssueMessage,
-                      retrying: _retryingSave || store.isSaving,
-                      onRetry: _retrySave,
-                    ),
-                    const SizedBox(height: 10),
-                  ],
                   Align(
                     alignment: Alignment.centerRight,
                     child: _ShellUtilityActions(
@@ -975,6 +1019,16 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                       onHelp: _openQuickHelp,
                     ),
                   ),
+                  if (showSaveIssueBanner) ...[
+                    const SizedBox(height: 10),
+                    _SaveErrorBanner(
+                      title: saveIssueTitle!,
+                      message: saveIssueMessage,
+                      retrying: _retryingSave || store.isSaving,
+                      onRetry: _retrySave,
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   const SizedBox(height: 6),
                   if (license.shouldShowLicenseUi &&
                       license.status != LicenseStatus.active) ...[
@@ -1289,110 +1343,127 @@ class _RailBrand extends StatelessWidget {
 
 class _SaveErrorBanner extends StatelessWidget {
   const _SaveErrorBanner({
+    required this.title,
     required this.message,
     required this.retrying,
     required this.onRetry,
+    this.onDismiss,
   });
 
+  final String title;
   final String message;
   final bool retrying;
   final VoidCallback onRetry;
+  final VoidCallback? onDismiss;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final panelColor = Color.alphaBlend(
-      BpcColors.sandSoft.withValues(alpha: 0.58),
+      BpcColors.sandSoft.withValues(alpha: 0.44),
       BpcColors.surface,
     );
     return BpcPanel(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
       color: panelColor,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final compact = constraints.maxWidth < 620;
-          final action = FilledButton.tonalIcon(
+          final compact = constraints.maxWidth < 560;
+          final action = OutlinedButton.icon(
             onPressed: retrying ? null : onRetry,
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               foregroundColor: BpcColors.ink,
-              backgroundColor: Colors.white.withValues(alpha: 0.72),
+              backgroundColor: Colors.white.withValues(alpha: 0.42),
+              side: BorderSide(
+                color: BpcColors.lineStrong.withValues(alpha: 0.8),
+              ),
             ),
             icon: retrying
                 ? const SizedBox.square(
-                    dimension: 16,
+                    dimension: 14,
                     child: CircularProgressIndicator(strokeWidth: 2.2),
                   )
-                : const Icon(Icons.refresh_rounded, size: 18),
-            label: Text(
-              retrying
-                  ? 'Reintentando'
-                  : compact
-                  ? 'Reintentar'
-                  : 'Reintentar guardado',
-            ),
+                : const Icon(Icons.refresh_rounded, size: 16),
+            label: Text(retrying ? 'Reintentando' : 'Reintentar'),
           );
 
-          final messageBlock = Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Guardado interrumpido',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: BpcColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
+          final messageBlock = Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: BpcColors.ink,
+                  fontWeight: FontWeight.w900,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  message,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: BpcColors.mutedInk,
-                    fontWeight: FontWeight.w700,
-                    height: 1.3,
-                  ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                message,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: BpcColors.mutedInk,
+                  fontWeight: FontWeight.w600,
+                  height: 1.25,
                 ),
-              ],
-            ),
+              ),
+            ],
           );
 
-          final leading = Container(
-            width: 42,
-            height: 42,
+          final leading = DecoratedBox(
             decoration: BoxDecoration(
-              color: BpcColors.sand.withValues(alpha: 0.24),
-              borderRadius: BorderRadius.circular(14),
+              color: BpcColors.sand.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(
-              Icons.cloud_off_rounded,
-              color: BpcColors.expense,
-              size: 22,
+            child: const Padding(
+              padding: EdgeInsets.all(7),
+              child: Icon(
+                Icons.sync_problem_rounded,
+                color: BpcColors.expense,
+                size: 16,
+              ),
             ),
           );
+
+          final dismissButton = onDismiss == null
+              ? null
+              : IconButton(
+                  onPressed: onDismiss,
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  splashRadius: 18,
+                  tooltip: 'Ocultar aviso',
+                );
 
           if (compact) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [leading, const SizedBox(width: 14), messageBlock],
+                  children: [
+                    leading,
+                    const SizedBox(width: 10),
+                    Expanded(child: messageBlock),
+                    if (dismissButton != null) dismissButton,
+                  ],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
                 action,
               ],
             );
           }
 
           return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               leading,
-              const SizedBox(width: 14),
-              messageBlock,
-              const SizedBox(width: 14),
+              const SizedBox(width: 10),
+              Expanded(child: messageBlock),
+              const SizedBox(width: 12),
               action,
+              if (dismissButton != null) ...[
+                const SizedBox(width: 2),
+                dismissButton,
+              ],
             ],
           );
         },
