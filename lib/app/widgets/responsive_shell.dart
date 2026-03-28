@@ -885,132 +885,121 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
             : store.isSaving
             ? BpcColors.sandMuted
             : BpcColors.income;
-        final saveStatusBackground = hasSaveIssue
-            ? Color.alphaBlend(
-                BpcColors.sandSoft.withValues(alpha: 0.54),
-                BpcColors.surface,
-              )
-            : BpcColors.surfaceStrong;
 
         if (wide) {
           return Scaffold(
             body: SafeArea(
               child: Row(
                 children: [
-                  Container(
-                    width: 238,
-                    margin: const EdgeInsets.fromLTRB(16, 16, 0, 16),
-                    decoration: BoxDecoration(
-                      color: BpcColors.surface.withValues(alpha: 0.88),
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: BpcColors.line),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: BpcColors.shadow,
-                          blurRadius: 14,
-                          offset: Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
-                          child: const Padding(
-                            padding: EdgeInsets.fromLTRB(2, 4, 2, 6),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 0, 16),
+                    child: SizedBox(
+                      width: 230,
+                      child: Column(
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.fromLTRB(6, 6, 6, 14),
                             child: _RailBrand(),
                           ),
-                        ),
-                        Expanded(
-                          child: NavigationRail(
-                            selectedIndex: _tab.index,
-                            onDestinationSelected: (index) {
-                              setState(() => _tab = CommerceTab.values[index]);
-                            },
-                            labelType: NavigationRailLabelType.all,
-                            leading: const SizedBox(height: 2),
-                            groupAlignment: -0.88,
-                            backgroundColor: Colors.transparent,
-                            destinations: [
-                              const NavigationRailDestination(
-                                icon: Icon(Icons.home_outlined),
-                                selectedIcon: Icon(Icons.home_rounded),
-                                label: Text('Inicio'),
-                              ),
-                              NavigationRailDestination(
-                                icon: _ProductsIconBadge(count: lowStockCount),
-                                selectedIcon: _ProductsIconBadge(
-                                  count: lowStockCount,
-                                  selected: true,
+                          Expanded(
+                            child: NavigationRail(
+                              selectedIndex: _tab.index,
+                              onDestinationSelected: (index) {
+                                setState(
+                                  () => _tab = CommerceTab.values[index],
+                                );
+                              },
+                              labelType: NavigationRailLabelType.all,
+                              leading: const SizedBox(height: 2),
+                              groupAlignment: -0.88,
+                              backgroundColor: Colors.transparent,
+                              destinations: [
+                                const NavigationRailDestination(
+                                  icon: Icon(Icons.home_outlined),
+                                  selectedIcon: Icon(Icons.home_rounded),
+                                  label: Text('Inicio'),
                                 ),
-                                label: const Text('Productos'),
-                              ),
-                              const NavigationRailDestination(
-                                icon: Icon(
-                                  Icons.account_balance_wallet_outlined,
-                                ),
-                                selectedIcon: Icon(
-                                  Icons.account_balance_wallet_rounded,
-                                ),
-                                label: Text('Caja'),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                            decoration: BoxDecoration(
-                              color: saveStatusBackground,
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: hasSaveIssue
-                                    ? BpcColors.sandMuted.withValues(
-                                        alpha: 0.34,
-                                      )
-                                    : BpcColors.line.withValues(alpha: 0.56),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 10,
-                                  height: 10,
-                                  decoration: BoxDecoration(
-                                    color: saveStatusColor,
-                                    shape: BoxShape.circle,
+                                NavigationRailDestination(
+                                  icon: _ProductsIconBadge(
+                                    count: lowStockCount,
                                   ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    saveStatusLabel,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          color: BpcColors.ink,
-                                          fontWeight: FontWeight.w800,
-                                        ),
+                                  selectedIcon: _ProductsIconBadge(
+                                    count: lowStockCount,
+                                    selected: true,
                                   ),
+                                  label: const Text('Productos'),
+                                ),
+                                const NavigationRailDestination(
+                                  icon: Icon(
+                                    Icons.account_balance_wallet_outlined,
+                                  ),
+                                  selectedIcon: Icon(
+                                    Icons.account_balance_wallet_rounded,
+                                  ),
+                                  label: Text('Caja'),
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 10),
-                        const Padding(
-                          padding: EdgeInsets.fromLTRB(14, 0, 14, 14),
-                          child: _BuildInfoStrip(),
-                        ),
-                      ],
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(6, 0, 6, 12),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  top: BorderSide(
+                                    color: hasSaveIssue
+                                        ? BpcColors.sandMuted.withValues(
+                                            alpha: 0.5,
+                                          )
+                                        : BpcColors.line,
+                                  ),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color: saveStatusColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      saveStatusLabel,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: BpcColors.ink,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.fromLTRB(6, 0, 6, 0),
+                            child: _BuildInfoStrip(),
+                          ),
+                        ],
+                      ),
                     ),
+                  ),
+                  Container(
+                    width: 1,
+                    margin: const EdgeInsets.fromLTRB(18, 20, 0, 20),
+                    color: BpcColors.line,
                   ),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 18, 16),
+                      padding: const EdgeInsets.fromLTRB(22, 16, 18, 16),
                       child: Column(
                         children: [
                           Align(
@@ -1349,16 +1338,6 @@ class _RailBrand extends StatelessWidget {
                   BpcColors.surface,
                 ),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: scheme.primary.withValues(alpha: 0.18),
-                ),
-                boxShadow: const [
-                  BoxShadow(
-                    color: BpcColors.shadow,
-                    blurRadius: 12,
-                    offset: Offset(0, 4),
-                  ),
-                ],
               ),
               alignment: Alignment.center,
               child: ClipRRect(
@@ -1608,12 +1587,12 @@ class _BuildInfoStrip extends StatelessWidget {
         },
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: scheme.surfaceContainerHighest.withValues(alpha: 0.58),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: scheme.outlineVariant.withValues(alpha: 0.34),
+            border: Border(
+              top: BorderSide(
+                color: scheme.outlineVariant.withValues(alpha: 0.4),
+              ),
             ),
           ),
           child: Row(
