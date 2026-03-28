@@ -1006,7 +1006,12 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                               licenseService: license,
                               onManage: _openLicenseManagement,
                             ),
-                            const SizedBox(height: 10),
+                            SizedBox(
+                              height:
+                                  license.status == LicenseStatus.trialActive
+                                  ? 6
+                                  : 10,
+                            ),
                           ],
                           Expanded(child: page),
                         ],
@@ -1053,7 +1058,11 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                       licenseService: license,
                       onManage: _openLicenseManagement,
                     ),
-                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: license.status == LicenseStatus.trialActive
+                          ? 6
+                          : 10,
+                    ),
                   ],
                   const _BuildInfoStrip(),
                   const SizedBox(height: 8),
@@ -1202,7 +1211,99 @@ class _LicenseStatusBanner extends StatelessWidget {
     final accent = expired ? scheme.error : scheme.primary;
     final chipLabel = expired
         ? 'Solo lectura'
-        : 'Prueba: ${licenseService.trialDaysRemaining} ${licenseService.trialDaysRemaining == 1 ? 'dia' : 'dias'}';
+        : '${licenseService.trialDaysRemaining} ${licenseService.trialDaysRemaining == 1 ? 'dia' : 'dias'} restantes';
+
+    if (!expired) {
+      final summary =
+          'Puedes activar cuando quieras. Tus datos siguen guardados en esta PC.';
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(4, 2, 4, 10),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: scheme.outlineVariant.withValues(alpha: 0.3),
+            ),
+          ),
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 760;
+            final manageButton = TextButton.icon(
+              onPressed: () => onManage(),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+              ),
+              icon: const Icon(Icons.key_rounded, size: 18),
+              label: const Text('Ver activacion'),
+            );
+            final body = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      licenseService.statusHeadline,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: BpcColors.ink,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.09),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        chipLabel,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: accent,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  summary,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.outline,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            );
+
+            if (compact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [body, const SizedBox(height: 4), manageButton],
+              );
+            }
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: body),
+                const SizedBox(width: 12),
+                manageButton,
+              ],
+            );
+          },
+        ),
+      );
+    }
 
     return BpcPanel(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
