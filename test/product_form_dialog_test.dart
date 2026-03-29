@@ -67,8 +67,8 @@ void main() {
         ),
       );
 
-      await tester.ensureVisible(find.text('Guardar'));
-      await tester.tap(find.text('Guardar'));
+      await tester.ensureVisible(find.text('Guardar producto'));
+      await tester.tap(find.text('Guardar producto'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
@@ -97,8 +97,8 @@ void main() {
         ),
       );
 
-      await tester.ensureVisible(find.text('Guardar'));
-      await tester.tap(find.text('Guardar'));
+      await tester.ensureVisible(find.text('Guardar producto'));
+      await tester.tap(find.text('Guardar producto'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
@@ -125,8 +125,8 @@ void main() {
       ),
     );
 
-    await tester.ensureVisible(find.text('Guardar'));
-    await tester.tap(find.text('Guardar'));
+    await tester.ensureVisible(find.text('Guardar producto'));
+    await tester.tap(find.text('Guardar producto'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -159,8 +159,8 @@ void main() {
       );
       await tester.pump();
 
-      await tester.ensureVisible(find.text('Guardar'));
-      await tester.tap(find.text('Guardar'));
+      await tester.ensureVisible(find.text('Guardar producto'));
+      await tester.tap(find.text('Guardar producto'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
@@ -202,6 +202,33 @@ void main() {
 
       expect(find.byType(Dialog), findsOneWidget);
       expect(find.widgetWithText(TextFormField, 'Nombre'), findsOneWidget);
+      expect(find.text('Ver mas opciones'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'Categoria'), findsNothing);
     },
   );
+
+  testWidgets('desktop product form keeps extras hidden by default', (
+    tester,
+  ) async {
+    final store = CommerceStore.emptyForTest();
+
+    await pumpProductDialog(tester, store, size: const Size(1100, 900));
+
+    expect(find.text('Lo basico'), findsOneWidget);
+    expect(
+      find.text('Solo necesitas nombre, precio y stock para empezar a vender.'),
+      findsOneWidget,
+    );
+    expect(find.text('Ver mas opciones'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Categoria'), findsNothing);
+
+    await tester.tap(find.text('Ver mas opciones'));
+    await tester.pump();
+
+    expect(find.widgetWithText(TextFormField, 'Categoria'), findsOneWidget);
+    expect(
+      find.widgetWithText(TextFormField, 'Codigo de barras'),
+      findsOneWidget,
+    );
+  });
 }

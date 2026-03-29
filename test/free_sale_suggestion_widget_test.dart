@@ -56,8 +56,8 @@ void main() {
 
       expect(find.text('Agregar producto'), findsWidgets);
       expect(find.text('Cable USB rapido'), findsWidgets);
-      expect(find.text('Vista rapida'), findsOneWidget);
-      expect(find.text('Cable USB rapido / \$ 4.200'), findsOneWidget);
+      expect(find.text('Lo basico'), findsOneWidget);
+      expect(find.text('Guardar producto'), findsOneWidget);
     },
   );
 }

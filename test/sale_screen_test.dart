@@ -2,6 +2,7 @@ import 'package:b_plus_commerce/app/screens/sale_screen.dart';
 import 'package:b_plus_commerce/app/models/product.dart';
 import 'package:b_plus_commerce/app/services/commerce_store.dart';
 import 'package:b_plus_commerce/app/widgets/commerce_scope.dart';
+import 'package:b_plus_commerce/app/widgets/sale_receipt_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -97,7 +98,7 @@ void main() {
         find.text('Toca un resultado para confirmar el producto.'),
         findsOneWidget,
       );
-      expect(find.text('Sin seleccionar'), findsOneWidget);
+      expect(find.text('Detalle: Sin seleccionar'), findsOneWidget);
       expect(saveButton(tester).onPressed, isNull);
 
       await tester.ensureVisible(find.text('8 u.'));
@@ -150,7 +151,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('Sin seleccionar'), findsOneWidget);
+      expect(find.text('Detalle: Sin seleccionar'), findsOneWidget);
       expect(find.text('No se encontraron productos'), findsOneWidget);
       expect(
         find.text('Prueba con otro nombre, categoria o codigo.'),
@@ -266,8 +267,8 @@ void main() {
 
       expect(find.text('Agregar producto'), findsOneWidget);
       expect(find.text('Galletitas surtidas'), findsWidgets);
-      expect(find.text('Vista rapida'), findsOneWidget);
-      expect(find.text('Galletitas surtidas / \$ 3.900'), findsOneWidget);
+      expect(find.text('Lo basico'), findsOneWidget);
+      expect(find.text('Guardar producto'), findsOneWidget);
     },
   );
 
@@ -385,8 +386,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      await tester.ensureVisible(find.text('Guardar'));
-      await tester.tap(find.text('Guardar'));
+      await tester.ensureVisible(find.text('Guardar producto'));
+      await tester.tap(find.text('Guardar producto'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 450));
 
@@ -453,12 +454,25 @@ void main() {
         find.byKey(const Key('payment-method-mercado-pago')),
       );
       expect(paymentChip.selected, isTrue);
-      expect(
-        find.text(
-          'Marca el medio de pago para dejar caja y comprobante claros desde el principio.',
-        ),
-        findsOneWidget,
-      );
+      expect(find.text('Marca como cobraron esta venta.'), findsOneWidget);
     },
   );
+
+  testWidgets('detalle de comprobante arranca oculto y se puede abrir', (
+    tester,
+  ) async {
+    final store = CommerceStore.seededForTest();
+
+    await pumpSaleScreen(tester, store);
+
+    expect(find.text('Ver detalle del comprobante'), findsOneWidget);
+    expect(find.byType(SaleReceiptCard), findsNothing);
+
+    await tester.ensureVisible(find.text('Ver detalle del comprobante'));
+    await tester.tap(find.text('Ver detalle del comprobante'));
+    await tester.pump();
+
+    expect(find.byType(SaleReceiptCard), findsOneWidget);
+    expect(find.text('Ocultar detalle del comprobante'), findsOneWidget);
+  });
 }

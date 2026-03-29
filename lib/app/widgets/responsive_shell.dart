@@ -859,6 +859,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     _queueOnboardingTutorialIfNeeded(store);
     final pages = <CommerceTab, Widget>{
       CommerceTab.home: HomeScreen(
+        onRegisterCashOpening: _registerCashOpening,
         onNewSale: _openSale,
         onNewExpense: _openExpense,
         onScanProduct: _openBarcodeScan,
@@ -872,6 +873,8 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         exportingExcel: _exportingExcel,
         applyingStarterTemplate: _applyingStarterTemplate,
         loadingDemoData: _loadingDemoData,
+        hasCashOpeningToday: store.hasCashOpeningToday,
+        savingCashEvent: _savingCashEvent,
       ),
       CommerceTab.products: ProductsScreen(
         onApplyStarterTemplate: _applyStarterTemplate,

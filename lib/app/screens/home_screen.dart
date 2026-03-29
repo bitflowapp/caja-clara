@@ -13,6 +13,7 @@ import '../widgets/product_form_dialog.dart';
 class HomeScreen extends StatelessWidget {
   const HomeScreen({
     super.key,
+    required this.onRegisterCashOpening,
     required this.onNewSale,
     required this.onNewExpense,
     required this.onScanProduct,
@@ -26,8 +27,11 @@ class HomeScreen extends StatelessWidget {
     required this.exportingExcel,
     required this.applyingStarterTemplate,
     required this.loadingDemoData,
+    required this.hasCashOpeningToday,
+    required this.savingCashEvent,
   });
 
+  final VoidCallback onRegisterCashOpening;
   final VoidCallback onNewSale;
   final VoidCallback onNewExpense;
   final VoidCallback onScanProduct;
@@ -43,6 +47,8 @@ class HomeScreen extends StatelessWidget {
   final bool exportingExcel;
   final bool applyingStarterTemplate;
   final bool loadingDemoData;
+  final bool hasCashOpeningToday;
+  final bool savingCashEvent;
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +64,20 @@ class HomeScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _HeaderStrip(now: now, store: store),
+              _ActionWorkspace(
+                onRegisterCashOpening: onRegisterCashOpening,
+                onNewSale: onNewSale,
+                onNewExpense: onNewExpense,
+                onScanProduct: onScanProduct,
+                lowStockCount: store.lowStockCount,
+                onAddProduct: () => showProductEditor(context, store),
+                onOpenLowStock: onOpenProducts,
+                onExportExcel: onExportExcel,
+                exportingExcel: exportingExcel,
+                hasProducts: store.hasProducts,
+                hasCashOpeningToday: hasCashOpeningToday,
+                savingCashEvent: savingCashEvent,
+              ),
               if (!store.hasProducts) ...[
                 const SizedBox(height: 14),
                 _StarterTemplateCard(
@@ -71,18 +90,8 @@ class HomeScreen extends StatelessWidget {
                   hasMovements: store.hasMovements,
                 ),
               ],
-              const SizedBox(height: 14),
-              _ActionWorkspace(
-                onNewSale: onNewSale,
-                onNewExpense: onNewExpense,
-                onScanProduct: onScanProduct,
-                lowStockCount: store.lowStockCount,
-                onAddProduct: () => showProductEditor(context, store),
-                onOpenLowStock: onOpenProducts,
-                onExportExcel: onExportExcel,
-                exportingExcel: exportingExcel,
-                hasProducts: store.hasProducts,
-              ),
+              const SizedBox(height: 16),
+              _HeaderStrip(now: now, store: store),
               if (store.hasProducts) ...[
                 const SizedBox(height: 16),
                 _CatalogReadinessCard(store: store),
@@ -502,6 +511,7 @@ class _WorkspaceMetricCard extends StatelessWidget {
 
 class _ActionWorkspace extends StatelessWidget {
   const _ActionWorkspace({
+    required this.onRegisterCashOpening,
     required this.onNewSale,
     required this.onNewExpense,
     required this.onScanProduct,
@@ -511,8 +521,11 @@ class _ActionWorkspace extends StatelessWidget {
     required this.onExportExcel,
     required this.exportingExcel,
     required this.hasProducts,
+    required this.hasCashOpeningToday,
+    required this.savingCashEvent,
   });
 
+  final VoidCallback onRegisterCashOpening;
   final VoidCallback onNewSale;
   final VoidCallback onNewExpense;
   final VoidCallback onScanProduct;
@@ -522,10 +535,43 @@ class _ActionWorkspace extends StatelessWidget {
   final VoidCallback onExportExcel;
   final bool exportingExcel;
   final bool hasProducts;
+  final bool hasCashOpeningToday;
+  final bool savingCashEvent;
 
   @override
   Widget build(BuildContext context) {
-    final operations = [
+    final primaryOpenCash = ActionCard(
+      title: savingCashEvent
+          ? 'Guardando apertura'
+          : hasCashOpeningToday
+          ? 'Editar apertura'
+          : 'Abrir caja',
+      subtitle: hasCashOpeningToday
+          ? 'La caja ya esta abierta. Ajusta el efectivo inicial si hace falta.'
+          : 'Marca el efectivo inicial del dia antes de empezar a cobrar.',
+      icon: hasCashOpeningToday ? Icons.edit_note_rounded : Icons.login_rounded,
+      onTap: onRegisterCashOpening,
+    );
+    final primaryNewSale = ActionCard(
+      title: 'Nueva venta',
+      subtitle: hasProducts
+          ? 'Elige producto, marca el cobro y registra en tres pasos.'
+          : 'Puedes vender en cuanto cargues el primer producto o usar venta libre.',
+      icon: Icons.shopping_bag_rounded,
+      onTap: onNewSale,
+      fillColor: Theme.of(context).colorScheme.primary,
+      contentColor: Theme.of(context).colorScheme.onPrimary,
+      emphasized: true,
+    );
+    final primaryAddProduct = ActionCard(
+      title: 'Agregar producto',
+      subtitle: hasProducts
+          ? 'Carga nombre, precio y stock en lo basico. El resto es opcional.'
+          : 'Empieza el catalogo con nombre, precio y stock.',
+      icon: Icons.add_box_rounded,
+      onTap: onAddProduct,
+    );
+    final secondaryActions = [
       _ActionShortcut(
         title: 'Registrar gasto',
         subtitle: 'Anota una salida y deja la caja del dia clara',
@@ -537,16 +583,6 @@ class _ActionWorkspace extends StatelessWidget {
         subtitle: 'Camara, lector o codigo manual',
         icon: Icons.qr_code_scanner_rounded,
         onTap: onScanProduct,
-      ),
-    ];
-    final catalog = [
-      _ActionShortcut(
-        title: 'Agregar producto',
-        subtitle: hasProducts
-            ? 'Carga nombre, stock, precio y codigo'
-            : 'Empieza a cargar tu catalogo manualmente',
-        icon: Icons.add_box_rounded,
-        onTap: onAddProduct,
       ),
       _ActionShortcut(
         title: 'Ver stock bajo',
@@ -575,40 +611,45 @@ class _ActionWorkspace extends StatelessWidget {
       color: Colors.white.withValues(alpha: 0.8),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 980;
-          final shortcuts = Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _ActionShortcutGroup(title: 'Operaciones', actions: operations),
-              const SizedBox(height: 20),
-              _ActionShortcutGroup(
-                title: 'Catalogo y salida',
-                actions: catalog,
-              ),
-            ],
+          final wide = constraints.maxWidth >= 1040;
+          final shortcuts = _ActionShortcutGroup(
+            title: 'Tambien puedes',
+            actions: secondaryActions,
           );
 
-          final primary = ActionCard(
-            title: 'Nueva venta',
-            subtitle: 'Registra una venta y deja la caja al dia al momento',
-            icon: Icons.shopping_bag_rounded,
-            onTap: onNewSale,
-            fillColor: Theme.of(context).colorScheme.primary,
-            contentColor: Theme.of(context).colorScheme.onPrimary,
-            emphasized: true,
-          );
+          final primaryActions = wide
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 5, child: primaryNewSale),
+                    const SizedBox(width: 14),
+                    Expanded(flex: 4, child: primaryOpenCash),
+                    const SizedBox(width: 14),
+                    Expanded(flex: 4, child: primaryAddProduct),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    primaryNewSale,
+                    const SizedBox(height: 12),
+                    primaryOpenCash,
+                    const SizedBox(height: 12),
+                    primaryAddProduct,
+                  ],
+                );
 
           if (!wide) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SectionHeader(
-                  title: 'Panel de trabajo',
+                  title: 'Empieza por aca',
                   subtitle:
-                      'Las acciones clave viven juntas para cobrar, cargar y salir sin saltar entre bloques.',
+                      'Primero caja, venta y catalogo. Lo demas queda a mano mas abajo.',
                 ),
                 const SizedBox(height: 16),
-                primary,
+                primaryActions,
                 const SizedBox(height: 18),
                 shortcuts,
               ],
@@ -619,19 +660,14 @@ class _ActionWorkspace extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SectionHeader(
-                title: 'Panel de trabajo',
+                title: 'Empieza por aca',
                 subtitle:
-                    'Las acciones clave viven juntas para cobrar, cargar y salir sin saltar entre bloques.',
+                    'Primero caja, venta y catalogo. Despues revisa stock, gastos y salida.',
               ),
               const SizedBox(height: 16),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(flex: 5, child: primary),
-                  const SizedBox(width: 20),
-                  Expanded(flex: 4, child: shortcuts),
-                ],
-              ),
+              primaryActions,
+              const SizedBox(height: 18),
+              shortcuts,
             ],
           );
         },

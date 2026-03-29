@@ -26,6 +26,7 @@ void main() {
 
     expect(find.text('Caja Clara'), findsWidgets);
     expect(find.text('Nueva venta'), findsOneWidget);
+    expect(find.text('Abrir caja'), findsWidgets);
     expect(find.text('Registrar gasto'), findsOneWidget);
     expect(find.text('Escanear producto'), findsOneWidget);
     expect(find.text('Agregar producto'), findsWidgets);

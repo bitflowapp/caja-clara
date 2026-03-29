@@ -74,6 +74,15 @@ void main() {
     );
   }
 
+  Future<void> openAdvancedProductOptions(WidgetTester tester) async {
+    if (find.text('Ver mas opciones').evaluate().isEmpty) {
+      return;
+    }
+    await tester.ensureVisible(find.text('Ver mas opciones'));
+    await tester.tap(find.text('Ver mas opciones'));
+    await tester.pump();
+  }
+
   testWidgets(
     'manual fallback resolves an existing local barcode without duplicates',
     (tester) async {
@@ -159,23 +168,22 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 450));
 
+      await openAdvancedProductOptions(tester);
+
       expect(
         fieldByLabel('Nombre', tester).controller?.text,
         'Cristaline Eau De Source',
       );
+      expect(fieldByLabel('Categoria', tester).controller?.text, 'Bebidas');
       expect(
-        fieldByLabel('Categoria', tester).controller?.text,
-        'Bebidas',
-      );
-      expect(
-        fieldByLabel('Codigo de barras (opcional)', tester).controller?.text,
+        fieldByLabel('Codigo de barras', tester).controller?.text,
         '3274080005003',
       );
       expect(find.text('Datos sugeridos por Open Food Facts'), findsOneWidget);
       expect(find.text('Marca: Cristaline'), findsOneWidget);
 
-      await tester.ensureVisible(find.text('Guardar'));
-      await tester.tap(find.text('Guardar'));
+      await tester.ensureVisible(find.text('Guardar producto'));
+      await tester.tap(find.text('Guardar producto'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 
@@ -221,9 +229,11 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 450));
 
+      await openAdvancedProductOptions(tester);
+
       expect(fieldByLabel('Nombre', tester).controller?.text, isEmpty);
       expect(
-        fieldByLabel('Codigo de barras (opcional)', tester).controller?.text,
+        fieldByLabel('Codigo de barras', tester).controller?.text,
         'ABC999',
       );
       expect(find.text('Codigo listo'), findsOneWidget);
@@ -283,7 +293,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.text('Nueva venta'), findsOneWidget);
+      expect(find.text('Nueva venta'), findsWidgets);
 
       final saveSaleButton = find
           .ancestor(
