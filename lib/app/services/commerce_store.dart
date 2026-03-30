@@ -608,26 +608,20 @@ class CommerceStore extends ChangeNotifier {
   int get totalStockUnits =>
       _products.fold<int>(0, (sum, product) => sum + product.stockUnits);
 
-  int get sellableProductsCount => _products
-      .where((product) => product.pricePesos > 0 && product.stockUnits > 0)
-      .length;
+  int get sellableProductsCount =>
+      _products.where((product) => product.isSellable).length;
 
   int get productsWithoutPriceCount =>
-      _products.where((product) => product.pricePesos <= 0).length;
+      _products.where((product) => !product.hasPrice).length;
 
   int get productsWithBarcodeCount =>
-      _products.where((product) => (product.barcode ?? '').isNotEmpty).length;
+      _products.where((product) => product.hasBarcode).length;
 
-  int get productsWithoutBarcodeCount => _products
-      .where((product) => (product.barcode ?? '').trim().isEmpty)
-      .length;
+  int get productsWithoutBarcodeCount =>
+      _products.where((product) => !product.hasBarcode).length;
 
-  int get productsNeedingCatalogReviewCount => _products
-      .where(
-        (product) =>
-            product.pricePesos <= 0 || (product.barcode ?? '').trim().isEmpty,
-      )
-      .length;
+  int get productsNeedingCatalogReviewCount =>
+      _products.where((product) => product.needsCatalogAttention).length;
 
   bool get isCatalogReadyForSelling =>
       hasProducts &&
@@ -662,7 +656,7 @@ class CommerceStore extends ChangeNotifier {
     if (quantityUnits <= 0) {
       return 'Ingresa una cantidad mayor a 0.';
     }
-    if (product.pricePesos <= 0) {
+    if (!product.hasPrice) {
       return 'Define un precio antes de vender este producto.';
     }
     if (product.stockUnits < quantityUnits) {

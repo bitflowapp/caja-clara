@@ -22,6 +22,10 @@ class Product {
   final String? barcode;
 
   bool get isLowStock => stockUnits <= minStockUnits;
+  bool get hasPrice => pricePesos > 0;
+  bool get hasBarcode => (barcode ?? '').trim().isNotEmpty;
+  bool get needsCatalogAttention => !hasPrice || !hasBarcode;
+  bool get isSellable => hasPrice && stockUnits > 0;
 
   Product copyWith({
     String? id,
@@ -40,21 +44,25 @@ class Product {
       minStockUnits: minStockUnits ?? this.minStockUnits,
       costPesos: costPesos ?? this.costPesos,
       pricePesos: pricePesos ?? this.pricePesos,
-      category: identical(category, _sentinel) ? this.category : category as String?,
-      barcode: identical(barcode, _sentinel) ? this.barcode : barcode as String?,
+      category: identical(category, _sentinel)
+          ? this.category
+          : category as String?,
+      barcode: identical(barcode, _sentinel)
+          ? this.barcode
+          : barcode as String?,
     );
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'name': name,
-        'stockUnits': stockUnits,
-        'minStockUnits': minStockUnits,
-        'costPesos': costPesos,
-        'pricePesos': pricePesos,
-        'category': category,
-        'barcode': barcode,
-      };
+    'id': id,
+    'name': name,
+    'stockUnits': stockUnits,
+    'minStockUnits': minStockUnits,
+    'costPesos': costPesos,
+    'pricePesos': pricePesos,
+    'category': category,
+    'barcode': barcode,
+  };
 
   static Product fromJson(Map<String, dynamic> json) {
     return Product(
@@ -62,10 +70,12 @@ class Product {
       name: (json['name'] as String?) ?? '',
       stockUnits: (json['stockUnits'] as num?)?.toInt() ?? 0,
       minStockUnits: (json['minStockUnits'] as num?)?.toInt() ?? 0,
-      costPesos: (json['costPesos'] as num?)?.toInt() ??
+      costPesos:
+          (json['costPesos'] as num?)?.toInt() ??
           (json['costCents'] as num?)?.toInt() ??
           0,
-      pricePesos: (json['pricePesos'] as num?)?.toInt() ??
+      pricePesos:
+          (json['pricePesos'] as num?)?.toInt() ??
           (json['priceCents'] as num?)?.toInt() ??
           0,
       category: json['category'] as String?,

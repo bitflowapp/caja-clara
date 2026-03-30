@@ -290,9 +290,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
               CommerceStore.barcodeMatchesQuery(product.barcode, query);
           final matchesLowStock = !_onlyLowStock || product.isLowStock;
           final matchesMissingBarcode =
-              !_onlyMissingBarcode || !_hasBarcode(product);
+              !_onlyMissingBarcode || !product.hasBarcode;
           final matchesAttention =
-              !_onlyNeedsAttention || _needsCatalogAttention(product);
+              !_onlyNeedsAttention || product.needsCatalogAttention;
           return matchesQuery &&
               matchesLowStock &&
               matchesMissingBarcode &&
@@ -398,24 +398,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 }
 
-bool _hasBarcode(Product product) => (product.barcode ?? '').trim().isNotEmpty;
-
-bool _missingPrice(Product product) => product.pricePesos <= 0;
-
-bool _needsCatalogAttention(Product product) =>
-    !_hasBarcode(product) || _missingPrice(product);
-
-bool _canSellProduct(Product product) =>
-    product.pricePesos > 0 && product.stockUnits > 0;
-
 int _productSortRank(Product product) {
-  if (_missingPrice(product)) {
+  if (!product.hasPrice) {
     return 0;
   }
   if (product.isLowStock) {
     return 1;
   }
-  if (!_hasBarcode(product)) {
+  if (!product.hasBarcode) {
     return 2;
   }
   return 3;
@@ -829,9 +819,9 @@ class _ProductTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final hasBarcode = _hasBarcode(product);
-    final missingPrice = _missingPrice(product);
-    final canSell = onSell != null && _canSellProduct(product);
+    final hasBarcode = product.hasBarcode;
+    final missingPrice = !product.hasPrice;
+    final canSell = onSell != null && product.isSellable;
     final accent = missingPrice
         ? scheme.error
         : product.isLowStock
