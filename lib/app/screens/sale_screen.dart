@@ -222,7 +222,7 @@ class _SaleScreenState extends State<SaleScreen> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          '1. Elige el producto. 2. Marca el medio de pago. 3. Confirma.',
+                          '1. Elige el producto. 2. Marca el cobro. 3. Confirma.',
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
                                 color: Theme.of(context).colorScheme.outline,
@@ -240,8 +240,8 @@ class _SaleScreenState extends State<SaleScreen> {
                               ? 'Elige el producto'
                               : 'Describe la venta',
                           subtitle: _saleMode == SaleEntryMode.catalog
-                              ? 'Busca y confirma un producto antes de cobrar.'
-                              : 'Carga una descripcion simple. Si ya existe, usa el producto cargado.',
+                              ? 'Busca y toca el producto antes de cobrar.'
+                              : 'Escribe que vendiste. Si ya existe, usa el producto cargado.',
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -250,24 +250,37 @@ class _SaleScreenState extends State<SaleScreen> {
                                   EmptyCard(
                                     title: 'Todavia no hay productos cargados',
                                     message:
-                                        'Puedes usar venta libre ahora mismo o cargar una base simple para empezar con stock.',
+                                        'Cobra ahora con venta libre o agrega tu primer producto.',
                                     icon: Icons.inventory_2_rounded,
                                     action: Wrap(
                                       spacing: 10,
                                       runSpacing: 10,
                                       alignment: WrapAlignment.center,
                                       children: [
-                                        FilledButton(
+                                        FilledButton.icon(
+                                          onPressed: () =>
+                                              _handleSaleModeChanged(
+                                                SaleEntryMode.quick,
+                                              ),
+                                          icon: const Icon(
+                                            Icons.flash_on_rounded,
+                                          ),
+                                          label: const Text('Usar venta libre'),
+                                        ),
+                                        OutlinedButton.icon(
+                                          onPressed: () =>
+                                              showProductEditor(context, store),
+                                          icon: const Icon(
+                                            Icons.add_box_rounded,
+                                          ),
+                                          label: const Text('Agregar producto'),
+                                        ),
+                                        TextButton(
                                           onPressed: () =>
                                               _loadStarterTemplate(store),
                                           child: const Text(
                                             'Cargar base simple',
                                           ),
-                                        ),
-                                        TextButton(
-                                          onPressed: () =>
-                                              showProductEditor(context, store),
-                                          child: const Text('Agregar producto'),
                                         ),
                                       ],
                                     ),
@@ -964,7 +977,7 @@ class _SaleScreenState extends State<SaleScreen> {
       return null;
     }
     if (_selectedProduct != null) {
-      return 'Producto listo. Puedes seguir con la venta o cambiarlo.';
+      return 'Producto listo. Sigue con la venta o cambialo.';
     }
     if (_normalizedProductQuery.isEmpty) {
       return 'Escribe, dicta o toca un producto para seleccionarlo.';
@@ -1380,8 +1393,8 @@ class _PaymentMethodSelectorCard extends StatelessWidget {
       children: [
         Text(
           hasCustomSelection
-              ? 'Se recupero el ultimo medio usado. Puedes cambiarlo con un toque.'
-              : 'Marca como cobraron esta venta.',
+              ? 'Quedo el ultimo cobro usado. Cambialo si hace falta.'
+              : 'Marca el cobro.',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: scheme.outline,
             fontWeight: FontWeight.w600,
@@ -1698,7 +1711,7 @@ class _SaleModeSelector extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Como cargas la venta',
+          'Elige como cargarla',
           style: Theme.of(
             context,
           ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
@@ -1710,7 +1723,7 @@ class _SaleModeSelector extends StatelessWidget {
           children: [
             _SaleModeChip(
               tapKey: const Key('sale-mode-catalog'),
-              label: 'Catalogo',
+              label: 'Producto cargado',
               icon: Icons.inventory_2_rounded,
               selected: currentMode == SaleEntryMode.catalog,
               onTap: onChanged == null

@@ -30,8 +30,7 @@ Future<bool> showDangerConfirmationDialog(
               BpcDialogHeader(
                 icon: Icons.warning_amber_rounded,
                 title: title,
-                subtitle:
-                    'Revisa este cambio antes de seguir. Si confirmas, se aplica en el momento.',
+                subtitle: 'Si confirmas, se aplica ahora.',
                 badgeLabel: 'Confirmacion',
                 badgeColor: scheme.error,
                 onClose: () => Navigator.of(context).pop(false),
@@ -143,8 +142,7 @@ Future<int?> showAmountEntryDialog(
             BpcDialogHeader(
               icon: Icons.point_of_sale_rounded,
               title: title,
-              subtitle:
-                  'Carga el monto y confirma. La caja se actualiza en cuanto guardas.',
+              subtitle: 'Escribe el monto y guarda.',
               badgeLabel: 'Movimiento de caja',
               onClose: () => Navigator.of(dialogContext).pop(),
             ),
@@ -225,7 +223,7 @@ class _AmountEntryFormState extends State<_AmountEntryForm> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Monto cargado',
+                      'Monto',
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: Theme.of(context).colorScheme.primary,
                         fontWeight: FontWeight.w900,
@@ -253,16 +251,6 @@ class _AmountEntryFormState extends State<_AmountEntryForm> {
                 ),
               ),
               const SizedBox(height: 14),
-              if (widget.helper != null) ...[
-                Text(
-                  'Confirma el valor antes de guardar para dejar la caja al dia.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
               EnsureVisibleWhenFocused(
                 focusNode: _focusNode,
                 child: TextFormField(
@@ -275,7 +263,7 @@ class _AmountEntryFormState extends State<_AmountEntryForm> {
                   decoration: InputDecoration(
                     labelText: widget.label,
                     prefixText: '\$ ',
-                    helperText: 'Solo numeros. Caja Clara lo guarda en pesos.',
+                    helperText: 'Solo numeros en pesos.',
                   ),
                   onTapOutside: (_) => _focusNode.unfocus(),
                   onFieldSubmitted: (_) => _submit(),

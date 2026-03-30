@@ -51,6 +51,11 @@ void main() {
     expect(find.text('Como quieres empezar?'), findsOneWidget);
     expect(find.text('Empezar vacio'), findsWidgets);
     expect(find.text('Cargar ejemplo para probar'), findsWidgets);
+    expect(find.text('Primero abre caja'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Como quieres empezar?')).dy,
+      lessThan(tester.getTopLeft(find.text('Primero abre caja')).dy),
+    );
 
     await tester.ensureVisible(find.text('Ayuda'));
     await tester.tap(find.text('Ayuda'));

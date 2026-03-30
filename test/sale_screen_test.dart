@@ -188,6 +188,25 @@ void main() {
   );
 
   testWidgets(
+    'sin catalogo deja pasar directo a venta libre desde el estado vacio',
+    (tester) async {
+      final store = CommerceStore.emptyForTest();
+
+      await pumpSaleScreen(tester, store);
+
+      expect(find.text('Usar venta libre'), findsOneWidget);
+
+      await tester.ensureVisible(find.text('Usar venta libre'));
+      await tester.tap(find.text('Usar venta libre'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.widgetWithText(TextFormField, 'Descripcion'), findsOneWidget);
+      expect(find.text('Todavia no hay productos cargados'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'venta libre guarda sin producto seleccionado y no necesita catalogo',
     (tester) async {
       final store = CommerceStore.emptyForTest();
@@ -267,7 +286,7 @@ void main() {
 
       expect(find.text('Agregar producto'), findsOneWidget);
       expect(find.text('Galletitas surtidas'), findsWidgets);
-      expect(find.text('Lo basico'), findsOneWidget);
+      expect(find.text('Solo esto'), findsOneWidget);
       expect(find.text('Guardar producto'), findsOneWidget);
     },
   );
@@ -328,7 +347,7 @@ void main() {
       expect(find.text('Yerba premium'), findsWidgets);
       expect(saveButton(tester).onPressed, isNotNull);
       expect(
-        find.text('Producto listo. Puedes seguir con la venta o cambiarlo.'),
+        find.text('Producto listo. Sigue con la venta o cambialo.'),
         findsOneWidget,
       );
     },
@@ -454,7 +473,7 @@ void main() {
         find.byKey(const Key('payment-method-mercado-pago')),
       );
       expect(paymentChip.selected, isTrue);
-      expect(find.text('Marca como cobraron esta venta.'), findsOneWidget);
+      expect(find.text('Marca el cobro.'), findsOneWidget);
     },
   );
 

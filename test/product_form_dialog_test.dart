@@ -214,11 +214,8 @@ void main() {
 
     await pumpProductDialog(tester, store, size: const Size(1100, 900));
 
-    expect(find.text('Lo basico'), findsOneWidget);
-    expect(
-      find.text('Solo necesitas nombre, precio y stock para empezar a vender.'),
-      findsOneWidget,
-    );
+    expect(find.text('Solo esto'), findsOneWidget);
+    expect(find.text('Con esto ya puedes guardar y vender.'), findsOneWidget);
     expect(find.text('Ver mas opciones'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, 'Categoria'), findsNothing);
 

@@ -328,8 +328,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
           ? Icons.inventory_2_rounded
           : Icons.edit_note_rounded,
       title: _title,
-      subtitle:
-          'Carga nombre, precio y stock para empezar. Lo demas queda como opcional.',
+      subtitle: 'Nombre, precio y stock. Lo demas es opcional.',
       badgeLabel: widget.product == null ? 'Catalogo' : 'Edicion',
       onClose: _saving ? null : () => Navigator.of(context).pop(),
     );
@@ -342,7 +341,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Lo basico',
+          'Solo esto',
           style: theme.textTheme.titleMedium?.copyWith(
             color: Theme.of(context).colorScheme.primary,
             fontWeight: FontWeight.w900,
@@ -350,7 +349,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Solo necesitas nombre, precio y stock para empezar a vender.',
+          'Con esto ya puedes guardar y vender.',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: Theme.of(context).colorScheme.outline,
             fontWeight: FontWeight.w600,
@@ -399,7 +398,6 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                         textCapitalization: TextCapitalization.words,
                         decoration: InputDecoration(
                           labelText: 'Nombre',
-                          helperText: 'Obligatorio',
                           suffixIcon: SpeechDictationActionButton(
                             controller: _nameDictation,
                             textController: _nameController,
@@ -448,10 +446,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                       child: TextFormField(
                         controller: _priceController,
                         focusNode: _priceFocusNode,
-                        decoration: const InputDecoration(
-                          labelText: 'Precio',
-                          helperText: 'Obligatorio',
-                        ),
+                        decoration: const InputDecoration(labelText: 'Precio'),
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
@@ -486,10 +481,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                       child: TextFormField(
                         controller: _stockController,
                         focusNode: _stockFocusNode,
-                        decoration: const InputDecoration(
-                          labelText: 'Stock',
-                          helperText: 'Obligatorio',
-                        ),
+                        decoration: const InputDecoration(labelText: 'Stock'),
                         keyboardType: TextInputType.number,
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
@@ -889,7 +881,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
 
   String? _required(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'Escribe un dato.';
+      return 'Escribe el nombre.';
     }
     return null;
   }
@@ -947,7 +939,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   String get _advancedFieldsSummary {
     final count = _advancedFieldCount;
     if (count == 0) {
-      return 'Categoria, codigo, costo y stock minimo quedan como opcionales.';
+      return 'Categoria, codigo, costo y stock minimo pueden esperar.';
     }
     return '$count datos extra cargados. Puedes revisarlos solo si hacen falta.';
   }

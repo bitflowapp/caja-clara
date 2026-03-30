@@ -60,11 +60,27 @@ class HomeScreen extends StatelessWidget {
         final now = DateTime.now();
         final recent = store.recentMovements();
         final suggestions = store.freeSaleSuggestions;
+        final showInitialSetupChoice =
+            !store.hasProducts && store.shouldPromptInitialCatalogSetup;
 
         return SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (showInitialSetupChoice) ...[
+                _StarterTemplateCard(
+                  onApplyStarterTemplate: onApplyStarterTemplate,
+                  onLoadDemoData: onLoadDemoData,
+                  onChooseEmptyCatalogStart: onChooseEmptyCatalogStart,
+                  onAddProduct: () => showProductEditor(context, store),
+                  applyingStarterTemplate: applyingStarterTemplate,
+                  loadingDemoData: loadingDemoData,
+                  canLoadDemoData: store.isEmptyState,
+                  hasMovements: store.hasMovements,
+                  showInitialSetupChoice: true,
+                ),
+                const SizedBox(height: 14),
+              ],
               _ActionWorkspace(
                 onRegisterCashOpening: onRegisterCashOpening,
                 onNewSale: onNewSale,
@@ -79,7 +95,7 @@ class HomeScreen extends StatelessWidget {
                 hasCashOpeningToday: hasCashOpeningToday,
                 savingCashEvent: savingCashEvent,
               ),
-              if (!store.hasProducts) ...[
+              if (!store.hasProducts && !showInitialSetupChoice) ...[
                 const SizedBox(height: 14),
                 _StarterTemplateCard(
                   onApplyStarterTemplate: onApplyStarterTemplate,
@@ -544,6 +560,21 @@ class _ActionWorkspace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final prioritizeCashOpening = !hasCashOpeningToday;
+    final prioritizeCatalog = hasCashOpeningToday && !hasProducts;
+    final sectionTitle = prioritizeCashOpening
+        ? 'Primero abre caja'
+        : prioritizeCatalog
+        ? 'Primero agrega un producto'
+        : 'Siguiente paso';
+    final sectionSubtitle = prioritizeCashOpening
+        ? hasProducts
+              ? 'Marca el efectivo inicial y sigue con la primera venta.'
+              : 'Marca el efectivo inicial y despues agrega tu primer producto.'
+        : prioritizeCatalog
+        ? 'Con nombre, precio y stock ya puedes vender sin vueltas.'
+        : 'Nueva venta arriba. Lo demas queda mas abajo.';
     final primaryOpenCash = ActionCard(
       title: savingCashEvent
           ? 'Guardando apertura'
@@ -551,30 +582,47 @@ class _ActionWorkspace extends StatelessWidget {
           ? 'Editar apertura'
           : 'Abrir caja',
       subtitle: hasCashOpeningToday
-          ? 'La caja ya esta abierta. Ajusta el efectivo inicial si hace falta.'
-          : 'Marca el efectivo inicial del dia antes de empezar a cobrar.',
+          ? 'La caja ya esta abierta. Ajusta el efectivo si hace falta.'
+          : 'Marca el efectivo inicial del dia.',
       icon: hasCashOpeningToday ? Icons.edit_note_rounded : Icons.login_rounded,
       onTap: onRegisterCashOpening,
+      fillColor: prioritizeCashOpening ? scheme.primary : null,
+      contentColor: prioritizeCashOpening ? scheme.onPrimary : null,
+      emphasized: prioritizeCashOpening,
     );
     final primaryNewSale = ActionCard(
       title: 'Nueva venta',
       subtitle: hasProducts
-          ? 'Elige producto, marca el cobro y registra en tres pasos.'
-          : 'Puedes vender en cuanto cargues el primer producto o usar venta libre.',
+          ? 'Elige producto, marca el cobro y confirma.'
+          : 'Si necesitas cobrar ya, usa venta libre.',
       icon: Icons.shopping_bag_rounded,
       onTap: onNewSale,
-      fillColor: Theme.of(context).colorScheme.primary,
-      contentColor: Theme.of(context).colorScheme.onPrimary,
-      emphasized: true,
+      fillColor: prioritizeCashOpening || prioritizeCatalog
+          ? null
+          : scheme.primary,
+      contentColor: prioritizeCashOpening || prioritizeCatalog
+          ? null
+          : scheme.onPrimary,
+      emphasized: !prioritizeCashOpening && !prioritizeCatalog,
     );
     final primaryAddProduct = ActionCard(
       title: 'Agregar producto',
       subtitle: hasProducts
-          ? 'Carga nombre, precio y stock en lo basico. El resto es opcional.'
-          : 'Empieza el catalogo con nombre, precio y stock.',
+          ? 'Carga nombre, precio y stock. Lo demas puede esperar.'
+          : 'Empieza con nombre, precio y stock.',
       icon: Icons.add_box_rounded,
       onTap: onAddProduct,
+      fillColor: prioritizeCatalog ? scheme.primary : null,
+      contentColor: prioritizeCatalog ? scheme.onPrimary : null,
+      emphasized: prioritizeCatalog,
     );
+    final orderedPrimaryActions = prioritizeCashOpening
+        ? hasProducts
+              ? [primaryOpenCash, primaryNewSale, primaryAddProduct]
+              : [primaryOpenCash, primaryAddProduct, primaryNewSale]
+        : prioritizeCatalog
+        ? [primaryAddProduct, primaryNewSale, primaryOpenCash]
+        : [primaryNewSale, primaryOpenCash, primaryAddProduct];
     final secondaryActions = [
       _ActionShortcut(
         title: 'Registrar gasto',
@@ -617,7 +665,7 @@ class _ActionWorkspace extends StatelessWidget {
         builder: (context, constraints) {
           final wide = constraints.maxWidth >= 1040;
           final shortcuts = _ActionShortcutGroup(
-            title: 'Tambien puedes',
+            title: 'Despues, si hace falta',
             actions: secondaryActions,
           );
 
@@ -625,21 +673,21 @@ class _ActionWorkspace extends StatelessWidget {
               ? Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(flex: 5, child: primaryNewSale),
+                    Expanded(flex: 5, child: orderedPrimaryActions[0]),
                     const SizedBox(width: 14),
-                    Expanded(flex: 4, child: primaryOpenCash),
+                    Expanded(flex: 4, child: orderedPrimaryActions[1]),
                     const SizedBox(width: 14),
-                    Expanded(flex: 4, child: primaryAddProduct),
+                    Expanded(flex: 4, child: orderedPrimaryActions[2]),
                   ],
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    primaryNewSale,
+                    orderedPrimaryActions[0],
                     const SizedBox(height: 12),
-                    primaryOpenCash,
+                    orderedPrimaryActions[1],
                     const SizedBox(height: 12),
-                    primaryAddProduct,
+                    orderedPrimaryActions[2],
                   ],
                 );
 
@@ -647,11 +695,7 @@ class _ActionWorkspace extends StatelessWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SectionHeader(
-                  title: 'Empieza por aca',
-                  subtitle:
-                      'Primero caja, venta y catalogo. Lo demas queda a mano mas abajo.',
-                ),
+                SectionHeader(title: sectionTitle, subtitle: sectionSubtitle),
                 const SizedBox(height: 16),
                 primaryActions,
                 const SizedBox(height: 18),
@@ -663,11 +707,7 @@ class _ActionWorkspace extends StatelessWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SectionHeader(
-                title: 'Empieza por aca',
-                subtitle:
-                    'Primero caja, venta y catalogo. Despues revisa stock, gastos y salida.',
-              ),
+              SectionHeader(title: sectionTitle, subtitle: sectionSubtitle),
               const SizedBox(height: 16),
               primaryActions,
               const SizedBox(height: 18),

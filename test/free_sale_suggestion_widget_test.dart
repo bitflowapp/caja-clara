@@ -56,7 +56,7 @@ void main() {
 
       expect(find.text('Agregar producto'), findsWidgets);
       expect(find.text('Cable USB rapido'), findsWidgets);
-      expect(find.text('Lo basico'), findsOneWidget);
+      expect(find.text('Solo esto'), findsOneWidget);
       expect(find.text('Guardar producto'), findsOneWidget);
     },
   );
