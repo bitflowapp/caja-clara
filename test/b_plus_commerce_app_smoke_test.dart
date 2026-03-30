@@ -1,6 +1,7 @@
 import 'package:b_plus_commerce/app/b_plus_commerce_app.dart';
 import 'package:b_plus_commerce/app/services/barcode_lookup_service.dart';
 import 'package:b_plus_commerce/app/services/commerce_store.dart';
+import 'package:b_plus_commerce/app/models/product.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -34,7 +35,7 @@ void main() {
     expect(find.text('Ultimos movimientos'), findsOneWidget);
   });
 
-  testWidgets('first use opens the tutorial and it can be reopened from help', (
+  testWidgets('first use shows start choice and tutorial stays in help', (
     tester,
   ) async {
     final store = CommerceStore.emptyForTest();
@@ -46,15 +47,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Tutorial rapido'), findsOneWidget);
-    expect(find.text('Abri caja'), findsWidgets);
-    expect(find.text('1/5'), findsOneWidget);
-
-    await tester.tap(find.text('Saltear'));
-    await tester.pumpAndSettle();
-
     expect(find.text('Tutorial rapido'), findsNothing);
-    expect(find.text('Primeros pasos'), findsOneWidget);
+    expect(find.text('Como quieres empezar?'), findsOneWidget);
+    expect(find.text('Empezar vacio'), findsWidgets);
+    expect(find.text('Cargar ejemplo para probar'), findsWidgets);
 
     await tester.ensureVisible(find.text('Ayuda'));
     await tester.tap(find.text('Ayuda'));
@@ -64,7 +60,9 @@ void main() {
     expect(find.text('Abri caja'), findsWidgets);
   });
 
-  testWidgets('Home guides first use with kiosk template', (tester) async {
+  testWidgets('Home guides first use with empty or example start paths', (
+    tester,
+  ) async {
     final store = CommerceStore.emptyForTest();
     await tester.pumpWidget(
       BPlusCommerceApp(
@@ -73,12 +71,39 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await dismissTutorialIfVisible(tester);
 
-    expect(find.text('Primeros pasos'), findsOneWidget);
-    expect(find.text('Ver ejemplo'), findsOneWidget);
-    expect(find.text('Cargar Kiosco argentino'), findsOneWidget);
-    expect(find.text('Agregar producto'), findsWidgets);
+    expect(find.text('Como quieres empezar?'), findsOneWidget);
+    expect(find.text('Empezar vacio'), findsWidgets);
+    expect(find.text('Cargar ejemplo para probar'), findsWidgets);
+  });
+
+  testWidgets('Home keeps catalog status honest when products are incomplete', (
+    tester,
+  ) async {
+    final store = CommerceStore.emptyForTest();
+    await store.addProduct(
+      const Product(
+        id: 'p-1',
+        name: 'Producto sin completar',
+        stockUnits: 4,
+        minStockUnits: 1,
+        costPesos: 1000,
+        pricePesos: 0,
+        barcode: '7791234500097',
+      ),
+    );
+
+    await tester.pumpWidget(
+      BPlusCommerceApp(
+        store: store,
+        barcodeLookupService: const DisabledBarcodeLookupService(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Catalogo listo para vender'), findsNothing);
+    expect(find.text('Productos para completar'), findsOneWidget);
+    expect(find.text('Sin codigo'), findsWidgets);
   });
 
   testWidgets(
@@ -101,8 +126,8 @@ void main() {
       await tester.pumpAndSettle();
       await dismissTutorialIfVisible(tester);
 
-      expect(find.text('Ver ejemplo'), findsNothing);
-      expect(find.text('Cargar Kiosco argentino'), findsOneWidget);
+      expect(find.text('Cargar ejemplo para probar'), findsNothing);
+      expect(find.text('Cargar base simple'), findsNothing);
       expect(find.text('Agregar producto'), findsWidgets);
     },
   );

@@ -435,18 +435,20 @@ void main() {
       },
     );
 
-    test('persists dismissed onboarding tutorial state in snapshots', () async {
+    test('persists empty-start choice in snapshots', () async {
       final store = CommerceStore.emptyForTest();
 
-      expect(store.shouldPromptOnboardingTutorial, isTrue);
+      expect(store.shouldPromptInitialCatalogSetup, isTrue);
+      expect(store.shouldPromptOnboardingTutorial, isFalse);
 
-      await store.dismissOnboardingTutorial();
+      await store.chooseEmptyCatalogStart();
 
+      expect(store.initialCatalogSetupStatus, InitialCatalogSetupStatus.empty);
+      expect(store.shouldPromptInitialCatalogSetup, isFalse);
       expect(
         store.onboardingTutorialStatus,
         OnboardingTutorialStatus.dismissed,
       );
-      expect(store.shouldPromptOnboardingTutorial, isFalse);
 
       final snapshot = store.buildSnapshot(
         generatedAt: DateTime(2026, 3, 28, 16, 0),
@@ -455,9 +457,10 @@ void main() {
       await restored.restoreSnapshot(snapshot);
 
       expect(
-        restored.onboardingTutorialStatus,
-        OnboardingTutorialStatus.dismissed,
+        restored.initialCatalogSetupStatus,
+        InitialCatalogSetupStatus.empty,
       );
+      expect(restored.shouldPromptInitialCatalogSetup, isFalse);
       expect(restored.shouldPromptOnboardingTutorial, isFalse);
     });
 
@@ -465,9 +468,10 @@ void main() {
       'older snapshots with data stay quiet even without onboarding status',
       () async {
         final source = CommerceStore.seededForTest();
-        final snapshot = source.buildSnapshot(
-          generatedAt: DateTime(2026, 3, 28, 16, 30),
-        )..remove('onboardingTutorialStatus');
+        final snapshot =
+            source.buildSnapshot(generatedAt: DateTime(2026, 3, 28, 16, 30))
+              ..remove('onboardingTutorialStatus')
+              ..remove('initialCatalogSetupStatus');
 
         final restored = CommerceStore.emptyForTest();
         await restored.restoreSnapshot(snapshot);
@@ -476,7 +480,12 @@ void main() {
           restored.onboardingTutorialStatus,
           OnboardingTutorialStatus.completed,
         );
+        expect(
+          restored.initialCatalogSetupStatus,
+          InitialCatalogSetupStatus.empty,
+        );
         expect(restored.shouldPromptOnboardingTutorial, isFalse);
+        expect(restored.shouldPromptInitialCatalogSetup, isFalse);
       },
     );
 

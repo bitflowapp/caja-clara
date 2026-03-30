@@ -250,7 +250,7 @@ class _SaleScreenState extends State<SaleScreen> {
                                   EmptyCard(
                                     title: 'Todavia no hay productos cargados',
                                     message:
-                                        'Puedes usar venta libre ahora mismo o cargar la plantilla kiosco para empezar con stock.',
+                                        'Puedes usar venta libre ahora mismo o cargar una base simple para empezar con stock.',
                                     icon: Icons.inventory_2_rounded,
                                     action: Wrap(
                                       spacing: 10,
@@ -261,7 +261,7 @@ class _SaleScreenState extends State<SaleScreen> {
                                           onPressed: () =>
                                               _loadStarterTemplate(store),
                                           child: const Text(
-                                            'Cargar plantilla kiosco',
+                                            'Cargar base simple',
                                           ),
                                         ),
                                         TextButton(
@@ -824,8 +824,8 @@ class _SaleScreenState extends State<SaleScreen> {
         SnackBar(
           content: Text(
             result.fullySkipped
-                ? 'La plantilla kiosco ya estaba cargada.'
-                : 'Plantilla kiosco cargada. Ya puedes buscar y vender.',
+                ? 'La base simple ya estaba cargada.'
+                : 'Base simple cargada. Ya puedes buscar y vender.',
           ),
           behavior: SnackBarBehavior.floating,
         ),

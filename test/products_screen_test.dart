@@ -21,6 +21,7 @@ void main() {
               applyingStarterTemplate: false,
               onLoadDemoData: () async {},
               loadingDemoData: false,
+              onChooseEmptyCatalogStart: () async {},
               onSellProduct: onSellProduct,
             ),
           ),
@@ -30,8 +31,21 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('products screen shows start choice on first use', (
+    tester,
+  ) async {
+    final store = CommerceStore.emptyForTest();
+
+    await pumpProductsScreen(tester, store);
+
+    expect(find.text('Como quieres empezar?'), findsOneWidget);
+    expect(find.text('Empezar vacio'), findsWidgets);
+    expect(find.text('Cargar ejemplo para probar'), findsWidgets);
+    expect(find.text('Agregar producto'), findsNothing);
+  });
+
   testWidgets(
-    'products screen hides demo CTA when there are movements without catalog',
+    'products screen hides example CTA when there are movements without catalog',
     (tester) async {
       final store = CommerceStore.emptyForTest();
       await store.recordFreeSale(
@@ -43,9 +57,9 @@ void main() {
 
       await pumpProductsScreen(tester, store);
 
-      expect(find.text('Demo comercial'), findsNothing);
-      expect(find.text('Cargar demo comercial'), findsNothing);
-      expect(find.text('Plantilla kiosco'), findsOneWidget);
+      expect(find.text('Cargar ejemplo para probar'), findsNothing);
+      expect(find.text('Cargar base simple'), findsNothing);
+      expect(find.text('Agregar producto'), findsWidgets);
     },
   );
 
@@ -76,11 +90,7 @@ void main() {
       ),
     );
 
-      await pumpProductsScreen(
-      tester,
-      store,
-      onSellProduct: (_) async {},
-    );
+    await pumpProductsScreen(tester, store, onSellProduct: (_) async {});
 
     expect(find.text('Sin codigo'), findsAtLeastNWidgets(2));
     expect(find.text('Sin precio'), findsOneWidget);

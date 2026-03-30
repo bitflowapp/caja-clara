@@ -23,6 +23,7 @@ class ProductsScreen extends StatefulWidget {
     required this.applyingStarterTemplate,
     required this.onLoadDemoData,
     required this.loadingDemoData,
+    required this.onChooseEmptyCatalogStart,
     this.onSellProduct,
   });
 
@@ -30,6 +31,7 @@ class ProductsScreen extends StatefulWidget {
   final bool applyingStarterTemplate;
   final Future<void> Function() onLoadDemoData;
   final bool loadingDemoData;
+  final Future<void> Function() onChooseEmptyCatalogStart;
   final Future<void> Function(Product product)? onSellProduct;
 
   @override
@@ -69,14 +71,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
       builder: (context, _) {
         final products = _filteredProducts(store.products);
         final emptyCatalog = store.products.isEmpty;
-        final canLoadDemoData = store.isEmptyState;
+        final showInitialSetupChoice = store.shouldPromptInitialCatalogSetup;
+        final canLoadDemoData = store.isEmptyState && showInitialSetupChoice;
         final filteredEmpty = products.isEmpty && !emptyCatalog;
-        final withoutBarcodeCount = _productsWithoutBarcodeCount(
-          store.products,
-        );
-        final needsAttentionCount = _productsNeedingAttentionCount(
-          store.products,
-        );
+        final withoutBarcodeCount = store.productsWithoutBarcodeCount;
+        final needsAttentionCount = store.productsNeedingCatalogReviewCount;
 
         return InputShortcutScope(
           onCancel: () {
@@ -97,8 +96,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     applyingStarterTemplate: widget.applyingStarterTemplate,
                     loadingDemoData: widget.loadingDemoData,
                     canLoadDemoData: canLoadDemoData,
+                    showInitialSetupChoice: showInitialSetupChoice,
                     onApplyStarterTemplate: widget.onApplyStarterTemplate,
                     onLoadDemoData: widget.onLoadDemoData,
+                    onChooseEmptyCatalogStart: widget.onChooseEmptyCatalogStart,
                     onAddProduct: () => showProductEditor(context, store),
                     withoutBarcodeCount: withoutBarcodeCount,
                     needsAttentionCount: needsAttentionCount,
@@ -138,30 +139,48 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   if (products.isEmpty)
                     EmptyCard(
                       title: emptyCatalog
-                          ? 'Todavia no cargaste productos'
+                          ? showInitialSetupChoice
+                                ? 'Elige como quieres empezar'
+                                : 'Todavia no cargaste productos'
                           : 'Sin resultados para ese filtro',
                       message: emptyCatalog
-                          ? canLoadDemoData
-                                ? 'Puedes empezar con la plantilla del kiosco, abrir un ejemplo corto o cargar productos a mano. Todo queda editable y guardado localmente.'
-                                : 'Ya hay movimientos guardados, asi que conviene sumar catalogo real con una plantilla o alta manual sin tocar ese historial.'
+                          ? showInitialSetupChoice
+                                ? 'Nada se carga solo. Puedes arrancar vacio o probar un ejemplo corto.'
+                                : store.hasMovements
+                                ? 'Ya hay movimientos guardados, asi que conviene sumar catalogo real sin tocar ese historial.'
+                                : 'Agrega tu primer producto y deja el resto para despues. Si quieres, tambien puedes cargar una base simple.'
                           : 'No hay productos que coincidan con la busqueda actual. Ajusta filtros o agrega un producto nuevo.',
                       action: Wrap(
                         spacing: 10,
                         runSpacing: 10,
                         alignment: WrapAlignment.center,
                         children: [
-                          if (emptyCatalog && canLoadDemoData)
+                          if (emptyCatalog && showInitialSetupChoice)
                             FilledButton(
+                              onPressed: () =>
+                                  widget.onChooseEmptyCatalogStart(),
+                              child: const Text('Empezar vacio'),
+                            ),
+                          if (emptyCatalog && canLoadDemoData)
+                            OutlinedButton(
                               onPressed: widget.loadingDemoData
                                   ? null
                                   : () => widget.onLoadDemoData(),
                               child: Text(
                                 widget.loadingDemoData
                                     ? 'Cargando ejemplo...'
-                                    : 'Ver ejemplo',
+                                    : 'Cargar ejemplo para probar',
                               ),
                             ),
-                          if (emptyCatalog)
+                          if (emptyCatalog && !showInitialSetupChoice)
+                            FilledButton(
+                              onPressed: () =>
+                                  showProductEditor(context, store),
+                              child: const Text('Agregar producto'),
+                            ),
+                          if (emptyCatalog &&
+                              !showInitialSetupChoice &&
+                              !store.hasMovements)
                             OutlinedButton(
                               onPressed:
                                   widget.applyingStarterTemplate ||
@@ -170,8 +189,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                   : () => widget.onApplyStarterTemplate(),
                               child: Text(
                                 widget.applyingStarterTemplate
-                                    ? 'Cargando plantilla...'
-                                    : 'Cargar plantilla kiosco',
+                                    ? 'Cargando base...'
+                                    : 'Cargar base simple',
                               ),
                             ),
                           if (filteredEmpty)
@@ -179,10 +198,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
                               onPressed: _clearFilters,
                               child: const Text('Limpiar filtros'),
                             ),
-                          TextButton(
-                            onPressed: () => showProductEditor(context, store),
-                            child: const Text('Agregar producto'),
-                          ),
+                          if (!emptyCatalog || filteredEmpty)
+                            TextButton(
+                              onPressed: () =>
+                                  showProductEditor(context, store),
+                              child: const Text('Agregar producto'),
+                            ),
                         ],
                       ),
                     )
@@ -300,7 +321,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
       title: 'Ajustar stock',
       label: 'Cantidad a sumar',
       confirmLabel: 'Guardar',
-      helper: 'Se suma stock sobre ${product.name} sin tocar el resto del catalogo.',
+      helper:
+          'Se suma stock sobre ${product.name} sin tocar el resto del catalogo.',
     );
     if (amount == null || !mounted) {
       return;
@@ -386,12 +408,6 @@ bool _needsCatalogAttention(Product product) =>
 bool _canSellProduct(Product product) =>
     product.pricePesos > 0 && product.stockUnits > 0;
 
-int _productsWithoutBarcodeCount(Iterable<Product> products) =>
-    products.where((product) => !_hasBarcode(product)).length;
-
-int _productsNeedingAttentionCount(Iterable<Product> products) =>
-    products.where(_needsCatalogAttention).length;
-
 int _productSortRank(Product product) {
   if (_missingPrice(product)) {
     return 0;
@@ -411,8 +427,10 @@ class _CatalogOverviewCard extends StatelessWidget {
     required this.applyingStarterTemplate,
     required this.loadingDemoData,
     required this.canLoadDemoData,
+    required this.showInitialSetupChoice,
     required this.onApplyStarterTemplate,
     required this.onLoadDemoData,
+    required this.onChooseEmptyCatalogStart,
     required this.onAddProduct,
     required this.withoutBarcodeCount,
     required this.needsAttentionCount,
@@ -422,8 +440,10 @@ class _CatalogOverviewCard extends StatelessWidget {
   final bool applyingStarterTemplate;
   final bool loadingDemoData;
   final bool canLoadDemoData;
+  final bool showInitialSetupChoice;
   final Future<void> Function() onApplyStarterTemplate;
   final Future<void> Function() onLoadDemoData;
+  final Future<void> Function() onChooseEmptyCatalogStart;
   final VoidCallback onAddProduct;
   final int withoutBarcodeCount;
   final int needsAttentionCount;
@@ -432,6 +452,50 @@ class _CatalogOverviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    if (showInitialSetupChoice) {
+      return BpcPanel(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+        color: Colors.white.withValues(alpha: 0.86),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SectionHeader(
+              title: 'Como quieres empezar?',
+              subtitle:
+                  'Nada se carga sin preguntarte. Puedes arrancar vacio o probar un ejemplo corto.',
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                FilledButton.icon(
+                  onPressed: onChooseEmptyCatalogStart,
+                  icon: const Icon(Icons.add_business_rounded),
+                  label: const Text('Empezar vacio'),
+                ),
+                if (canLoadDemoData)
+                  OutlinedButton.icon(
+                    onPressed: loadingDemoData ? null : onLoadDemoData,
+                    icon: loadingDemoData
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.play_circle_rounded),
+                    label: Text(
+                      loadingDemoData
+                          ? 'Cargando ejemplo'
+                          : 'Cargar ejemplo para probar',
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
     final metrics = [
       _OverviewMetricData(
         label: 'Catalogo',
@@ -488,42 +552,29 @@ class _CatalogOverviewCard extends StatelessWidget {
             runSpacing: 10,
             alignment: WrapAlignment.end,
             children: [
-              if (canLoadDemoData)
-                FilledButton.icon(
-                  onPressed: loadingDemoData ? null : () => onLoadDemoData(),
-                  icon: loadingDemoData
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.play_circle_rounded),
-                  label: Text(
-                    loadingDemoData ? 'Cargando ejemplo' : 'Ver ejemplo',
-                  ),
-                ),
-              OutlinedButton.icon(
-                onPressed: applyingStarterTemplate || loadingDemoData
-                    ? null
-                    : () => onApplyStarterTemplate(),
-                icon: applyingStarterTemplate
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.storefront_rounded),
-                label: Text(
-                  applyingStarterTemplate
-                      ? 'Cargando plantilla'
-                      : 'Plantilla kiosco',
-                ),
-              ),
               FilledButton.icon(
                 onPressed: onAddProduct,
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('Agregar producto'),
               ),
+              if (!store.hasMovements)
+                OutlinedButton.icon(
+                  onPressed: applyingStarterTemplate || loadingDemoData
+                      ? null
+                      : () => onApplyStarterTemplate(),
+                  icon: applyingStarterTemplate
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.storefront_rounded),
+                  label: Text(
+                    applyingStarterTemplate
+                        ? 'Cargando base'
+                        : 'Cargar base simple',
+                  ),
+                ),
             ],
           );
 
@@ -884,7 +935,9 @@ class _ProductTile extends StatelessWidget {
                       _ProductInfoPanel(
                         label: 'Codigo',
                         value: hasBarcode ? product.barcode! : 'Sin codigo',
-                        helper: hasBarcode ? 'listo para lector' : 'puedes cargarlo despues',
+                        helper: hasBarcode
+                            ? 'listo para lector'
+                            : 'puedes cargarlo despues',
                         icon: Icons.qr_code_rounded,
                         accent: hasBarcode
                             ? BpcColors.greenSoft

@@ -418,10 +418,10 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         SnackBar(
           content: Text(
             result.fullySkipped
-                ? 'La plantilla kiosco ya estaba cargada.'
+                ? 'La base simple ya estaba cargada.'
                 : result.skippedCount == 0
-                ? 'Plantilla kiosco cargada: ${result.addedCount} productos nuevos.'
-                : 'Plantilla kiosco cargada: ${result.addedCount} nuevos y ${result.skippedCount} repetidos salteados.',
+                ? 'Base simple cargada: ${result.addedCount} productos nuevos.'
+                : 'Base simple cargada: ${result.addedCount} nuevos y ${result.skippedCount} repetidos salteados.',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -442,6 +442,35 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       if (mounted) {
         setState(() => _applyingStarterTemplate = false);
       }
+    }
+  }
+
+  Future<void> _chooseEmptyCatalogStart() async {
+    final store = CommerceScope.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await store.chooseEmptyCatalogStart();
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Listo. Arrancas vacio y puedes cargar tu catalogo cuando quieras.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(userFacingErrorMessage(error)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -867,6 +896,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         onExportExcel: _exportExcel,
         onApplyStarterTemplate: _applyStarterTemplate,
         onLoadDemoData: _loadDemoData,
+        onChooseEmptyCatalogStart: _chooseEmptyCatalogStart,
         onCreateProductFromFreeSale: _createProductFromFreeSale,
         onCreateProductFromSuggestion: _createProductFromSuggestion,
         onDismissFreeSaleSuggestion: _dismissFreeSaleSuggestion,
@@ -881,6 +911,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         applyingStarterTemplate: _applyingStarterTemplate,
         onLoadDemoData: _loadDemoData,
         loadingDemoData: _loadingDemoData,
+        onChooseEmptyCatalogStart: _chooseEmptyCatalogStart,
         onSellProduct: _openSaleForProduct,
       ),
       CommerceTab.summary: SummaryScreen(

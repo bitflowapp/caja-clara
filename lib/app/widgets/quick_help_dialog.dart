@@ -37,7 +37,7 @@ class _QuickHelpDialogState extends State<_QuickHelpDialog> {
     ),
     _TutorialStepData(
       title: 'Agrega un producto',
-      body: 'Carga nombre, precio y stock. Si quieres, usa el catalogo base.',
+      body: 'Carga nombre, precio y stock. El resto puede esperar.',
       icon: Icons.inventory_2_rounded,
       section: 'Productos',
     ),

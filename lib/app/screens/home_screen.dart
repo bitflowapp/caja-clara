@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../models/movement.dart';
 import '../services/commerce_store.dart';
-import '../services/starter_templates.dart';
 import '../theme/bpc_colors.dart';
 import '../utils/formatters.dart';
 import '../widgets/caja_clara_brand.dart';
@@ -21,6 +20,7 @@ class HomeScreen extends StatelessWidget {
     required this.onExportExcel,
     required this.onApplyStarterTemplate,
     required this.onLoadDemoData,
+    required this.onChooseEmptyCatalogStart,
     required this.onCreateProductFromFreeSale,
     required this.onCreateProductFromSuggestion,
     required this.onDismissFreeSaleSuggestion,
@@ -39,6 +39,7 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onExportExcel;
   final VoidCallback onApplyStarterTemplate;
   final VoidCallback onLoadDemoData;
+  final VoidCallback onChooseEmptyCatalogStart;
   final Future<void> Function(Movement movement) onCreateProductFromFreeSale;
   final Future<void> Function(FreeSaleSuggestion suggestion)
   onCreateProductFromSuggestion;
@@ -83,11 +84,13 @@ class HomeScreen extends StatelessWidget {
                 _StarterTemplateCard(
                   onApplyStarterTemplate: onApplyStarterTemplate,
                   onLoadDemoData: onLoadDemoData,
+                  onChooseEmptyCatalogStart: onChooseEmptyCatalogStart,
                   onAddProduct: () => showProductEditor(context, store),
                   applyingStarterTemplate: applyingStarterTemplate,
                   loadingDemoData: loadingDemoData,
                   canLoadDemoData: store.isEmptyState,
                   hasMovements: store.hasMovements,
+                  showInitialSetupChoice: store.shouldPromptInitialCatalogSetup,
                 ),
               ],
               const SizedBox(height: 16),
@@ -115,6 +118,7 @@ class HomeScreen extends StatelessWidget {
                 onApplyStarterTemplate: onApplyStarterTemplate,
                 onAddProduct: () => showProductEditor(context, store),
                 onCreateProductFromFreeSale: onCreateProductFromFreeSale,
+                showInitialSetupChoice: store.shouldPromptInitialCatalogSetup,
               ),
               const SizedBox(height: 18),
             ],
@@ -798,6 +802,7 @@ class _HomeMovementsPanel extends StatelessWidget {
     required this.onApplyStarterTemplate,
     required this.onAddProduct,
     required this.onCreateProductFromFreeSale,
+    required this.showInitialSetupChoice,
   });
 
   final CommerceStore store;
@@ -807,6 +812,7 @@ class _HomeMovementsPanel extends StatelessWidget {
   final VoidCallback onApplyStarterTemplate;
   final VoidCallback onAddProduct;
   final Future<void> Function(Movement movement) onCreateProductFromFreeSale;
+  final bool showInitialSetupChoice;
 
   @override
   Widget build(BuildContext context) {
@@ -832,31 +838,39 @@ class _HomeMovementsPanel extends StatelessWidget {
             EmptyCard(
               title: store.hasProducts
                   ? 'Todavia no registraste movimientos'
-                  : 'Arranca con lo basico',
+                  : 'Todavia no hay actividad',
               message: store.hasProducts
                   ? 'Empieza con una venta o un gasto. Todo queda guardado en esta PC.'
-                  : 'Puedes cargar una base simple o agregar tus primeros productos a mano.',
+                  : showInitialSetupChoice
+                  ? 'Elige arriba como quieres empezar. Cuando cargues productos, aqui veras ventas y gastos.'
+                  : 'Agrega tu primer producto y la actividad del dia va a aparecer aqui.',
               action: Wrap(
                 spacing: 10,
                 runSpacing: 10,
                 alignment: WrapAlignment.center,
                 children: [
                   FilledButton(
-                    onPressed: store.hasProducts
-                        ? onNewSale
-                        : onApplyStarterTemplate,
+                    onPressed: store.hasProducts ? onNewSale : onAddProduct,
                     child: Text(
-                      store.hasProducts
-                          ? 'Nueva venta'
-                          : applyingStarterTemplate
-                          ? 'Cargando plantilla...'
-                          : 'Cargar plantilla kiosco',
+                      store.hasProducts ? 'Nueva venta' : 'Agregar producto',
                     ),
                   ),
-                  TextButton(
-                    onPressed: onAddProduct,
-                    child: const Text('Agregar producto'),
-                  ),
+                  if (!store.hasProducts && !showInitialSetupChoice)
+                    TextButton(
+                      onPressed: applyingStarterTemplate
+                          ? null
+                          : onApplyStarterTemplate,
+                      child: Text(
+                        applyingStarterTemplate
+                            ? 'Cargando base...'
+                            : 'Cargar base simple',
+                      ),
+                    ),
+                  if (store.hasProducts)
+                    TextButton(
+                      onPressed: onAddProduct,
+                      child: const Text('Agregar producto'),
+                    ),
                 ],
               ),
               framed: false,
@@ -887,31 +901,37 @@ class _StarterTemplateCard extends StatelessWidget {
   const _StarterTemplateCard({
     required this.onApplyStarterTemplate,
     required this.onLoadDemoData,
+    required this.onChooseEmptyCatalogStart,
     required this.onAddProduct,
     required this.applyingStarterTemplate,
     required this.loadingDemoData,
     required this.canLoadDemoData,
     required this.hasMovements,
+    required this.showInitialSetupChoice,
   });
 
   final VoidCallback onApplyStarterTemplate;
   final VoidCallback onLoadDemoData;
+  final VoidCallback onChooseEmptyCatalogStart;
   final VoidCallback onAddProduct;
   final bool applyingStarterTemplate;
   final bool loadingDemoData;
   final bool canLoadDemoData;
   final bool hasMovements;
+  final bool showInitialSetupChoice;
 
   @override
   Widget build(BuildContext context) {
-    final title = canLoadDemoData
-        ? 'Primeros pasos'
-        : 'Falta completar tu catalogo base';
-    final message = canLoadDemoData
-        ? 'Puedes arrancar con una base simple del kiosco o abrir un ejemplo corto para recorrer la app sin tocar tus datos.'
+    final title = showInitialSetupChoice
+        ? 'Como quieres empezar?'
         : hasMovements
-        ? 'Ya hay movimientos guardados en esta PC, asi que conviene sumar catalogo real sin tocar ese historial.'
-        : 'Conviene sumar catalogo real con una plantilla simple o alta manual para empezar a vender sin vueltas.';
+        ? 'Catalogo para completar'
+        : 'Catalogo vacio';
+    final message = showInitialSetupChoice
+        ? 'Nada se carga sin preguntarte. Puedes arrancar vacio o probar un ejemplo corto.'
+        : hasMovements
+        ? 'Ya hay movimientos guardados en esta PC, asi que conviene sumar productos reales sin tocar ese historial.'
+        : 'Arranca con tu catalogo real. Lo basico es nombre, precio y stock.';
     return BpcPanel(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
       color: Theme.of(
@@ -924,41 +944,18 @@ class _StarterTemplateCard extends StatelessWidget {
           SectionHeader(title: title, subtitle: message),
           const SizedBox(height: 14),
           Wrap(
-            spacing: 18,
-            runSpacing: 12,
-            children: [
-              _OnboardingStepChip(
-                step: '1',
-                title: 'Abri caja',
-                subtitle: 'Marca el efectivo inicial del dia',
-              ),
-              _OnboardingStepChip(
-                step: '2',
-                title: 'Agrega un producto',
-                subtitle: 'Nombre, precio y stock basico',
-              ),
-              _OnboardingStepChip(
-                step: '3',
-                title: 'Hace una venta',
-                subtitle: 'Elige medio de pago y guarda',
-              ),
-              _OnboardingStepChip(
-                step: '4',
-                title: 'Listo',
-                subtitle: 'Caja y movimientos al dia',
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Wrap(
             spacing: 10,
             runSpacing: 10,
             children: [
-              if (canLoadDemoData)
+              if (showInitialSetupChoice)
                 FilledButton.icon(
-                  onPressed: loadingDemoData || applyingStarterTemplate
-                      ? null
-                      : onLoadDemoData,
+                  onPressed: loadingDemoData ? null : onChooseEmptyCatalogStart,
+                  icon: const Icon(Icons.add_business_rounded),
+                  label: const Text('Empezar vacio'),
+                ),
+              if (showInitialSetupChoice && canLoadDemoData)
+                OutlinedButton.icon(
+                  onPressed: loadingDemoData ? null : onLoadDemoData,
                   icon: loadingDemoData
                       ? const SizedBox(
                           width: 16,
@@ -967,95 +964,36 @@ class _StarterTemplateCard extends StatelessWidget {
                         )
                       : const Icon(Icons.play_circle_rounded),
                   label: Text(
-                    loadingDemoData ? 'Cargando ejemplo...' : 'Ver ejemplo',
+                    loadingDemoData
+                        ? 'Cargando ejemplo...'
+                        : 'Cargar ejemplo para probar',
                   ),
                 ),
-              OutlinedButton.icon(
-                onPressed: applyingStarterTemplate || loadingDemoData
-                    ? null
-                    : onApplyStarterTemplate,
-                icon: applyingStarterTemplate
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.storefront_rounded),
-                label: Text(
-                  applyingStarterTemplate
-                      ? 'Cargando plantilla...'
-                      : 'Cargar $argentinianKioskTemplateName',
+              if (!showInitialSetupChoice)
+                FilledButton.icon(
+                  onPressed: onAddProduct,
+                  icon: const Icon(Icons.add_box_rounded),
+                  label: const Text('Agrega tu primer producto'),
                 ),
-              ),
-              TextButton.icon(
-                onPressed: onAddProduct,
-                icon: const Icon(Icons.add_box_rounded),
-                label: const Text('Agregar producto'),
-              ),
+              if (!showInitialSetupChoice && !hasMovements)
+                OutlinedButton.icon(
+                  onPressed: applyingStarterTemplate || loadingDemoData
+                      ? null
+                      : onApplyStarterTemplate,
+                  icon: applyingStarterTemplate
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.storefront_rounded),
+                  label: Text(
+                    applyingStarterTemplate
+                        ? 'Cargando base...'
+                        : 'Cargar base simple',
+                  ),
+                ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OnboardingStepChip extends StatelessWidget {
-  const _OnboardingStepChip({
-    required this.step,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final String step;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 170, maxWidth: 230),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 26,
-            height: 26,
-            decoration: BoxDecoration(
-              color: BpcColors.greenDeep,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              step,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: BpcColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: BpcColors.subtleInk,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -1070,6 +1008,22 @@ class _CatalogReadinessCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final withoutPriceCount = store.productsWithoutPriceCount;
+    final withoutBarcodeCount = store.productsWithoutBarcodeCount;
+    final title = store.isCatalogReadyForSelling
+        ? 'Catalogo listo para vender'
+        : withoutPriceCount > 0 && withoutBarcodeCount > 0
+        ? 'Catalogo para revisar'
+        : withoutPriceCount > 0
+        ? 'Productos para completar'
+        : 'Catalogo para revisar';
+    final subtitle = store.isCatalogReadyForSelling
+        ? 'Todos los productos cargados tienen precio y codigo para trabajar sin sorpresas.'
+        : withoutPriceCount > 0 && withoutBarcodeCount > 0
+        ? 'Faltan precios o codigos en parte del catalogo.'
+        : withoutPriceCount > 0
+        ? 'Hay productos sin precio. Conviene completarlos antes de vender.'
+        : 'Hay productos sin codigo. Conviene revisarlos antes de usar lector o scanner.';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(0, 14, 0, 14),
@@ -1082,11 +1036,7 @@ class _CatalogReadinessCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionHeader(
-            title: 'Catalogo listo para vender',
-            subtitle:
-                'Estas senales te muestran rapido si hay precio, stock y codigos para trabajar sin sorpresas.',
-          ),
+          SectionHeader(title: title, subtitle: subtitle),
           const SizedBox(height: 12),
           Wrap(
             spacing: 18,
@@ -1097,13 +1047,17 @@ class _CatalogReadinessCard extends StatelessWidget {
                 value: '${store.sellableProductsCount}',
               ),
               _SuggestionMeta(
-                label: 'Con codigo',
+                label: 'Con precio',
                 value:
-                    '${store.productsWithBarcodeCount}/${store.products.length}',
+                    '${store.products.length - withoutPriceCount}/${store.products.length}',
               ),
               _SuggestionMeta(
-                label: 'Stock invertido',
-                value: formatMoney(store.estimatedInventoryCostPesos),
+                label: 'Sin codigo',
+                value: '$withoutBarcodeCount',
+              ),
+              _SuggestionMeta(
+                label: 'Para revisar',
+                value: '${store.productsNeedingCatalogReviewCount}',
               ),
               _SuggestionMeta(
                 label: 'Alertas de stock',

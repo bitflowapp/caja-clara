@@ -10,6 +10,11 @@ void main() {
       expect(store.movements, isEmpty);
       expect(store.hasProducts, isFalse);
       expect(store.hasMovements, isFalse);
+      expect(
+        store.initialCatalogSetupStatus,
+        InitialCatalogSetupStatus.pending,
+      );
+      expect(store.shouldPromptInitialCatalogSetup, isTrue);
     });
 
     test('loads commercial demo data from the empty first-use state', () async {
@@ -24,6 +29,10 @@ void main() {
       expect(store.sellableProductsCount, greaterThan(0));
       expect(store.estimatedInventoryCostPesos, greaterThan(0));
       expect(store.movements.first.title, 'Venta');
+      expect(
+        store.initialCatalogSetupStatus,
+        InitialCatalogSetupStatus.example,
+      );
     });
 
     test(
@@ -74,6 +83,17 @@ void main() {
       await store.applyArgentinianKioskTemplate();
 
       await expectLater(store.loadDemoData(), throwsA(isA<StateError>()));
+    });
+
+    test('marks empty start without loading products', () async {
+      final store = CommerceStore.emptyForTest();
+
+      await store.chooseEmptyCatalogStart();
+
+      expect(store.products, isEmpty);
+      expect(store.movements, isEmpty);
+      expect(store.initialCatalogSetupStatus, InitialCatalogSetupStatus.empty);
+      expect(store.shouldPromptInitialCatalogSetup, isFalse);
     });
 
     test('allows zero price but blocks sale until price is defined', () async {
