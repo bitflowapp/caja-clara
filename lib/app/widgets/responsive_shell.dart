@@ -455,9 +455,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       }
       messenger.showSnackBar(
         const SnackBar(
-          content: Text(
-            'Listo. Arrancas vacio y puedes cargar tu catalogo cuando quieras.',
-          ),
+          content: Text('Listo. Ya puedes cargar tu primer producto.'),
           behavior: SnackBarBehavior.floating,
         ),
       );

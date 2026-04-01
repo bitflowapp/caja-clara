@@ -140,12 +140,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     EmptyCard(
                       title: emptyCatalog
                           ? showInitialSetupChoice
-                                ? 'Elige como quieres empezar'
+                                ? 'Empieza hoy'
                                 : 'Todavia no cargaste productos'
                           : 'Sin resultados para ese filtro',
                       message: emptyCatalog
                           ? showInitialSetupChoice
-                                ? 'Nada se carga solo. Puedes empezar vacio o probar un ejemplo corto para ver como se siente.'
+                                ? 'Carga tu negocio ahora o recorre un ejemplo corto. Con un producto bien cargado ya puedes vender.'
                                 : store.hasMovements
                                 ? 'Ya hay movimientos guardados, asi que conviene sumar tu catalogo real sin tocar ese historial.'
                                 : 'Con nombre, precio y stock en un producto ya puedes vender. El resto puede esperar.'
@@ -159,18 +159,19 @@ class _ProductsScreenState extends State<ProductsScreen> {
                             FilledButton(
                               onPressed: widget.loadingDemoData
                                   ? null
+                                  : () => widget.onChooseEmptyCatalogStart(),
+                              child: const Text('Cargar mi negocio'),
+                            ),
+                          if (emptyCatalog && showInitialSetupChoice)
+                            OutlinedButton(
+                              onPressed: widget.loadingDemoData
+                                  ? null
                                   : () => widget.onLoadDemoData(),
                               child: Text(
                                 widget.loadingDemoData
                                     ? 'Cargando ejemplo...'
                                     : 'Probar con ejemplo',
                               ),
-                            ),
-                          if (emptyCatalog && showInitialSetupChoice)
-                            OutlinedButton(
-                              onPressed: () =>
-                                  widget.onChooseEmptyCatalogStart(),
-                              child: const Text('Empezar vacio'),
                             ),
                           if (emptyCatalog && !showInitialSetupChoice)
                             FilledButton(
@@ -450,17 +451,22 @@ class _CatalogOverviewCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SectionHeader(
-              title: 'Como quieres empezar?',
+              title: 'Empieza hoy',
               subtitle:
-                  'Nada se carga sin preguntarte. Puedes empezar vacio o probar un ejemplo corto para ver como se siente.',
+                  'Carga tu negocio ahora o recorre un ejemplo corto. Con un producto bien cargado ya puedes vender.',
             ),
             const SizedBox(height: 14),
             Wrap(
               spacing: 10,
               runSpacing: 10,
               children: [
+                FilledButton.icon(
+                  onPressed: loadingDemoData ? null : onChooseEmptyCatalogStart,
+                  icon: const Icon(Icons.add_business_rounded),
+                  label: const Text('Cargar mi negocio'),
+                ),
                 if (canLoadDemoData)
-                  FilledButton.icon(
+                  OutlinedButton.icon(
                     onPressed: loadingDemoData ? null : onLoadDemoData,
                     icon: loadingDemoData
                         ? const SizedBox(
@@ -475,11 +481,6 @@ class _CatalogOverviewCard extends StatelessWidget {
                           : 'Probar con ejemplo',
                     ),
                   ),
-                OutlinedButton.icon(
-                  onPressed: onChooseEmptyCatalogStart,
-                  icon: const Icon(Icons.add_business_rounded),
-                  label: const Text('Empezar vacio'),
-                ),
               ],
             ),
           ],

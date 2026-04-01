@@ -48,13 +48,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Abri caja'), findsNothing);
-    expect(find.text('Como quieres empezar?'), findsOneWidget);
-    expect(find.text('Empezar vacio'), findsWidgets);
+    expect(find.text('Empieza hoy'), findsOneWidget);
+    expect(find.text('Cargar mi negocio'), findsWidgets);
     expect(find.text('Probar con ejemplo'), findsWidgets);
-    expect(find.text('Primero abre caja'), findsOneWidget);
+    expect(find.text('Empieza con tu primer producto'), findsOneWidget);
     expect(
-      tester.getTopLeft(find.text('Como quieres empezar?')).dy,
-      lessThan(tester.getTopLeft(find.text('Primero abre caja')).dy),
+      tester.getTopLeft(find.text('Empieza hoy')).dy,
+      lessThan(
+        tester.getTopLeft(find.text('Empieza con tu primer producto')).dy,
+      ),
     );
 
     await tester.ensureVisible(find.text('Primeros pasos'));
@@ -80,8 +82,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Como quieres empezar?'), findsOneWidget);
-    expect(find.text('Empezar vacio'), findsWidgets);
+    expect(find.text('Empieza hoy'), findsOneWidget);
+    expect(find.text('Cargar mi negocio'), findsWidgets);
     expect(find.text('Probar con ejemplo'), findsWidgets);
   });
 

@@ -785,19 +785,17 @@ class _ActionWorkspace extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final prioritizeCashOpening = !hasCashOpeningToday;
-    final prioritizeCatalog = hasCashOpeningToday && !hasProducts;
-    final sectionTitle = prioritizeCashOpening
-        ? 'Primero abre caja'
-        : prioritizeCatalog
-        ? 'Primero agrega un producto'
+    final prioritizeCatalog = !hasProducts;
+    final prioritizeCashOpening = hasProducts && !hasCashOpeningToday;
+    final sectionTitle = prioritizeCatalog
+        ? 'Empieza con tu primer producto'
+        : prioritizeCashOpening
+        ? 'Abre caja y vende'
         : 'Siguiente paso';
-    final sectionSubtitle = prioritizeCashOpening
-        ? hasProducts
-              ? 'Marca el efectivo inicial y sigue con la primera venta.'
-              : 'Marca el efectivo inicial y despues agrega tu primer producto.'
-        : prioritizeCatalog
-        ? 'Con nombre, precio y stock ya puedes cobrar y controlar.'
+    final sectionSubtitle = prioritizeCatalog
+        ? 'Con nombre, precio y stock ya puedes arrancar hoy. Lo demas puede esperar.'
+        : prioritizeCashOpening
+        ? 'Marca el efectivo inicial y sigue con la primera venta.'
         : 'Nueva venta arriba. Caja, gastos y stock quedan a mano.';
     final primaryOpenCash = ActionCard(
       title: savingCashEvent
@@ -1106,7 +1104,7 @@ class _HomeMovementsPanel extends StatelessWidget {
               message: store.hasProducts
                   ? 'La primera venta o gasto deja caja, resumen y stock al dia.'
                   : showInitialSetupChoice
-                  ? 'Elige arriba como quieres empezar. Cuando cargues productos, aqui veras ventas y gastos.'
+                  ? 'Arriba puedes cargar tu negocio o recorrer un ejemplo. Aqui vas a ver ventas y gastos del dia.'
                   : 'Agrega tu primer producto y la actividad del dia va a aparecer aqui.',
               action: Wrap(
                 spacing: 10,
@@ -1187,15 +1185,15 @@ class _StarterTemplateCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final title = showInitialSetupChoice
-        ? 'Como quieres empezar?'
+        ? 'Empieza hoy'
         : hasMovements
         ? 'Catalogo para completar'
         : 'Catalogo vacio';
     final message = showInitialSetupChoice
-        ? 'Puedes cargar tu negocio despues. Si primero quieres ver como se siente, prueba un ejemplo corto.'
+        ? 'Carga tu negocio ahora o recorre un ejemplo corto. Con un producto bien cargado ya puedes vender.'
         : hasMovements
         ? 'Ya hay movimientos guardados en esta PC, asi que conviene sumar productos reales sin tocar ese historial.'
-        : 'Arranca con tu catalogo real. Lo basico es nombre, precio y stock.';
+        : 'Con nombre, precio y stock en un producto ya puedes vender.';
     return BpcPanel(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
       color: Theme.of(
@@ -1213,6 +1211,12 @@ class _StarterTemplateCard extends StatelessWidget {
             children: [
               if (showInitialSetupChoice)
                 FilledButton.icon(
+                  onPressed: loadingDemoData ? null : onChooseEmptyCatalogStart,
+                  icon: const Icon(Icons.add_business_rounded),
+                  label: const Text('Cargar mi negocio'),
+                ),
+              if (showInitialSetupChoice)
+                OutlinedButton.icon(
                   onPressed: loadingDemoData ? null : onLoadDemoData,
                   icon: loadingDemoData
                       ? const SizedBox(
@@ -1226,12 +1230,6 @@ class _StarterTemplateCard extends StatelessWidget {
                         ? 'Cargando ejemplo...'
                         : 'Probar con ejemplo',
                   ),
-                ),
-              if (showInitialSetupChoice)
-                OutlinedButton.icon(
-                  onPressed: loadingDemoData ? null : onChooseEmptyCatalogStart,
-                  icon: const Icon(Icons.add_business_rounded),
-                  label: const Text('Empezar vacio'),
                 ),
               if (!showInitialSetupChoice)
                 FilledButton.icon(

@@ -38,8 +38,8 @@ void main() {
 
     await pumpProductsScreen(tester, store);
 
-    expect(find.text('Como quieres empezar?'), findsOneWidget);
-    expect(find.text('Empezar vacio'), findsWidgets);
+    expect(find.text('Empieza hoy'), findsWidgets);
+    expect(find.text('Cargar mi negocio'), findsWidgets);
     expect(find.text('Probar con ejemplo'), findsWidgets);
     expect(find.text('Agregar producto'), findsNothing);
   });
