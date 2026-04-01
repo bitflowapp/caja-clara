@@ -77,6 +77,9 @@ class _SaleScreenState extends State<SaleScreen> {
     _paymentMethod = resolveSalePaymentMethodSelection(
       store.lastSalePaymentMethod,
     );
+    if (widget.initialProduct == null && !store.hasProducts) {
+      _saleMode = SaleEntryMode.quick;
+    }
     _didSeedDefaults = true;
   }
 
@@ -222,7 +225,9 @@ class _SaleScreenState extends State<SaleScreen> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          '1. Elige el producto. 2. Marca el cobro. 3. Confirma.',
+                          store.hasProducts
+                              ? 'Producto, cobro y guardar. Sin pasos de mas.'
+                              : 'Cobra ahora con venta libre. Despues, si hace falta, lo pasas al catalogo.',
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
                                 color: Theme.of(context).colorScheme.outline,
@@ -371,7 +376,7 @@ class _SaleScreenState extends State<SaleScreen> {
                                     editorContext: 'Venta libre',
                                     hintText: 'Ej. Agua mineral 500 ml',
                                     helperText:
-                                        'Usalo si todavia no cargaste el producto en el catalogo.',
+                                        'Sirve para cobrar ahora aunque el producto todavia no este cargado.',
                                     emptyDisplayText:
                                         'Toca para cargar la descripcion',
                                     keyboardType: TextInputType.text,
@@ -407,7 +412,7 @@ class _SaleScreenState extends State<SaleScreen> {
                                         labelText: 'Descripcion',
                                         hintText: 'Ej. Agua mineral 500 ml',
                                         helperText:
-                                            'Usalo si todavia no cargaste el producto en el catalogo.',
+                                            'Sirve para cobrar ahora aunque el producto todavia no este cargado.',
                                       ),
                                       validator: (value) {
                                         if (_saleMode != SaleEntryMode.quick) {
@@ -815,8 +820,9 @@ class _SaleScreenState extends State<SaleScreen> {
     }
     return _SaleFlowStatus(
       title: 'Todo listo para vender',
-      message:
-          'Cobras ${formatMoney(total)} con ${displayPaymentMethodLabel(_paymentMethod)} y la caja se actualiza al momento.',
+      message: _saleMode == SaleEntryMode.catalog
+          ? 'Cobras ${formatMoney(total)} con ${displayPaymentMethodLabel(_paymentMethod)} y el stock baja al guardar.'
+          : 'Cobras ${formatMoney(total)} con ${displayPaymentMethodLabel(_paymentMethod)} y la caja se actualiza al momento.',
       icon: Icons.check_circle_rounded,
       isReady: true,
     );
@@ -1614,7 +1620,9 @@ class _SaleCheckoutOverviewCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       status.isReady
-                          ? 'Caja y comprobante quedan al dia en el momento.'
+                          ? receipt.stockAfterUnits == null
+                                ? 'Caja y comprobante quedan al dia en el momento.'
+                                : 'Caja, comprobante y stock quedan al dia al guardar.'
                           : 'Completa lo que falta y despues registra la venta.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: Colors.white.withValues(alpha: 0.74),

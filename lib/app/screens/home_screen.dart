@@ -62,6 +62,9 @@ class HomeScreen extends StatelessWidget {
         final suggestions = store.freeSaleSuggestions;
         final showInitialSetupChoice =
             !store.hasProducts && store.shouldPromptInitialCatalogSetup;
+        final todaySignals = store.hasProducts || store.hasMovements
+            ? _buildHomeFocusItems(store)
+            : const <_HomeFocusItem>[];
 
         return SingleChildScrollView(
           child: Column(
@@ -111,6 +114,10 @@ class HomeScreen extends StatelessWidget {
               ],
               const SizedBox(height: 16),
               _HeaderStrip(now: now, store: store),
+              if (todaySignals.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _HomeFocusPanel(items: todaySignals),
+              ],
               if (store.hasProducts) ...[
                 const SizedBox(height: 16),
                 _CatalogReadinessCard(store: store),
@@ -299,19 +306,29 @@ class _HeaderStrip extends StatelessWidget {
       _WorkspaceMetric(
         label: 'Ventas del dia',
         value: formatMoney(store.todaySalesPesos),
-        helper: '${store.todayMovementCount} movimientos del dia',
+        helper: store.todaySalesCount > 0
+            ? '${store.todaySalesCount} ventas hoy'
+            : store.hasProducts
+            ? 'Haz la primera venta del dia'
+            : 'Empieza cargando un producto',
       ),
       _WorkspaceMetric(
         label: 'Caja actual',
         value: formatMoney(store.cashBalancePesos),
-        helper: store.hasCashOpeningToday
+        helper: store.todayExpectedCashPesos != null
+            ? 'Hoy deberia dar ${formatMoney(store.todayExpectedCashPesos!)}'
+            : store.hasCashOpeningToday
             ? 'Caja en marcha'
             : 'Conviene abrir caja',
       ),
       _WorkspaceMetric(
-        label: 'Productos',
-        value: '${store.products.length}',
-        helper: '${store.sellableProductsCount} listos para vender',
+        label: 'Listos para vender',
+        value: '${store.sellableProductsCount}',
+        helper: store.products.isEmpty
+            ? 'Agrega el primero y ya puedes vender'
+            : store.lowStockCount == 0
+            ? '${store.products.length} cargados en total'
+            : '${store.lowStockCount} con alerta',
       ),
     ];
 
@@ -380,7 +397,7 @@ class _HeaderStrip extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                'Ventas, caja, stock y codigos en un solo lugar.',
+                'Vende, controla y revisa el dia sin salir de la app.',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: Colors.white.withValues(alpha: 0.82),
                   fontWeight: FontWeight.w600,
@@ -529,6 +546,213 @@ class _WorkspaceMetricCard extends StatelessWidget {
   }
 }
 
+class _HomeFocusPanel extends StatelessWidget {
+  const _HomeFocusPanel({required this.items});
+
+  final List<_HomeFocusItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return BpcPanel(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+      color: Colors.white.withValues(alpha: 0.8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeader(
+            title: 'Que mirar hoy',
+            subtitle: 'Senales simples para decidir rapido sin abrir reportes.',
+          ),
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth >= 980
+                  ? 3
+                  : constraints.maxWidth >= 620
+                  ? 2
+                  : 1;
+              final spacing = 12.0;
+              final totalGap = columns > 1 ? spacing * (columns - 1) : 0.0;
+              final itemWidth = (constraints.maxWidth - totalGap) / columns;
+              return Wrap(
+                spacing: spacing,
+                runSpacing: 12,
+                children: items
+                    .map(
+                      (item) => SizedBox(
+                        width: columns == 1 ? constraints.maxWidth : itemWidth,
+                        child: _HomeFocusCard(item: item),
+                      ),
+                    )
+                    .toList(growable: false),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeFocusCard extends StatelessWidget {
+  const _HomeFocusCard({required this.item});
+
+  final _HomeFocusItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: BpcColors.line),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: scheme.primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(item.icon, color: scheme.primary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: BpcColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.message,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: BpcColors.subtleInk,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeFocusItem {
+  const _HomeFocusItem({
+    required this.title,
+    required this.message,
+    required this.icon,
+  });
+
+  final String title;
+  final String message;
+  final IconData icon;
+}
+
+List<_HomeFocusItem> _buildHomeFocusItems(CommerceStore store) {
+  final items = <_HomeFocusItem>[];
+  final topSelling = store.topSellingProductsToday(limit: 1);
+  final urgentRestock = store.urgentRestockProducts(limit: 1);
+  final lowRotation = store.lowRotationProducts(limit: 1);
+  final suggestions = store.freeSaleSuggestions;
+
+  if (!store.hasCashOpeningToday) {
+    items.add(
+      const _HomeFocusItem(
+        title: 'Abrir caja',
+        message:
+            'Marca el efectivo inicial y despues comparas el cierre con una referencia real.',
+        icon: Icons.login_rounded,
+      ),
+    );
+  }
+
+  if (store.hasProducts && store.todaySalesCount == 0) {
+    items.add(
+      const _HomeFocusItem(
+        title: 'Primera venta pendiente',
+        message:
+            'En cuanto cobres algo, caja, resumen y comprobante quedan al dia.',
+        icon: Icons.shopping_bag_rounded,
+      ),
+    );
+  }
+
+  if (topSelling.isNotEmpty) {
+    final product = topSelling.first;
+    items.add(
+      _HomeFocusItem(
+        title: 'Mas vendido hoy',
+        message:
+            '${product.product.name} lleva ${product.unitsSold} u. y conviene mirar si alcanza el stock.',
+        icon: Icons.trending_up_rounded,
+      ),
+    );
+  }
+
+  if (urgentRestock.isNotEmpty) {
+    final product = urgentRestock.first;
+    items.add(
+      _HomeFocusItem(
+        title: 'Reponer pronto',
+        message:
+            '${product.product.name} quedo en ${product.product.stockUnits} u. y ya esta pidiendo reposicion.',
+        icon: Icons.inventory_2_rounded,
+      ),
+    );
+  }
+
+  if (suggestions.isNotEmpty) {
+    final suggestion = suggestions.first;
+    items.add(
+      _HomeFocusItem(
+        title: 'Pasar al catalogo',
+        message:
+            '"${suggestion.displayDescription}" ya se vendio ${suggestion.repeatCount} veces y puede quedar como producto.',
+        icon: Icons.add_box_rounded,
+      ),
+    );
+  }
+
+  if (lowRotation.hasEnoughHistory && lowRotation.products.isNotEmpty) {
+    final product = lowRotation.products.first;
+    items.add(
+      _HomeFocusItem(
+        title: 'Revisar antes de comprar',
+        message:
+            '${product.product.name} tiene poca salida. Conviene mirarlo antes de volver a reponer.',
+        icon: Icons.visibility_rounded,
+      ),
+    );
+  }
+
+  if (items.isEmpty && store.hasMovements) {
+    items.add(
+      _HomeFocusItem(
+        title: 'Dia en marcha',
+        message:
+            '${store.todayMovementCount} movimientos guardados. En Resumen ves caja, ventas y gastos del dia.',
+        icon: Icons.insights_rounded,
+      ),
+    );
+  }
+
+  return items.take(3).toList(growable: false);
+}
+
 class _ActionWorkspace extends StatelessWidget {
   const _ActionWorkspace({
     required this.onRegisterCashOpening,
@@ -573,8 +797,8 @@ class _ActionWorkspace extends StatelessWidget {
               ? 'Marca el efectivo inicial y sigue con la primera venta.'
               : 'Marca el efectivo inicial y despues agrega tu primer producto.'
         : prioritizeCatalog
-        ? 'Con nombre, precio y stock ya puedes vender sin vueltas.'
-        : 'Nueva venta arriba. Lo demas queda mas abajo.';
+        ? 'Con nombre, precio y stock ya puedes cobrar y controlar.'
+        : 'Nueva venta arriba. Caja, gastos y stock quedan a mano.';
     final primaryOpenCash = ActionCard(
       title: savingCashEvent
           ? 'Guardando apertura'
@@ -651,7 +875,7 @@ class _ActionWorkspace extends StatelessWidget {
         subtitle: exportingExcel
             ? 'Preparando archivo'
             : hasProducts
-            ? 'Lleva ventas, gastos y productos a un archivo'
+            ? 'Comparte o revisa el dia fuera de la app'
             : 'Disponible cuando empieces a cargar datos',
         icon: Icons.file_download_rounded,
         onTap: onExportExcel,
@@ -665,7 +889,7 @@ class _ActionWorkspace extends StatelessWidget {
         builder: (context, constraints) {
           final wide = constraints.maxWidth >= 1040;
           final shortcuts = _ActionShortcutGroup(
-            title: 'Despues, si hace falta',
+            title: 'Tambien puedes',
             actions: secondaryActions,
           );
 
@@ -880,7 +1104,7 @@ class _HomeMovementsPanel extends StatelessWidget {
                   ? 'Todavia no registraste movimientos'
                   : 'Todavia no hay actividad',
               message: store.hasProducts
-                  ? 'Empieza con una venta o un gasto. Todo queda guardado en esta PC.'
+                  ? 'La primera venta o gasto deja caja, resumen y stock al dia.'
                   : showInitialSetupChoice
                   ? 'Elige arriba como quieres empezar. Cuando cargues productos, aqui veras ventas y gastos.'
                   : 'Agrega tu primer producto y la actividad del dia va a aparecer aqui.',
@@ -968,7 +1192,7 @@ class _StarterTemplateCard extends StatelessWidget {
         ? 'Catalogo para completar'
         : 'Catalogo vacio';
     final message = showInitialSetupChoice
-        ? 'Nada se carga sin preguntarte. Puedes arrancar vacio o probar un ejemplo corto.'
+        ? 'Puedes cargar tu negocio despues. Si primero quieres ver como se siente, prueba un ejemplo corto.'
         : hasMovements
         ? 'Ya hay movimientos guardados en esta PC, asi que conviene sumar productos reales sin tocar ese historial.'
         : 'Arranca con tu catalogo real. Lo basico es nombre, precio y stock.';
@@ -989,12 +1213,6 @@ class _StarterTemplateCard extends StatelessWidget {
             children: [
               if (showInitialSetupChoice)
                 FilledButton.icon(
-                  onPressed: loadingDemoData ? null : onChooseEmptyCatalogStart,
-                  icon: const Icon(Icons.add_business_rounded),
-                  label: const Text('Empezar vacio'),
-                ),
-              if (showInitialSetupChoice && canLoadDemoData)
-                OutlinedButton.icon(
                   onPressed: loadingDemoData ? null : onLoadDemoData,
                   icon: loadingDemoData
                       ? const SizedBox(
@@ -1006,14 +1224,20 @@ class _StarterTemplateCard extends StatelessWidget {
                   label: Text(
                     loadingDemoData
                         ? 'Cargando ejemplo...'
-                        : 'Cargar ejemplo para probar',
+                        : 'Probar con ejemplo',
                   ),
+                ),
+              if (showInitialSetupChoice)
+                OutlinedButton.icon(
+                  onPressed: loadingDemoData ? null : onChooseEmptyCatalogStart,
+                  icon: const Icon(Icons.add_business_rounded),
+                  label: const Text('Empezar vacio'),
                 ),
               if (!showInitialSetupChoice)
                 FilledButton.icon(
                   onPressed: onAddProduct,
                   icon: const Icon(Icons.add_box_rounded),
-                  label: const Text('Agrega tu primer producto'),
+                  label: const Text('Agregar producto'),
                 ),
               if (!showInitialSetupChoice && !hasMovements)
                 OutlinedButton.icon(
@@ -1058,9 +1282,9 @@ class _CatalogReadinessCard extends StatelessWidget {
         ? 'Productos para completar'
         : 'Catalogo para revisar';
     final subtitle = store.isCatalogReadyForSelling
-        ? 'Todos los productos cargados tienen precio y codigo para trabajar sin sorpresas.'
+        ? 'Ya tienes lo necesario para vender y usar lector sin completar nada mas.'
         : withoutPriceCount > 0 && withoutBarcodeCount > 0
-        ? 'Faltan precios o codigos en parte del catalogo.'
+        ? 'Hay productos para completar antes de trabajar mas comodo.'
         : withoutPriceCount > 0
         ? 'Hay productos sin precio. Conviene completarlos antes de vender.'
         : 'Hay productos sin codigo. Conviene revisarlos antes de usar lector o scanner.';

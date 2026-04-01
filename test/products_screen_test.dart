@@ -40,7 +40,7 @@ void main() {
 
     expect(find.text('Como quieres empezar?'), findsOneWidget);
     expect(find.text('Empezar vacio'), findsWidgets);
-    expect(find.text('Cargar ejemplo para probar'), findsWidgets);
+    expect(find.text('Probar con ejemplo'), findsWidgets);
     expect(find.text('Agregar producto'), findsNothing);
   });
 
@@ -57,7 +57,7 @@ void main() {
 
       await pumpProductsScreen(tester, store);
 
-      expect(find.text('Cargar ejemplo para probar'), findsNothing);
+      expect(find.text('Probar con ejemplo'), findsNothing);
       expect(find.text('Cargar base simple'), findsNothing);
       expect(find.text('Agregar producto'), findsWidgets);
     },

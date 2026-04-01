@@ -31,33 +31,31 @@ class _QuickHelpDialogState extends State<_QuickHelpDialog> {
   static const List<_TutorialStepData> _steps = <_TutorialStepData>[
     _TutorialStepData(
       title: 'Abri caja',
-      body: 'Registra la apertura con el efectivo inicial del dia.',
+      body:
+          'Marca el efectivo inicial y arrancas el dia con una referencia clara.',
       icon: Icons.point_of_sale_rounded,
       section: 'Caja',
     ),
     _TutorialStepData(
-      title: 'Agrega un producto',
-      body: 'Carga nombre, precio y stock. El resto puede esperar.',
+      title: 'Carga un producto',
+      body:
+          'Con nombre, precio y stock ya puedes vender. Lo demas puede esperar.',
       icon: Icons.inventory_2_rounded,
       section: 'Productos',
     ),
     _TutorialStepData(
-      title: 'Hace una venta',
-      body: 'Busca el producto, marca el cobro y guarda la venta.',
+      title: 'Guarda la primera venta',
+      body:
+          'Busca el producto, marca el cobro y guarda. Caja y comprobante quedan al dia.',
       icon: Icons.shopping_cart_checkout_rounded,
       section: 'Ventas',
     ),
     _TutorialStepData(
-      title: 'Revisa el resumen',
-      body: 'Mira ventas, gastos y caja del dia antes de cerrar.',
+      title: 'Mira que paso hoy',
+      body:
+          'En Caja ves ventas, gastos, stock para reponer y lo que conviene revisar.',
       icon: Icons.account_balance_wallet_rounded,
-      section: 'Resumen',
-    ),
-    _TutorialStepData(
-      title: 'Listo para usar',
-      body: 'Ya puedes trabajar. Si necesitas repasar, abre Ayuda.',
-      icon: Icons.check_circle_rounded,
-      section: 'Listo',
+      section: 'Caja',
     ),
   ];
 
@@ -80,8 +78,8 @@ class _QuickHelpDialogState extends State<_QuickHelpDialog> {
         children: [
           BpcDialogHeader(
             icon: Icons.auto_stories_rounded,
-            title: 'Tutorial rapido',
-            subtitle: 'Hace esto, despues esto, y listo.',
+            title: 'Primeros pasos',
+            subtitle: 'En menos de un minuto ya se entiende como usarla.',
             badgeLabel: '${_currentStep + 1}/${_steps.length}',
             onClose: () =>
                 Navigator.of(context).pop(QuickHelpDialogResult.dismissed),

@@ -145,10 +145,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
                           : 'Sin resultados para ese filtro',
                       message: emptyCatalog
                           ? showInitialSetupChoice
-                                ? 'Nada se carga solo. Puedes arrancar vacio o probar un ejemplo corto.'
+                                ? 'Nada se carga solo. Puedes empezar vacio o probar un ejemplo corto para ver como se siente.'
                                 : store.hasMovements
-                                ? 'Ya hay movimientos guardados, asi que conviene sumar catalogo real sin tocar ese historial.'
-                                : 'Agrega tu primer producto y deja el resto para despues. Si quieres, tambien puedes cargar una base simple.'
+                                ? 'Ya hay movimientos guardados, asi que conviene sumar tu catalogo real sin tocar ese historial.'
+                                : 'Con nombre, precio y stock en un producto ya puedes vender. El resto puede esperar.'
                           : 'No hay productos que coincidan con la busqueda actual. Ajusta filtros o agrega un producto nuevo.',
                       action: Wrap(
                         spacing: 10,
@@ -157,20 +157,20 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         children: [
                           if (emptyCatalog && showInitialSetupChoice)
                             FilledButton(
-                              onPressed: () =>
-                                  widget.onChooseEmptyCatalogStart(),
-                              child: const Text('Empezar vacio'),
-                            ),
-                          if (emptyCatalog && canLoadDemoData)
-                            OutlinedButton(
                               onPressed: widget.loadingDemoData
                                   ? null
                                   : () => widget.onLoadDemoData(),
                               child: Text(
                                 widget.loadingDemoData
                                     ? 'Cargando ejemplo...'
-                                    : 'Cargar ejemplo para probar',
+                                    : 'Probar con ejemplo',
                               ),
+                            ),
+                          if (emptyCatalog && showInitialSetupChoice)
+                            OutlinedButton(
+                              onPressed: () =>
+                                  widget.onChooseEmptyCatalogStart(),
+                              child: const Text('Empezar vacio'),
                             ),
                           if (emptyCatalog && !showInitialSetupChoice)
                             FilledButton(
@@ -452,20 +452,15 @@ class _CatalogOverviewCard extends StatelessWidget {
             const SectionHeader(
               title: 'Como quieres empezar?',
               subtitle:
-                  'Nada se carga sin preguntarte. Puedes arrancar vacio o probar un ejemplo corto.',
+                  'Nada se carga sin preguntarte. Puedes empezar vacio o probar un ejemplo corto para ver como se siente.',
             ),
             const SizedBox(height: 14),
             Wrap(
               spacing: 10,
               runSpacing: 10,
               children: [
-                FilledButton.icon(
-                  onPressed: onChooseEmptyCatalogStart,
-                  icon: const Icon(Icons.add_business_rounded),
-                  label: const Text('Empezar vacio'),
-                ),
                 if (canLoadDemoData)
-                  OutlinedButton.icon(
+                  FilledButton.icon(
                     onPressed: loadingDemoData ? null : onLoadDemoData,
                     icon: loadingDemoData
                         ? const SizedBox(
@@ -477,9 +472,14 @@ class _CatalogOverviewCard extends StatelessWidget {
                     label: Text(
                       loadingDemoData
                           ? 'Cargando ejemplo'
-                          : 'Cargar ejemplo para probar',
+                          : 'Probar con ejemplo',
                     ),
                   ),
+                OutlinedButton.icon(
+                  onPressed: onChooseEmptyCatalogStart,
+                  icon: const Icon(Icons.add_business_rounded),
+                  label: const Text('Empezar vacio'),
+                ),
               ],
             ),
           ],
@@ -535,6 +535,19 @@ class _CatalogOverviewCard extends StatelessWidget {
                     .map((metric) => _CatalogSummaryPill(metric: metric))
                     .toList(growable: false),
               ),
+              const SizedBox(height: 14),
+              _CatalogReadinessNote(
+                title: store.sellableProductsCount > 0
+                    ? 'Ya puedes vender'
+                    : store.products.isEmpty
+                    ? 'Empieza con uno'
+                    : 'Completa uno y ya puedes vender',
+                message: store.sellableProductsCount > 0
+                    ? 'Con ${store.sellableProductsCount} productos listos, el resto se puede completar despues.'
+                    : store.productsWithoutPriceCount > 0
+                    ? 'Ponle precio a un producto y ya queda listo para vender.'
+                    : 'Con nombre, precio y stock en un producto alcanza para empezar.',
+              ),
             ],
           );
           final actions = Wrap(
@@ -587,6 +600,67 @@ class _CatalogOverviewCard extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _CatalogReadinessNote extends StatelessWidget {
+  const _CatalogReadinessNote({required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: scheme.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: scheme.primary.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: scheme.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.check_circle_outline_rounded,
+              color: scheme.primary,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: BpcColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  message,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: BpcColors.subtleInk,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

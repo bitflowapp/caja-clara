@@ -53,9 +53,10 @@ void main() {
     await pumpSummaryScreen(tester, store);
 
     expect(find.text('Senales para decidir'), findsOneWidget);
+    expect(find.text('Que mirar hoy'), findsOneWidget);
     expect(find.text('Movimientos de hoy'), findsOneWidget);
-    expect(find.text('Mas vendidos'), findsOneWidget);
-    expect(find.text('Reponer pronto'), findsOneWidget);
+    expect(find.text('Mas vendidos'), findsWidgets);
+    expect(find.text('Reponer pronto'), findsWidgets);
     expect(find.text('Poca salida'), findsOneWidget);
     expect(
       find.text(
@@ -82,11 +83,12 @@ void main() {
 
     await pumpSummaryScreen(tester, store);
 
-    await tester.ensureVisible(find.text('Copiar resumen'));
-    await tester.tap(find.text('Copiar resumen'));
+    await tester.ensureVisible(find.text('Copiar para compartir'));
+    await tester.tap(find.text('Copiar para compartir'));
     await tester.pump();
 
     expect(copiedText, contains('Resumen de hoy'));
+    expect(copiedText, contains('Que mirar hoy:'));
     expect(copiedText, contains('Ventas:'));
     expect(copiedText, contains('Mas vendidos:'));
     expect(copiedText, contains('Reponer pronto:'));

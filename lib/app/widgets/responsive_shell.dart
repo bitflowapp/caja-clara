@@ -496,7 +496,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       messenger.showSnackBar(
         const SnackBar(
           content: Text(
-            'Ejemplo cargado. Ya puedes recorrer ventas, productos y caja.',
+            'Ejemplo cargado. Ya puedes probar ventas, productos y caja.',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -965,6 +965,10 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
             : store.isSaving
             ? Icons.sync_rounded
             : Icons.check_circle_outline_rounded;
+        final helpActionLabel = store.isEmptyState ? 'Primeros pasos' : 'Ayuda';
+        final helpActionIcon = store.isEmptyState
+            ? Icons.auto_stories_rounded
+            : Icons.help_outline_rounded;
 
         if (wide) {
           return Scaffold(
@@ -1051,6 +1055,8 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                                   ? 'Licencia'
                                   : 'Activar Caja Clara',
                               onLicenseAction: _openLicenseManagement,
+                              helpActionLabel: helpActionLabel,
+                              helpActionIcon: helpActionIcon,
                               onHelp: _openQuickHelp,
                             ),
                           ),
@@ -1113,6 +1119,8 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                           ? 'Licencia'
                           : 'Activar Caja Clara',
                       onLicenseAction: _openLicenseManagement,
+                      helpActionLabel: helpActionLabel,
+                      helpActionIcon: helpActionIcon,
                       onHelp: _openQuickHelp,
                     ),
                   ),
@@ -1183,12 +1191,16 @@ class _ShellUtilityActions extends StatelessWidget {
     required this.showLicenseAction,
     required this.licenseActionLabel,
     required this.onLicenseAction,
+    required this.helpActionLabel,
+    required this.helpActionIcon,
     required this.onHelp,
   });
 
   final bool showLicenseAction;
   final String licenseActionLabel;
   final Future<void> Function() onLicenseAction;
+  final String helpActionLabel;
+  final IconData helpActionIcon;
   final Future<void> Function() onHelp;
 
   @override
@@ -1206,8 +1218,8 @@ class _ShellUtilityActions extends StatelessWidget {
           ),
         TextButton.icon(
           onPressed: () => onHelp(),
-          icon: const Icon(Icons.help_outline_rounded),
-          label: const Text('Ayuda'),
+          icon: Icon(helpActionIcon),
+          label: Text(helpActionLabel),
         ),
       ],
     );

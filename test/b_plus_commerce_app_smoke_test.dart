@@ -8,7 +8,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   Future<void> dismissTutorialIfVisible(WidgetTester tester) async {
-    if (find.text('Tutorial rapido').evaluate().isEmpty) {
+    if (find.text('Primeros pasos').evaluate().isEmpty) {
       return;
     }
     await tester.tap(find.text('Saltear'));
@@ -47,21 +47,24 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Tutorial rapido'), findsNothing);
+    expect(find.text('Abri caja'), findsNothing);
     expect(find.text('Como quieres empezar?'), findsOneWidget);
     expect(find.text('Empezar vacio'), findsWidgets);
-    expect(find.text('Cargar ejemplo para probar'), findsWidgets);
+    expect(find.text('Probar con ejemplo'), findsWidgets);
     expect(find.text('Primero abre caja'), findsOneWidget);
     expect(
       tester.getTopLeft(find.text('Como quieres empezar?')).dy,
       lessThan(tester.getTopLeft(find.text('Primero abre caja')).dy),
     );
 
-    await tester.ensureVisible(find.text('Ayuda'));
-    await tester.tap(find.text('Ayuda'));
+    await tester.ensureVisible(find.text('Primeros pasos'));
+    await tester.tap(find.text('Primeros pasos'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Tutorial rapido'), findsOneWidget);
+    expect(
+      find.text('En menos de un minuto ya se entiende como usarla.'),
+      findsOneWidget,
+    );
     expect(find.text('Abri caja'), findsWidgets);
   });
 
@@ -79,7 +82,7 @@ void main() {
 
     expect(find.text('Como quieres empezar?'), findsOneWidget);
     expect(find.text('Empezar vacio'), findsWidgets);
-    expect(find.text('Cargar ejemplo para probar'), findsWidgets);
+    expect(find.text('Probar con ejemplo'), findsWidgets);
   });
 
   testWidgets('Home keeps catalog status honest when products are incomplete', (
@@ -131,7 +134,7 @@ void main() {
       await tester.pumpAndSettle();
       await dismissTutorialIfVisible(tester);
 
-      expect(find.text('Cargar ejemplo para probar'), findsNothing);
+      expect(find.text('Probar con ejemplo'), findsNothing);
       expect(find.text('Cargar base simple'), findsNothing);
       expect(find.text('Agregar producto'), findsWidgets);
     },

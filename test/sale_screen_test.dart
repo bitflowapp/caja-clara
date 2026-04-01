@@ -194,13 +194,6 @@ void main() {
 
       await pumpSaleScreen(tester, store);
 
-      expect(find.text('Usar venta libre'), findsOneWidget);
-
-      await tester.ensureVisible(find.text('Usar venta libre'));
-      await tester.tap(find.text('Usar venta libre'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-
       expect(find.widgetWithText(TextFormField, 'Descripcion'), findsOneWidget);
       expect(find.text('Todavia no hay productos cargados'), findsNothing);
     },

@@ -609,7 +609,15 @@ class _OwnerSignalsDeck extends StatelessWidget {
     final topSelling = store.topSellingProductsToday();
     final urgentRestock = store.urgentRestockProducts();
     final lowRotation = store.lowRotationProducts();
+    final focusItems = _buildOwnerFocusItems(
+      store,
+      daily: daily,
+      topSelling: topSelling,
+      urgentRestock: urgentRestock,
+      lowRotation: lowRotation,
+    );
     final shareSummary = _buildDailyShareSummary(
+      focusItems: focusItems,
       daily: daily,
       topSelling: topSelling,
       urgentRestock: urgentRestock,
@@ -623,7 +631,7 @@ class _OwnerSignalsDeck extends StatelessWidget {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Resumen de hoy copiado'),
+          content: Text('Resumen listo para compartir'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -773,10 +781,14 @@ class _OwnerSignalsDeck extends StatelessWidget {
             trailing: TextButton.icon(
               onPressed: copySummary,
               icon: const Icon(Icons.copy_rounded),
-              label: const Text('Copiar resumen'),
+              label: const Text('Copiar para compartir'),
             ),
           ),
           const SizedBox(height: 14),
+          if (focusItems.isNotEmpty) ...[
+            _OwnerFocusPanel(items: focusItems),
+            const SizedBox(height: 18),
+          ],
           LayoutBuilder(
             builder: (context, constraints) {
               final wide = constraints.maxWidth >= 980;
@@ -872,6 +884,129 @@ class _OwnerSignalSection extends StatelessWidget {
       ),
     );
   }
+}
+
+class _OwnerFocusPanel extends StatelessWidget {
+  const _OwnerFocusPanel({required this.items});
+
+  final List<_OwnerFocusItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Que mirar hoy',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: BpcColors.ink,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Tres senales simples para decidir sin perder tiempo.',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: BpcColors.subtleInk,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 12),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final columns = constraints.maxWidth >= 980
+                ? 3
+                : constraints.maxWidth >= 620
+                ? 2
+                : 1;
+            final spacing = 12.0;
+            final totalGap = columns > 1 ? spacing * (columns - 1) : 0.0;
+            final itemWidth = (constraints.maxWidth - totalGap) / columns;
+            return Wrap(
+              spacing: spacing,
+              runSpacing: 12,
+              children: items
+                  .map(
+                    (item) => SizedBox(
+                      width: columns == 1 ? constraints.maxWidth : itemWidth,
+                      child: _OwnerFocusCard(item: item),
+                    ),
+                  )
+                  .toList(growable: false),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _OwnerFocusCard extends StatelessWidget {
+  const _OwnerFocusCard({required this.item});
+
+  final _OwnerFocusItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: BpcColors.line),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: scheme.primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(item.icon, color: scheme.primary),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: BpcColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.detail,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: BpcColors.subtleInk,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OwnerFocusItem {
+  const _OwnerFocusItem({
+    required this.title,
+    required this.detail,
+    required this.icon,
+  });
+
+  final String title;
+  final String detail;
+  final IconData icon;
 }
 
 class _SignalNote extends StatelessWidget {
@@ -1035,19 +1170,121 @@ String _lowRotationDetail(LowRotationProduct product) {
   return 'Ultima venta ${formatCompactDateLabel(product.latestSoldAt!)} / Revisar antes de reponer';
 }
 
-String _buildDailyShareSummary({
+List<_OwnerFocusItem> _buildOwnerFocusItems(
+  CommerceStore store, {
   required DailyMovementSummary daily,
   required List<TopSellingProduct> topSelling,
   required List<UrgentRestockProduct> urgentRestock,
   required LowRotationInsight lowRotation,
 }) {
-  final lines = <String>[
-    'Resumen de hoy',
+  final items = <_OwnerFocusItem>[];
+  final suggestions = store.freeSaleSuggestions;
+
+  if (!store.hasCashOpeningToday) {
+    items.add(
+      const _OwnerFocusItem(
+        title: 'Abrir caja',
+        detail:
+            'Todavia no marcaste el efectivo inicial de hoy y despues cuesta comparar el cierre.',
+        icon: Icons.login_rounded,
+      ),
+    );
+  }
+
+  if (daily.salesCount == 0 && store.hasProducts) {
+    items.add(
+      const _OwnerFocusItem(
+        title: 'Primera venta pendiente',
+        detail:
+            'En cuanto registres una venta ya se actualizan caja, comprobante y resumen.',
+        icon: Icons.shopping_bag_rounded,
+      ),
+    );
+  }
+
+  if (topSelling.isNotEmpty) {
+    final item = topSelling.first;
+    items.add(
+      _OwnerFocusItem(
+        title: 'Mas vendido hoy',
+        detail: '${item.product.name} lleva ${item.unitsSold} u. vendidas.',
+        icon: Icons.trending_up_rounded,
+      ),
+    );
+  }
+
+  if (urgentRestock.isNotEmpty) {
+    final item = urgentRestock.first;
+    items.add(
+      _OwnerFocusItem(
+        title: 'Reponer pronto',
+        detail:
+            '${item.product.name} quedo en ${item.product.stockUnits} u. y ya aparece con alerta.',
+        icon: Icons.inventory_2_rounded,
+      ),
+    );
+  }
+
+  if (suggestions.isNotEmpty) {
+    final suggestion = suggestions.first;
+    items.add(
+      _OwnerFocusItem(
+        title: 'Venta libre repetida',
+        detail:
+            '"${suggestion.displayDescription}" se repitio ${suggestion.repeatCount} veces y puede pasar al catalogo.',
+        icon: Icons.add_box_rounded,
+      ),
+    );
+  }
+
+  if (lowRotation.hasEnoughHistory && lowRotation.products.isNotEmpty) {
+    final item = lowRotation.products.first;
+    items.add(
+      _OwnerFocusItem(
+        title: 'Poca salida',
+        detail:
+            '${item.product.name} conviene revisarlo antes de volver a reponer.',
+        icon: Icons.visibility_rounded,
+      ),
+    );
+  }
+
+  if (items.isEmpty && daily.movementCount > 0) {
+    items.add(
+      _OwnerFocusItem(
+        title: 'Dia en marcha',
+        detail:
+            '${daily.movementCount} movimientos guardados con ventas y gastos listos para revisar.',
+        icon: Icons.insights_rounded,
+      ),
+    );
+  }
+
+  return items.take(3).toList(growable: false);
+}
+
+String _buildDailyShareSummary({
+  required List<_OwnerFocusItem> focusItems,
+  required DailyMovementSummary daily,
+  required List<TopSellingProduct> topSelling,
+  required List<UrgentRestockProduct> urgentRestock,
+  required LowRotationInsight lowRotation,
+}) {
+  final lines = <String>['Resumen de hoy'];
+
+  if (focusItems.isNotEmpty) {
+    lines.add('Que mirar hoy:');
+    for (final item in focusItems) {
+      lines.add('- ${item.title}: ${item.detail}');
+    }
+  }
+
+  lines.addAll([
     'Movimientos: ${daily.movementCount}',
     'Ventas: ${formatMoney(daily.salesPesos)} en ${daily.salesCount} ventas',
     'Gastos: ${formatMoney(daily.expensesPesos)} en ${daily.expenseCount} gastos',
     'Mas vendidos:',
-  ];
+  ]);
 
   if (topSelling.isEmpty) {
     lines.add('- Sin ventas destacadas hoy');
