@@ -50,7 +50,7 @@ class StoreAccessException implements Exception {
   }
 
   @override
-  String toString() => 'StoreAccessException($issue): $cause';
+  String toString() => 'StoreAccessException($issue)';
 }
 
 /// Clasifica un error de almacenamiento crudo en un [StoreAccessIssue].
@@ -73,6 +73,7 @@ StoreAccessIssue classifyStorageError(Object error) {
     'being used by another process',
     'lo está usando otro proceso',
     'usado por otro proceso',
+    'siendo utilizado por otro proceso',
     'sharing violation',
   ];
   for (final hint in lockHints) {
@@ -148,9 +149,7 @@ Future<T> runWithStorageRetry<T>(
       }
 
       if (kDebugMode) {
-        debugPrint(
-          'Storage retry ${attempt + 1}/$maxAttempts ($issue): $error',
-        );
+        debugPrint('Storage retry ${attempt + 1}/$maxAttempts ($issue)');
       }
       final waitFor = attempt < backoff.length
           ? backoff[attempt]

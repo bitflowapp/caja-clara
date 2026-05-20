@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:hive_flutter/hive_flutter.dart';
 
+import 'hive_lock_probe.dart';
 import 'store_lock.dart';
 
 /// Persistencia local del store sobre Hive.
@@ -10,8 +11,12 @@ import 'store_lock.dart';
 /// un bloqueo temporal de Windows o un lock viejo que se libera se resuelven
 /// solos, y un lock que sigue tomado se reporta como [StoreAccessException].
 class CommercePersistence {
+  CommercePersistence({String? hivePath}) : _hivePath = hivePath;
+
   static const String _boxName = 'b_plus_commerce';
   static const String _snapshotKey = 'snapshot';
+
+  final String? _hivePath;
 
   Future<Map<String, dynamic>?> load() async {
     return runWithStorageRetry<Map<String, dynamic>?>(() async {
@@ -46,6 +51,15 @@ class CommercePersistence {
     if (Hive.isBoxOpen(_boxName)) {
       return Hive.box<dynamic>(_boxName);
     }
+    await assertHiveLockAvailable(boxName: _boxName, hivePath: _hivePath);
     return Hive.openBox<dynamic>(_boxName);
+  }
+}
+
+String? currentHiveHomePath() {
+  try {
+    return (Hive as dynamic).homePath as String?;
+  } catch (_) {
+    return null;
   }
 }

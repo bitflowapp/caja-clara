@@ -18,7 +18,7 @@ class CommerceStore extends ChangeNotifier {
   static Future<CommerceStore> loadOrSeed() async {
     await Hive.initFlutter();
     final store = CommerceStore._(
-      CommercePersistence(),
+      CommercePersistence(hivePath: currentHiveHomePath()),
       persistenceEnabled: true,
     );
     await store._load();
@@ -1379,7 +1379,7 @@ class CommerceStore extends ChangeNotifier {
           ? error.userMessage
           : 'No se pudo guardar el cambio.';
       if (kDebugMode) {
-        debugPrint('CommerceStore save failed: $error');
+        debugPrint('CommerceStore save failed: ${classifyStorageError(error)}');
       }
       rethrow;
     } finally {
