@@ -7,6 +7,7 @@ import '../models/movement.dart';
 import '../models/product.dart';
 import 'commerce_persistence.dart';
 import 'starter_templates.dart';
+import 'store_lock.dart';
 
 class CommerceStore extends ChangeNotifier {
   static const int freeSaleSuggestionThreshold = 3;
@@ -351,8 +352,9 @@ class CommerceStore extends ChangeNotifier {
       }
       _seedEmptyState();
       _ready = true;
-      _lastError =
-          'No se pudo abrir el almacenamiento. La app quedó lista para cargar tus datos.';
+      _lastError = error is StoreAccessException
+          ? error.userMessage
+          : 'No se pudo abrir el almacenamiento. La app quedó lista para cargar tus datos.';
       notifyListeners();
     }
   }
@@ -1373,7 +1375,9 @@ class CommerceStore extends ChangeNotifier {
     try {
       await _persistence.save(buildSnapshot());
     } catch (error) {
-      _lastError = 'No se pudo guardar el cambio.';
+      _lastError = error is StoreAccessException
+          ? error.userMessage
+          : 'No se pudo guardar el cambio.';
       if (kDebugMode) {
         debugPrint('CommerceStore save failed: $error');
       }

@@ -806,8 +806,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                         children: [
                           if (store.lastError != null) ...[
                             _SaveErrorBanner(
-                              message:
-                                  'El último cambio no se pudo guardar. Reintentá y seguimos.',
+                              message: store.lastError!,
                               retrying: _retryingSave || store.isSaving,
                               onRetry: _retrySave,
                             ),
@@ -841,8 +840,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                 children: [
                   if (store.lastError != null) ...[
                     _SaveErrorBanner(
-                      message:
-                          'El último cambio no se pudo guardar. Reintentá sin perder lo que cargaste.',
+                      message: store.lastError!,
                       retrying: _retryingSave || store.isSaving,
                       onRetry: _retrySave,
                     ),
