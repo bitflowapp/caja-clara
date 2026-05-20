@@ -17,35 +17,35 @@ Future<void> showQuickHelpDialog(BuildContext context) async {
             16 + MediaQuery.viewInsetsOf(context).bottom,
           ),
           scrollable: true,
-          title: const Text('Como usar Caja Clara'),
+          title: const Text('Cómo usar Caja Clara'),
           content: const Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _HelpBlock(
-                title: 'Que es',
+                title: 'Para que sirve',
                 text:
-                    'Caja Clara ayuda a registrar ventas, gastos, productos y caja desde una sola app local.',
+                    'Para ordenar tu negocio sin Excel: ventas, gastos, caja, productos y stock en una sola app.',
               ),
               _HelpBlock(
-                title: 'Empezar',
+                title: 'Cómo empezar',
                 text:
-                    'Primero carga tus productos. Luego registra ventas o gastos y revisa la caja en Resumen.',
+                    'Cargá tus productos (o usá la plantilla kiosco). Después registrá ventas y gastos en segundos.',
               ),
               _HelpBlock(
-                title: 'Barcode',
+                title: 'Vender rápido',
                 text:
-                    'Puedes leer con camara, scanner o ingreso manual. Si el codigo no existe, lo das de alta desde ahi.',
+                    'Buscás el producto, elegís la cantidad y guardás. La caja y el stock se actualizan solos.',
               ),
               _HelpBlock(
-                title: 'Exportar',
+                title: 'Código de barras',
                 text:
-                    'Desde Caja puedes exportar Excel o guardar un backup para llevarte la informacion.',
+                    'Usá la cámara, un lector o cargalo a mano. Si el código no existe, lo das de alta desde ahí.',
               ),
               _HelpBlock(
-                title: 'Si algo falla',
+                title: 'Llevarte los datos',
                 text:
-                    'Revisa el mensaje en pantalla. La app guarda localmente, asi que conviene exportar o hacer backup con regularidad.',
+                    'Desde Caja podés exportar a Excel o guardar un backup para tener tu información siempre a mano.',
               ),
             ],
           ),

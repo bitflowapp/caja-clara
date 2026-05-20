@@ -163,7 +163,7 @@ class _MobileFieldEditorFormFieldState
                   '${widget.prefixText ?? ''}$value')
             : (widget.emptyDisplayText ??
                   widget.hintText ??
-                  'Toca para editar');
+                  'Tocá para editar');
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -644,7 +644,7 @@ class _MobileFieldEditorSheetState extends State<_MobileFieldEditorSheet> {
       builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Hay cambios sin guardar'),
-          content: Text('Todavia no aplicaste los cambios en ${widget.title}.'),
+          content: Text('Todavía no aplicaste los cambios en ${widget.title}.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(

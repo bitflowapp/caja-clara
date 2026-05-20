@@ -33,9 +33,9 @@ class BPlusCommerceApp extends StatelessWidget {
           return DecoratedBox(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFFF3ECDD), Color(0xFFEEE6D8)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFF7F4EC), Color(0xFFF1ECE0)],
               ),
             ),
             child: child ?? const SizedBox.shrink(),

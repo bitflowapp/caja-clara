@@ -12,11 +12,12 @@ void main() {
 
     expect(find.text('Caja Clara'), findsWidgets);
     expect(find.text('Nueva venta'), findsOneWidget);
+    expect(find.text('Cargar producto'), findsOneWidget);
+    expect(find.text('Ver caja del día'), findsOneWidget);
     expect(find.text('Registrar gasto'), findsOneWidget);
-    expect(find.text('Escanear producto'), findsOneWidget);
-    expect(find.text('Agregar producto'), findsOneWidget);
-    expect(find.text('Ver stock bajo'), findsOneWidget);
-    expect(find.text('Ultimos movimientos'), findsOneWidget);
+    expect(find.text('Últimos movimientos'), findsOneWidget);
+    // Stock bajo banner shows because seeded test data has 3 low-stock products.
+    expect(find.textContaining('productos con poco stock'), findsOneWidget);
   });
 
   testWidgets('Home guides first use with kiosk template', (tester) async {
@@ -24,8 +25,9 @@ void main() {
     await tester.pumpWidget(BPlusCommerceApp(store: store));
     await tester.pumpAndSettle();
 
-    expect(find.text('Arranca con una base de kiosco'), findsOneWidget);
+    expect(find.text('Arrancá con una base de kiosco'), findsOneWidget);
     expect(find.text('Cargar Kiosco argentino'), findsOneWidget);
-    expect(find.text('Agregar producto manualmente'), findsOneWidget);
+    expect(find.text('Cargar producto manualmente'), findsOneWidget);
+    expect(find.text('Probá con datos de demo'), findsOneWidget);
   });
 }

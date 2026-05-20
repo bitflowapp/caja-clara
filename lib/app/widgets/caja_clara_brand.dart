@@ -30,11 +30,7 @@ class CajaClaraLogo extends StatelessWidget {
 }
 
 class CajaClaraSymbol extends StatelessWidget {
-  const CajaClaraSymbol({
-    super.key,
-    this.size = 28,
-    this.fit = BoxFit.contain,
-  });
+  const CajaClaraSymbol({super.key, this.size = 28, this.fit = BoxFit.contain});
 
   final double size;
   final BoxFit fit;

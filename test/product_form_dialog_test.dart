@@ -97,7 +97,7 @@ void main() {
 
       expect(store.products, hasLength(1));
       expect(store.products.single.name, 'Cable lightning');
-      expect(find.text('Agregar producto'), findsNothing);
+      expect(find.text('Cargar producto'), findsNothing);
       expect(find.byType(SnackBar), findsNothing);
     },
   );
@@ -123,7 +123,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text('Ese codigo ya existe'), findsOneWidget);
+    expect(find.text('Ese código ya existe'), findsOneWidget);
 
     await tester.tap(find.text('Usar existente'));
     await tester.pump();
@@ -141,9 +141,9 @@ void main() {
 
       expect(find.byType(Dialog), findsNothing);
       expect(find.byType(AppBar), findsOneWidget);
-      expect(find.text('Agregar producto'), findsOneWidget);
+      expect(find.text('Cargar producto'), findsOneWidget);
       expect(find.widgetWithText(TextFormField, 'Nombre'), findsNothing);
-      expect(find.text('Toca para cargar el nombre'), findsOneWidget);
+      expect(find.text('Tocá para cargar el nombre'), findsOneWidget);
 
       await tester.tap(find.byIcon(Icons.close_rounded).first);
       await tester.pump();

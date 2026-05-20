@@ -29,8 +29,8 @@ void main() {
               child: MobileFieldEditorFormField(
                 controller: controller,
                 labelText: label,
-                editorContext: 'Prueba movil',
-                emptyDisplayText: 'Toca para editar',
+                editorContext: 'Probá movil',
+                emptyDisplayText: 'Tocá para editar',
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 validator:
@@ -38,7 +38,7 @@ void main() {
                     (value) {
                       final parsed = int.tryParse(value ?? '') ?? 0;
                       if (parsed <= 0) {
-                        return 'Ingresa un monto valido';
+                        return 'Ingresá un monto válido';
                       }
                       return null;
                     },
@@ -104,12 +104,12 @@ void main() {
                     nextEditorController: secondEditorController,
                     nextFieldLabel: 'Precio',
                     labelText: 'Cantidad',
-                    editorContext: 'Prueba movil',
+                    editorContext: 'Probá movil',
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     validator: (value) {
                       final parsed = int.tryParse(value ?? '') ?? 0;
-                      return parsed <= 0 ? 'Ingresa una cantidad' : null;
+                      return parsed <= 0 ? 'Ingresá una cantidad' : null;
                     },
                   ),
                   const SizedBox(height: 12),
@@ -117,12 +117,12 @@ void main() {
                     controller: secondController,
                     editorController: secondEditorController,
                     labelText: 'Precio',
-                    editorContext: 'Prueba movil',
+                    editorContext: 'Probá movil',
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     validator: (value) {
                       final parsed = int.tryParse(value ?? '') ?? 0;
-                      return parsed <= 0 ? 'Ingresa un precio' : null;
+                      return parsed <= 0 ? 'Ingresá un precio' : null;
                     },
                   ),
                 ],
@@ -149,7 +149,7 @@ void main() {
     expect(secondController.text, '34');
   });
 
-  testWidgets('guardar y seguir invalido no cierra ni abre el siguiente', (
+  testWidgets('guardar y seguir inválido no cierra ni abre el siguiente', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -180,12 +180,12 @@ void main() {
                     nextEditorController: secondEditorController,
                     nextFieldLabel: 'Precio',
                     labelText: 'Cantidad',
-                    editorContext: 'Prueba movil',
+                    editorContext: 'Probá movil',
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     validator: (value) {
                       final parsed = int.tryParse(value ?? '') ?? 0;
-                      return parsed <= 0 ? 'Ingresa una cantidad' : null;
+                      return parsed <= 0 ? 'Ingresá una cantidad' : null;
                     },
                   ),
                   const SizedBox(height: 12),
@@ -193,12 +193,12 @@ void main() {
                     controller: secondController,
                     editorController: secondEditorController,
                     labelText: 'Precio',
-                    editorContext: 'Prueba movil',
+                    editorContext: 'Probá movil',
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     validator: (value) {
                       final parsed = int.tryParse(value ?? '') ?? 0;
-                      return parsed <= 0 ? 'Ingresa un precio' : null;
+                      return parsed <= 0 ? 'Ingresá un precio' : null;
                     },
                   ),
                 ],
@@ -221,12 +221,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(firstController.text, '12');
-    expect(find.text('Ingresa una cantidad'), findsOneWidget);
+    expect(find.text('Ingresá una cantidad'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, 'Cantidad'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, 'Precio'), findsNothing);
   });
 
-  testWidgets('cancelar sin cambios cierra sin modificar el valor', (
+  testWidgets('cancelar sin cambios cerrá sin modificar el valor', (
     tester,
   ) async {
     final controller = await pumpEditorField(tester, initialValue: '1800');
@@ -274,7 +274,7 @@ void main() {
     expect(find.byType(TextFormField), findsNothing);
   });
 
-  testWidgets('si el valor es invalido se queda abierto y muestra error', (
+  testWidgets('si el valor es inválido se queda abierto y muestra error', (
     tester,
   ) async {
     final controller = await pumpEditorField(tester, initialValue: '100');
@@ -288,7 +288,7 @@ void main() {
     await tester.tap(find.text('Confirmar'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Ingresa un monto valido'), findsOneWidget);
+    expect(find.text('Ingresá un monto válido'), findsOneWidget);
     expect(find.byType(TextFormField), findsOneWidget);
     expect(controller.text, '100');
   });
@@ -318,7 +318,7 @@ void main() {
                 editorController: editorController,
                 nextFieldLabel: 'Cantidad',
                 labelText: 'Observaciones',
-                editorContext: 'Prueba movil',
+                editorContext: 'Probá movil',
                 keyboardType: TextInputType.multiline,
                 minLines: 3,
                 maxLines: 5,

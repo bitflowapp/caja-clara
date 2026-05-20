@@ -87,7 +87,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No se pudo leer un codigo valido.'),
+          content: Text('No se pudo leer un código válido.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -261,7 +261,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
               TextButton.icon(
                 onPressed: _openManualInput,
                 icon: const Icon(Icons.keyboard_alt_rounded),
-                label: const Text('Ingresar codigo'),
+                label: const Text('Ingresar código'),
               ),
               const SizedBox(width: 8),
             ],
@@ -275,9 +275,9 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SectionHeader(
-                      title: 'Codigo de barras',
+                      title: 'Código de barras',
                       subtitle:
-                          'Busca un producto por camara, scanner o ingreso manual.',
+                          'Buscá un producto por cámara, scanner o ingreso manual.',
                     ),
                     const SizedBox(height: 14),
                     if (_supportsCamera)
@@ -310,7 +310,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                                   ),
                                   label: Text(
                                     _currentBarcode == null && !_cameraStarting
-                                        ? 'Ingresar codigo'
+                                        ? 'Ingresar código'
                                         : 'Leer otro',
                                   ),
                                 ),
@@ -333,7 +333,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                                               MainAxisAlignment.end,
                                           children: [
                                             Text(
-                                              'Codigo detectado',
+                                              'Código detectado',
                                               style: Theme.of(context)
                                                   .textTheme
                                                   .labelLarge
@@ -366,24 +366,24 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                       )
                     else
                       EmptyCard(
-                        title: 'Usar codigo o scanner',
+                        title: 'Usar código o scanner',
                         message:
-                            'En Windows suele ser mas rapido usar scanner USB/Bluetooth o escribir el codigo.',
+                            'En Windows suele ser más rápido usar scanner USB/Bluetooth o escribir el código.',
                         action: FilledButton.icon(
                           onPressed: _openManualInput,
                           icon: const Icon(Icons.keyboard_alt_rounded),
-                          label: const Text('Ingresar codigo'),
+                          label: const Text('Ingresar código'),
                         ),
                       ),
                     const SizedBox(height: 16),
                     if (_currentBarcode == null)
                       EmptyCard(
                         title: _cameraIssue != null
-                            ? 'Camara no disponible'
-                            : 'Esperando codigo',
+                            ? 'Cámara no disponible'
+                            : 'Esperando código',
                         message: _cameraIssue != null
-                            ? 'Puedes reintentar la camara o seguir con ingreso manual sin frenar la venta.'
-                            : 'Lee o escribe un codigo para encontrar el producto al instante.',
+                            ? 'Podés reintentar la cámara o seguir con ingreso manual sin frenar la venta.'
+                            : 'Leé o escribí un código para encontrar el producto al instante.',
                         icon: _cameraIssue != null
                             ? Icons.warning_amber_rounded
                             : Icons.qr_code_scanner_rounded,
@@ -395,7 +395,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                             FilledButton.icon(
                               onPressed: _openManualInput,
                               icon: const Icon(Icons.keyboard_alt_rounded),
-                              label: const Text('Ingresar codigo'),
+                              label: const Text('Ingresar código'),
                             ),
                             if (_supportsCamera)
                               TextButton.icon(
@@ -405,7 +405,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
                                 icon: const Icon(Icons.restart_alt_rounded),
                                 label: Text(
                                   _cameraIssue != null
-                                      ? 'Reintentar camara'
+                                      ? 'Reintentar cámara'
                                       : 'Reiniciar lector',
                                 ),
                               ),
@@ -444,43 +444,43 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
 
   String get _cameraStatusTitle {
     if (_currentBarcode != null) {
-      return 'Codigo leido';
+      return 'Código leido';
     }
     if (_cameraStarting) {
-      return 'Preparando camara';
+      return 'Preparando cámara';
     }
     if (_cameraIssue != null) {
       return _cameraIssue!.toLowerCase().contains('permiso')
-          ? 'Sin permiso de camara'
-          : 'Camara con problemas';
+          ? 'Sin permiso de cámara'
+          : 'Cámara con problemas';
     }
     if (_cameraRunning) {
       return 'Listo para leer';
     }
-    return 'Camara pausada';
+    return 'Cámara pausada';
   }
 
   String get _cameraStatusSubtitle {
     if (_currentBarcode != null) {
-      return 'Elige la accion y sigue.';
+      return 'Elegí la acción y seguí.';
     }
     if (_cameraStarting) {
-      return 'Estamos iniciando la camara para leer el codigo.';
+      return 'Estamos iniciando la cámara para leer el código.';
     }
     if (_cameraIssue != null) {
       return _cameraIssue!;
     }
     if (_cameraRunning) {
-      return 'Apunta al codigo del producto o usa ingreso manual.';
+      return 'Apuntá al código del producto o usá ingreso manual.';
     }
-    return 'Puedes seguir con ingreso manual si la camara no responde.';
+    return 'Podés seguir con ingreso manual si la cámara no responde.';
   }
 
   Widget _buildCameraViewport(BuildContext context) {
     if (_cameraStarting) {
       return _CameraPlaceholderState(
         icon: Icons.videocam_rounded,
-        title: 'Cargando camara',
+        title: 'Cargando cámara',
         message: 'Dando acceso al lector para empezar a escanear.',
       );
     }
@@ -491,7 +491,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
             : Icons.videocam_off_rounded,
         title: _cameraIssue!.toLowerCase().contains('permiso')
             ? 'Permiso denegado'
-            : 'No se pudo iniciar la camara',
+            : 'No se pudo iniciar la cámara',
         message: _cameraIssue!,
       );
     }
@@ -499,7 +499,7 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
       return const _CameraPlaceholderState(
         icon: Icons.qr_code_scanner_rounded,
         title: 'Listo para reintentar',
-        message: 'Toca "Leer otro" o usa ingreso manual para seguir.',
+        message: 'Tocá "Leer otro" o usá ingreso manual para seguir.',
       );
     }
     return MobileScanner(
@@ -737,7 +737,7 @@ class _BarcodeNotFoundCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Codigo leido',
+                      'Código leido',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: BpcColors.mutedInk,
                         fontWeight: FontWeight.w800,
@@ -745,7 +745,7 @@ class _BarcodeNotFoundCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'No esta en catalogo',
+                      'No está en catálogo',
                       style: Theme.of(context).textTheme.headlineSmall
                           ?.copyWith(
                             color: BpcColors.ink,
@@ -775,7 +775,7 @@ class _BarcodeNotFoundCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'El codigo se leyo bien. Puedes dar de alta el producto con este codigo cargado.',
+            'El código se leyó bien. Podés dar de alta el producto con este código cargado.',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),

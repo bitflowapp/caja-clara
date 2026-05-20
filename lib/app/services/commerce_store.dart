@@ -288,10 +288,10 @@ class CommerceStore extends ChangeNotifier {
   String? saleReadinessMessage(String productId, {required int quantityUnits}) {
     final product = productById(productId);
     if (product == null) {
-      return 'El producto ya no esta disponible.';
+      return 'El producto ya no está disponible.';
     }
     if (quantityUnits <= 0) {
-      return 'Ingresa una cantidad mayor a 0.';
+      return 'Ingresá una cantidad mayor a 0.';
     }
     if (product.pricePesos <= 0) {
       return 'Define un precio antes de vender este producto.';
@@ -308,13 +308,13 @@ class CommerceStore extends ChangeNotifier {
     required int unitPricePesos,
   }) {
     if (description.trim().isEmpty) {
-      return 'Escribe una descripcion para la venta.';
+      return 'Escribí una descripción para la venta.';
     }
     if (quantityUnits <= 0) {
-      return 'Ingresa una cantidad mayor a 0.';
+      return 'Ingresá una cantidad mayor a 0.';
     }
     if (unitPricePesos <= 0) {
-      return 'Ingresa un precio unitario mayor a 0.';
+      return 'Ingresá un precio unitario mayor a 0.';
     }
     return null;
   }
@@ -352,7 +352,7 @@ class CommerceStore extends ChangeNotifier {
       _seedEmptyState();
       _ready = true;
       _lastError =
-          'No se pudo abrir el almacenamiento. La app quedo lista para cargar tus datos.';
+          'No se pudo abrir el almacenamiento. La app quedó lista para cargar tus datos.';
       notifyListeners();
     }
   }
@@ -472,7 +472,7 @@ class CommerceStore extends ChangeNotifier {
           title: 'Venta',
           subtitle: 'Cafe molido + galletitas',
           quantityUnits: 2,
-          paymentMethod: 'Debito',
+          paymentMethod: 'Débito',
           productId: 'p-3',
         ),
       ])
@@ -531,6 +531,251 @@ class CommerceStore extends ChangeNotifier {
     );
   }
 
+  bool get canLoadCommercialDemo =>
+      !hasProducts &&
+      !hasMovements &&
+      _cashOpeningAt == null &&
+      _cashClosingAt == null;
+
+  Future<CommercialDemoApplyResult> loadCommercialDemo() async {
+    if (!canLoadCommercialDemo) {
+      return const CommercialDemoApplyResult(applied: false);
+    }
+
+    final now = DateTime.now();
+    DateTime atToday(int hour, int minute) =>
+        DateTime(now.year, now.month, now.day, hour, minute);
+
+    final demoProducts = <Product>[
+      Product(
+        id: _buildId('demo-product'),
+        name: 'Coca Cola 2.25 L',
+        stockUnits: 12,
+        minStockUnits: 6,
+        costPesos: 1800,
+        pricePesos: 2900,
+        category: 'Bebidas',
+        barcode: '7790895000016',
+      ),
+      Product(
+        id: _buildId('demo-product'),
+        name: 'Agua mineral 1.5 L',
+        stockUnits: 9,
+        minStockUnits: 6,
+        costPesos: 700,
+        pricePesos: 1200,
+        category: 'Bebidas',
+        barcode: '7790895000023',
+      ),
+      Product(
+        id: _buildId('demo-product'),
+        name: 'Alfajor triple',
+        stockUnits: 24,
+        minStockUnits: 12,
+        costPesos: 650,
+        pricePesos: 1100,
+        category: 'Golosinas',
+        barcode: '7790895000030',
+      ),
+      Product(
+        id: _buildId('demo-product'),
+        name: 'Galletitas dulces',
+        stockUnits: 4,
+        minStockUnits: 8,
+        costPesos: 850,
+        pricePesos: 1400,
+        category: 'Almacen',
+        barcode: '7790895000047',
+      ),
+      Product(
+        id: _buildId('demo-product'),
+        name: 'Yerba 1 kg',
+        stockUnits: 7,
+        minStockUnits: 5,
+        costPesos: 2600,
+        pricePesos: 4200,
+        category: 'Almacen',
+        barcode: '7790895000054',
+      ),
+      Product(
+        id: _buildId('demo-product'),
+        name: 'Pan lactal',
+        stockUnits: 5,
+        minStockUnits: 4,
+        costPesos: 1300,
+        pricePesos: 2100,
+        category: 'Almacen',
+        barcode: '7790895000061',
+      ),
+      Product(
+        id: _buildId('demo-product'),
+        name: 'Leche 1 L',
+        stockUnits: 10,
+        minStockUnits: 6,
+        costPesos: 900,
+        pricePesos: 1500,
+        category: 'Almacen',
+        barcode: '7790895000078',
+      ),
+      Product(
+        id: _buildId('demo-product'),
+        name: 'Aceite 900 ml',
+        stockUnits: 3,
+        minStockUnits: 5,
+        costPesos: 2100,
+        pricePesos: 3300,
+        category: 'Almacen',
+        barcode: '7790895000085',
+      ),
+      Product(
+        id: _buildId('demo-product'),
+        name: 'Fideos 500 g',
+        stockUnits: 18,
+        minStockUnits: 8,
+        costPesos: 700,
+        pricePesos: 1200,
+        category: 'Almacen',
+        barcode: '7790895000092',
+      ),
+      Product(
+        id: _buildId('demo-product'),
+        name: 'Cigarrillos box',
+        stockUnits: 14,
+        minStockUnits: 6,
+        costPesos: 2400,
+        pricePesos: 3500,
+        category: 'Mostrador',
+        barcode: '7790895000108',
+      ),
+    ];
+
+    Product byName(String name) =>
+        demoProducts.firstWhere((product) => product.name == name);
+
+    final demoMovements = <Movement>[
+      Movement(
+        id: _buildId('demo-sale'),
+        kind: MovementKind.sale,
+        origin: MovementOrigin.sale,
+        amountPesos: byName('Coca Cola 2.25 L').pricePesos * 2,
+        costOfSalePesos: byName('Coca Cola 2.25 L').costPesos * 2,
+        createdAt: atToday(9, 18),
+        title: 'Venta',
+        subtitle: 'Coca Cola 2.25 L',
+        productId: byName('Coca Cola 2.25 L').id,
+        quantityUnits: 2,
+        paymentMethod: 'Efectivo',
+      ),
+      Movement(
+        id: _buildId('demo-sale'),
+        kind: MovementKind.sale,
+        origin: MovementOrigin.sale,
+        amountPesos: byName('Alfajor triple').pricePesos * 3,
+        costOfSalePesos: byName('Alfajor triple').costPesos * 3,
+        createdAt: atToday(10, 5),
+        title: 'Venta',
+        subtitle: 'Alfajor triple',
+        productId: byName('Alfajor triple').id,
+        quantityUnits: 3,
+        paymentMethod: 'Efectivo',
+      ),
+      Movement(
+        id: _buildId('demo-expense'),
+        kind: MovementKind.expense,
+        origin: MovementOrigin.expense,
+        amountPesos: 3200,
+        createdAt: atToday(10, 30),
+        title: 'Compra bolsas',
+        subtitle: 'Insumos',
+        category: 'Insumos',
+      ),
+      Movement(
+        id: _buildId('demo-sale'),
+        kind: MovementKind.sale,
+        origin: MovementOrigin.sale,
+        amountPesos: byName('Yerba 1 kg').pricePesos,
+        costOfSalePesos: byName('Yerba 1 kg').costPesos,
+        createdAt: atToday(11, 42),
+        title: 'Venta',
+        subtitle: 'Yerba 1 kg',
+        productId: byName('Yerba 1 kg').id,
+        quantityUnits: 1,
+        paymentMethod: 'Transferencia',
+      ),
+      Movement(
+        id: _buildId('demo-sale'),
+        kind: MovementKind.sale,
+        origin: MovementOrigin.sale,
+        amountPesos: byName('Pan lactal').pricePesos * 2,
+        costOfSalePesos: byName('Pan lactal').costPesos * 2,
+        createdAt: atToday(12, 50),
+        title: 'Venta',
+        subtitle: 'Pan lactal',
+        productId: byName('Pan lactal').id,
+        quantityUnits: 2,
+        paymentMethod: 'Efectivo',
+      ),
+      Movement(
+        id: _buildId('demo-sale'),
+        kind: MovementKind.sale,
+        origin: MovementOrigin.sale,
+        amountPesos: byName('Leche 1 L').pricePesos * 2,
+        costOfSalePesos: byName('Leche 1 L').costPesos * 2,
+        createdAt: atToday(13, 15),
+        title: 'Venta',
+        subtitle: 'Leche 1 L',
+        productId: byName('Leche 1 L').id,
+        quantityUnits: 2,
+        paymentMethod: 'Débito',
+      ),
+      Movement(
+        id: _buildId('demo-sale'),
+        kind: MovementKind.sale,
+        origin: MovementOrigin.sale,
+        amountPesos: byName('Cigarrillos box').pricePesos,
+        costOfSalePesos: byName('Cigarrillos box').costPesos,
+        createdAt: atToday(14, 25),
+        title: 'Venta',
+        subtitle: 'Cigarrillos box',
+        productId: byName('Cigarrillos box').id,
+        quantityUnits: 1,
+        paymentMethod: 'Efectivo',
+      ),
+      Movement(
+        id: _buildId('demo-expense'),
+        kind: MovementKind.expense,
+        origin: MovementOrigin.expense,
+        amountPesos: 5800,
+        createdAt: atToday(15, 0),
+        title: 'Pago proveedor pan',
+        subtitle: 'Mercaderia',
+        category: 'Mercaderia',
+      ),
+    ];
+
+    await _runPersistedMutation(() {
+      _products
+        ..clear()
+        ..addAll(demoProducts);
+      _movements
+        ..clear()
+        ..addAll(demoMovements)
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _dismissedFreeSaleSuggestions.clear();
+      _cashOpeningAt = null;
+      _cashOpeningBalancePesos = null;
+      _cashClosingAt = null;
+      _cashClosingBalancePesos = null;
+      _sortProducts();
+    });
+
+    return CommercialDemoApplyResult(
+      applied: true,
+      productCount: demoProducts.length,
+      movementCount: demoMovements.length,
+    );
+  }
+
   Future<void> addProduct(Product product) async {
     final sanitized = _validateProduct(product);
     await _runPersistedMutation(() {
@@ -552,10 +797,10 @@ class CommerceStore extends ChangeNotifier {
   }) async {
     final index = _products.indexWhere((product) => product.id == productId);
     if (index == -1) {
-      throw StateError('No se encontro el producto.');
+      throw StateError('No se encontró el producto.');
     }
     if (quantityUnits <= 0) {
-      throw StateError('Ingresa una cantidad mayor a 0.');
+      throw StateError('Ingresá una cantidad mayor a 0.');
     }
 
     final product = _products[index];
@@ -588,7 +833,7 @@ class CommerceStore extends ChangeNotifier {
   Future<void> removeProduct(String productId) async {
     final productExists = _products.any((product) => product.id == productId);
     if (!productExists) {
-      throw StateError('No se encontro el producto.');
+      throw StateError('No se encontró el producto.');
     }
     if (_movements.any((movement) => movement.productId == productId)) {
       throw StateError(
@@ -619,10 +864,10 @@ class CommerceStore extends ChangeNotifier {
   }) async {
     final index = _products.indexWhere((product) => product.id == productId);
     if (index == -1) {
-      throw StateError('No se encontro el producto.');
+      throw StateError('No se encontró el producto.');
     }
     if (quantityUnits <= 0) {
-      throw StateError('Ingresa una cantidad mayor a 0.');
+      throw StateError('Ingresá una cantidad mayor a 0.');
     }
 
     final product = _products[index];
@@ -713,10 +958,10 @@ class CommerceStore extends ChangeNotifier {
     final cleanCategory = category.trim().isEmpty ? 'General' : category.trim();
 
     if (cleanConcept.isEmpty) {
-      throw StateError('Escribe un concepto.');
+      throw StateError('Escribí un concepto.');
     }
     if (amountPesos <= 0) {
-      throw StateError('Ingresa un monto mayor a 0.');
+      throw StateError('Ingresá un monto mayor a 0.');
     }
 
     await _runPersistedMutation(() {
@@ -782,7 +1027,7 @@ class CommerceStore extends ChangeNotifier {
   }) async {
     final timestamp = createdAt ?? DateTime.now();
     if (!hasCashOpeningToday) {
-      throw StateError('Registra primero una apertura de caja.');
+      throw StateError('Registrá primero una apertura de caja.');
     }
     if (closingBalancePesos < 0) {
       throw StateError('El cierre no puede ser negativo.');
@@ -821,7 +1066,7 @@ class CommerceStore extends ChangeNotifier {
 
     final movement = _movements.first;
     if (movement.resolvedOrigin == MovementOrigin.restore) {
-      throw StateError('No se puede deshacer una restauracion de backup.');
+      throw StateError('No se puede deshacer una restauración de backup.');
     }
 
     await _runPersistedMutation(() {
@@ -906,7 +1151,7 @@ class CommerceStore extends ChangeNotifier {
           cashImpactOverridePesos: 0,
           estimatedProfitImpactOverridePesos: 0,
           createdAt: DateTime.now(),
-          title: 'Restauracion de backup',
+          title: 'Restauración de backup',
           subtitle: 'Estado restaurado correctamente',
         ),
       );
@@ -942,7 +1187,7 @@ class CommerceStore extends ChangeNotifier {
       }
       final barcode = valid.barcode;
       if (barcode != null && !productBarcodes.add(barcode)) {
-        throw StateError('Hay codigos de barras duplicados en el backup.');
+        throw StateError('Hay códigos de barras duplicados en el backup.');
       }
       validatedProducts.add(valid);
     }
@@ -1007,7 +1252,7 @@ class CommerceStore extends ChangeNotifier {
   }) {
     final normalizedBarcode = normalizeBarcode(product.barcode);
     if (product.id.trim().isEmpty) {
-      throw StateError('El producto necesita un id valido.');
+      throw StateError('El producto necesita un id válido.');
     }
     if (product.name.trim().isEmpty) {
       throw StateError('El producto necesita un nombre.');
@@ -1016,7 +1261,7 @@ class CommerceStore extends ChangeNotifier {
       throw StateError('El stock no puede ser negativo.');
     }
     if (product.minStockUnits < 0) {
-      throw StateError('El stock minimo no puede ser negativo.');
+      throw StateError('El stock mínimo no puede ser negativo.');
     }
     if (product.costPesos < 0 || (!allowZeroCost && product.costPesos == 0)) {
       throw StateError('El costo debe ser mayor a 0.');
@@ -1030,7 +1275,7 @@ class CommerceStore extends ChangeNotifier {
           existing.id != product.id &&
           existing.barcode == normalizedBarcode) {
         throw StateError(
-          'Ese codigo de barras ya esta asignado a otro producto.',
+          'Ese código de barras ya está asignado a otro producto.',
         );
       }
     }
@@ -1045,7 +1290,7 @@ class CommerceStore extends ChangeNotifier {
 
   void _validateMovement(Movement movement, Set<String> productIds) {
     if (movement.amountPesos < 0) {
-      throw StateError('Hay un movimiento con importe invalido.');
+      throw StateError('Hay un movimiento con importe inválido.');
     }
     if (movement.title.trim().isEmpty) {
       throw StateError('Hay un movimiento sin titulo.');
@@ -1060,7 +1305,7 @@ class CommerceStore extends ChangeNotifier {
           throw StateError('Hay una venta asociada a un producto inexistente.');
         }
       } else if ((movement.subtitle ?? '').trim().isEmpty) {
-        throw StateError('Hay una venta libre sin descripcion.');
+        throw StateError('Hay una venta libre sin descripción.');
       }
     }
     if (movement.kind == MovementKind.expense &&
@@ -1221,6 +1466,18 @@ class StarterTemplateApplyResult {
   bool get fullySkipped => addedCount == 0 && skippedCount == totalCount;
 }
 
+class CommercialDemoApplyResult {
+  const CommercialDemoApplyResult({
+    required this.applied,
+    this.productCount = 0,
+    this.movementCount = 0,
+  });
+
+  final bool applied;
+  final int productCount;
+  final int movementCount;
+}
+
 class _MutableStoreState {
   const _MutableStoreState({
     required this.products,
@@ -1265,7 +1522,7 @@ class _SnapshotData {
       throw StateError('La apertura del backup es invalida.');
     }
     if (cashClosingBalancePesos != null && cashClosingBalancePesos! < 0) {
-      throw StateError('El cierre del backup es invalido.');
+      throw StateError('El cierre del backup es inválido.');
     }
   }
 }

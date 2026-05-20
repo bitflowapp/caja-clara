@@ -61,7 +61,10 @@ void main() {
         paymentMethod: 'Efectivo',
       );
 
-      expect(store.productByBarcode('7791234500028')!.stockUnits, initialStock - 2);
+      expect(
+        store.productByBarcode('7791234500028')!.stockUnits,
+        initialStock - 2,
+      );
       expect(store.cashBalancePesos, initialCash + (product.pricePesos * 2));
     });
 
@@ -77,7 +80,10 @@ void main() {
         note: 'Barcode',
       );
 
-      expect(store.productByBarcode('7791234500035')!.stockUnits, initialStock + 5);
+      expect(
+        store.productByBarcode('7791234500035')!.stockUnits,
+        initialStock + 5,
+      );
       expect(store.movements.length, initialMovements + 1);
       expect(store.movements.first.title, 'Ingreso de stock');
     });

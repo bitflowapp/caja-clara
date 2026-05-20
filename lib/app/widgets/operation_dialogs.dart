@@ -87,11 +87,11 @@ Future<int?> showAmountEntryDialog(
                   onFieldSubmitted: (_) => submit(),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'Completa este campo.';
+                      return 'Completá este campo.';
                     }
                     final parsed = _parseInt(value);
                     if (parsed <= 0) {
-                      return 'Ingresa un valor mayor a 0.';
+                      return 'Ingresá un valor mayor a 0.';
                     }
                     return null;
                   },

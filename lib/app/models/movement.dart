@@ -85,7 +85,7 @@ class Movement {
       case MovementOrigin.cashClosing:
         return 'Cierre';
       case MovementOrigin.restore:
-        return 'Restauracion';
+        return 'Restauración';
       case MovementOrigin.undo:
         return 'Deshacer';
       case MovementOrigin.adjustment:
@@ -125,23 +125,22 @@ class Movement {
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'kind': kind.name,
-        'origin': resolvedOrigin.name,
-        'amountPesos': amountPesos,
-        'createdAt': createdAt.toIso8601String(),
-        'title': title,
-        'saleKind': kind == MovementKind.sale ? resolvedSaleKind.name : null,
-        'subtitle': subtitle,
-        'productId': productId,
-        'quantityUnits': quantityUnits,
-        'category': category,
-        'paymentMethod': paymentMethod,
-        'costOfSalePesos': costOfSalePesos,
-        'cashImpactOverridePesos': cashImpactOverridePesos,
-        'estimatedProfitImpactOverridePesos':
-            estimatedProfitImpactOverridePesos,
-      };
+    'id': id,
+    'kind': kind.name,
+    'origin': resolvedOrigin.name,
+    'amountPesos': amountPesos,
+    'createdAt': createdAt.toIso8601String(),
+    'title': title,
+    'saleKind': kind == MovementKind.sale ? resolvedSaleKind.name : null,
+    'subtitle': subtitle,
+    'productId': productId,
+    'quantityUnits': quantityUnits,
+    'category': category,
+    'paymentMethod': paymentMethod,
+    'costOfSalePesos': costOfSalePesos,
+    'cashImpactOverridePesos': cashImpactOverridePesos,
+    'estimatedProfitImpactOverridePesos': estimatedProfitImpactOverridePesos,
+  };
 
   static Movement fromJson(Map<String, dynamic> json) {
     final kindRaw = (json['kind'] as String?) ?? MovementKind.sale.name;
@@ -157,7 +156,8 @@ class Movement {
       id: (json['id'] as String?) ?? '',
       kind: kind,
       origin: _readOrigin(originRaw, kind),
-      amountPesos: (json['amountPesos'] as num?)?.toInt() ??
+      amountPesos:
+          (json['amountPesos'] as num?)?.toInt() ??
           (json['amountCents'] as num?)?.toInt() ??
           0,
       createdAt: createdAtRaw == null
@@ -171,8 +171,8 @@ class Movement {
       category: json['category'] as String?,
       paymentMethod: json['paymentMethod'] as String?,
       costOfSalePesos: (json['costOfSalePesos'] as num?)?.toInt(),
-      cashImpactOverridePesos:
-          (json['cashImpactOverridePesos'] as num?)?.toInt(),
+      cashImpactOverridePesos: (json['cashImpactOverridePesos'] as num?)
+          ?.toInt(),
       estimatedProfitImpactOverridePesos:
           (json['estimatedProfitImpactOverridePesos'] as num?)?.toInt(),
     );

@@ -10,21 +10,21 @@ void main() {
     (tester) async {
       final store = CommerceStore.emptyForTest();
       await store.recordFreeSale(
-        description: 'Cable USB rapido',
+        description: 'Cable USB rápido',
         quantityUnits: 1,
         unitPricePesos: 4200,
         paymentMethod: 'Transferencia',
         createdAt: DateTime(2026, 3, 23, 19, 15),
       );
       await store.recordFreeSale(
-        description: 'Cable USB rapido',
+        description: 'Cable USB rápido',
         quantityUnits: 1,
         unitPricePesos: 3900,
         paymentMethod: 'Transferencia',
         createdAt: DateTime(2026, 3, 21, 11, 0),
       );
       await store.recordFreeSale(
-        description: 'Cable USB rapido',
+        description: 'Cable USB rápido',
         quantityUnits: 2,
         unitPricePesos: 4000,
         paymentMethod: 'Transferencia',
@@ -41,12 +41,12 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
 
       expect(find.text('Venta libre repetida'), findsOneWidget);
-      expect(find.textContaining('Cable USB rapido'), findsWidgets);
-      expect(find.text('Se vendio'), findsOneWidget);
+      expect(find.textContaining('Cable USB rápido'), findsWidgets);
+      expect(find.text('Se vendió'), findsOneWidget);
       expect(find.text('3 veces'), findsOneWidget);
       expect(find.text('Total vendido'), findsOneWidget);
       expect(find.text('\$16.100'), findsWidgets);
-      expect(find.text('Ultimo precio'), findsOneWidget);
+      expect(find.text('Último precio'), findsOneWidget);
       expect(find.text('\$4.200'), findsWidgets);
 
       await tester.ensureVisible(find.text('Crear producto').first);
@@ -54,10 +54,10 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      expect(find.text('Agregar producto'), findsWidgets);
-      expect(find.text('Cable USB rapido'), findsWidgets);
+      expect(find.text('Cargar producto'), findsWidgets);
+      expect(find.text('Cable USB rápido'), findsWidgets);
       expect(
-        find.text('Vista previa: Cable USB rapido / \$4.200'),
+        find.text('Vista previa: Cable USB rápido / \$4.200'),
         findsOneWidget,
       );
     },

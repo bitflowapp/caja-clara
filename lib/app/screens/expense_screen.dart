@@ -81,7 +81,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Anota el gasto, guarda y sigue. Sin vueltas.',
+                      'Anotálo y la caja queda al día. Sin vueltas.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.outline,
                       ),
@@ -95,12 +95,12 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                         nextFieldLabel: 'Monto',
                         labelText: 'Concepto',
                         editorContext: 'Registrar gasto',
-                        emptyDisplayText: 'Toca para cargar el concepto',
+                        emptyDisplayText: 'Tocá para cargar el concepto',
                         keyboardType: TextInputType.text,
                         textCapitalization: TextCapitalization.sentences,
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
-                            return 'Escribi un concepto';
+                            return 'Escribí un concepto';
                           }
                           return null;
                         },
@@ -138,7 +138,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'Escribi un concepto';
+                              return 'Escribí un concepto';
                             }
                             return null;
                           },
@@ -169,7 +169,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                                       labelText: 'Monto',
                                       editorContext: 'Registrar gasto',
                                       emptyDisplayText:
-                                          'Toca para cargar el monto',
+                                          'Tocá para cargar el monto',
                                       prefixText: '\$ ',
                                       keyboardType:
                                           const TextInputType.numberWithOptions(
@@ -181,13 +181,13 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                                       displayValueBuilder: (value) {
                                         final parsed = _parseInt(value);
                                         return parsed <= 0
-                                            ? 'Toca para cargar el monto'
+                                            ? 'Tocá para cargar el monto'
                                             : formatMoney(parsed);
                                       },
                                       validator: (value) {
                                         final parsed = _parseInt(value);
                                         if (parsed <= 0) {
-                                          return 'Ingresa un monto valido';
+                                          return 'Ingresá un monto válido';
                                         }
                                         return null;
                                       },
@@ -216,7 +216,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                                         validator: (value) {
                                           final parsed = _parseInt(value);
                                           if (parsed <= 0) {
-                                            return 'Ingresa un monto valido';
+                                            return 'Ingresá un monto válido';
                                           }
                                           return null;
                                         },
@@ -235,10 +235,10 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                                       controller: _categoryController,
                                       editorController:
                                           _categoryEditorController,
-                                      labelText: 'Categoria (opcional)',
+                                      labelText: 'Categoría (opcional)',
                                       editorContext: 'Registrar gasto',
                                       emptyDisplayText:
-                                          'Toca para cargar la categoria',
+                                          'Tocá para cargar la categoría',
                                       keyboardType: TextInputType.text,
                                       textCapitalization:
                                           TextCapitalization.words,
@@ -246,7 +246,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                                           SpeechDictationActionButton(
                                             controller: _categoryDictation,
                                             textController: controller,
-                                            tooltip: 'Dictar categoria',
+                                            tooltip: 'Dictar categoría',
                                           ),
                                       supportingBuilder: () =>
                                           SpeechDictationHint(
@@ -264,13 +264,13 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                                         textCapitalization:
                                             TextCapitalization.words,
                                         decoration: InputDecoration(
-                                          labelText: 'Categoria (opcional)',
+                                          labelText: 'Categoría (opcional)',
                                           suffixIcon:
                                               SpeechDictationActionButton(
                                                 controller: _categoryDictation,
                                                 textController:
                                                     _categoryController,
-                                                tooltip: 'Dictar categoria',
+                                                tooltip: 'Dictar categoría',
                                               ),
                                         ),
                                         onTapOutside: (_) =>
@@ -426,7 +426,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
         return;
       }
       messenger.hideCurrentSnackBar();
-      navigator.pop('Gasto guardado.');
+      navigator.pop('Gasto registrado.');
     } catch (error) {
       if (!mounted) {
         return;

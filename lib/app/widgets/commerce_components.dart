@@ -5,41 +5,46 @@ import '../models/product.dart';
 import '../theme/bpc_colors.dart';
 import '../utils/formatters.dart';
 
+/// Tarjeta base de la app: superficie blanca, borde fino y sombra suave.
 class BpcPanel extends StatelessWidget {
   const BpcPanel({
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(18),
     this.color,
+    this.borderColor,
+    this.elevated = true,
   });
 
   final Widget child;
   final EdgeInsets padding;
   final Color? color;
+  final Color? borderColor;
+  final bool elevated;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: color ?? scheme.surface,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.34),
-        ),
-        boxShadow: const [
-          BoxShadow(
-            color: BpcColors.shadow,
-            blurRadius: 12,
-            offset: Offset(0, 4),
-          ),
-        ],
+        color: color ?? BpcColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: borderColor ?? BpcColors.line),
+        boxShadow: elevated
+            ? const [
+                BoxShadow(
+                  color: BpcColors.shadow,
+                  blurRadius: 18,
+                  offset: Offset(0, 6),
+                ),
+              ]
+            : null,
       ),
       child: Padding(padding: padding, child: child),
     );
   }
 }
 
+/// Encabezado de sección con título fuerte y bajada opcional.
 class SectionHeader extends StatelessWidget {
   const SectionHeader({
     super.key,
@@ -64,7 +69,7 @@ class SectionHeader extends StatelessWidget {
             children: [
               Text(title, style: textTheme.titleLarge),
               if (subtitle != null) ...[
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   subtitle!,
                   style: textTheme.bodyMedium?.copyWith(
@@ -81,6 +86,103 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
+/// Tarjeta KPI con icono, etiqueta, valor grande y ayuda corta.
+class KpiCard extends StatelessWidget {
+  const KpiCard({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.icon,
+    this.helper,
+    this.accent = BpcColors.greenDark,
+    this.onTap,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final String? helper;
+  final Color accent;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final content = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(icon, color: accent, size: 19),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: BpcColors.mutedInk,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: theme.textTheme.headlineMedium?.copyWith(
+              color: BpcColors.ink,
+              fontSize: 26,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.6,
+            ),
+          ),
+          if (helper != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              helper!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: BpcColors.subtleInk,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+
+    return Material(
+      color: BpcColors.surface,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: BpcColors.line),
+          ),
+          child: content,
+        ),
+      ),
+    );
+  }
+}
+
+/// Métrica compacta usada en la pantalla de Caja.
 class MetricCard extends StatelessWidget {
   const MetricCard({
     super.key,
@@ -99,13 +201,13 @@ class MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
     return Container(
       padding: EdgeInsets.all(tight ? 14 : 16),
       decoration: BoxDecoration(
-        color:
-            accentColor ?? scheme.surfaceContainerLow.withValues(alpha: 0.64),
-        borderRadius: BorderRadius.circular(18),
+        color: accentColor ?? BpcColors.surfaceStrong,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: BpcColors.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -113,25 +215,28 @@ class MetricCard extends StatelessWidget {
         children: [
           Text(
             label,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            style: theme.textTheme.labelLarge?.copyWith(
               color: BpcColors.mutedInk,
               fontWeight: FontWeight.w800,
+              fontSize: 12,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Text(
             value,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineMedium?.copyWith(color: BpcColors.ink),
+            style: theme.textTheme.headlineMedium?.copyWith(
+              color: BpcColors.ink,
+              fontSize: 24,
+            ),
           ),
           if (helper != null) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 5),
             Text(
               helper!,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: BpcColors.subtleInk,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ],
@@ -140,6 +245,7 @@ class MetricCard extends StatelessWidget {
   }
 }
 
+/// Tarjeta de acción. `emphasized` la convierte en el CTA dominante.
 class ActionCard extends StatelessWidget {
   const ActionCard({
     super.key,
@@ -164,31 +270,32 @@ class ActionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final fg = contentColor ?? scheme.onSurface;
+    final radius = emphasized ? 22.0 : 18.0;
     final iconSurface = emphasized
         ? Colors.white.withValues(alpha: 0.16)
-        : scheme.primary.withValues(alpha: 0.08);
+        : BpcColors.greenDark.withValues(alpha: 0.08);
     return Material(
-      color: fillColor ?? scheme.surfaceContainerLow.withValues(alpha: 0.42),
-      borderRadius: BorderRadius.circular(emphasized ? 24 : 20),
+      color: fillColor ?? BpcColors.surface,
+      borderRadius: BorderRadius.circular(radius),
       child: InkWell(
-        borderRadius: BorderRadius.circular(emphasized ? 24 : 20),
+        borderRadius: BorderRadius.circular(radius),
         onTap: onTap,
         child: Container(
           constraints: BoxConstraints(minHeight: emphasized ? 112 : 84),
           padding: EdgeInsets.all(emphasized ? 20 : 16),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(emphasized ? 24 : 20),
+            borderRadius: BorderRadius.circular(radius),
             border: Border.all(
               color: emphasized
-                  ? Colors.white.withValues(alpha: 0.14)
-                  : Colors.transparent,
+                  ? Colors.white.withValues(alpha: 0.12)
+                  : BpcColors.line,
             ),
             boxShadow: emphasized
                 ? const [
                     BoxShadow(
-                      color: Color(0x22122520),
-                      blurRadius: 16,
-                      offset: Offset(0, 8),
+                      color: Color(0x33123A30),
+                      blurRadius: 22,
+                      offset: Offset(0, 10),
                     ),
                   ]
                 : null,
@@ -196,16 +303,16 @@ class ActionCard extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: emphasized ? 58 : 52,
-                height: emphasized ? 58 : 52,
+                width: emphasized ? 58 : 50,
+                height: emphasized ? 58 : 50,
                 decoration: BoxDecoration(
                   color: iconSurface,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(
                   icon,
-                  color: emphasized ? Colors.white : scheme.primary,
-                  size: emphasized ? 28 : 24,
+                  color: emphasized ? Colors.white : BpcColors.greenDark,
+                  size: emphasized ? 28 : 23,
                 ),
               ),
               const SizedBox(width: 14),
@@ -224,22 +331,27 @@ class ActionCard extends StatelessWidget {
                       ),
                     ),
                     if (subtitle != null) ...[
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 5),
                       Text(
                         subtitle!,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: emphasized
                               ? Colors.white.withValues(alpha: 0.82)
-                              : BpcColors.mutedInk,
-                          fontWeight: emphasized
-                              ? FontWeight.w600
-                              : FontWeight.w500,
+                              : BpcColors.subtleInk,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ],
                 ),
               ),
+              if (emphasized) ...[
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.arrow_forward_rounded,
+                  color: Colors.white.withValues(alpha: 0.9),
+                ),
+              ],
             ],
           ),
         ),
@@ -248,6 +360,7 @@ class ActionCard extends StatelessWidget {
   }
 }
 
+/// Fila de un movimiento (venta, gasto o ajuste) en una lista.
 class MovementsListTile extends StatelessWidget {
   const MovementsListTile({
     super.key,
@@ -264,30 +377,25 @@ class MovementsListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final color = movement.isNeutral
         ? BpcColors.mutedInk
-        : (movement.isIncome ? scheme.primary : scheme.error);
+        : (movement.isIncome ? BpcColors.income : BpcColors.expense);
     final label = movement.isNeutral
         ? formatMoney(0)
         : movement.isIncome
-        ? formatMoney(movement.amountPesos)
+        ? '+${formatMoney(movement.amountPesos)}'
         : '-${formatMoney(movement.amountPesos)}';
     final subtitle = movement.kind == MovementKind.sale
-        ? '${movement.subtitle ?? productName ?? movement.title} / ${movement.quantityUnits ?? 0} u. / ${movement.paymentMethod ?? 'Caja'}'
+        ? '${movement.subtitle ?? productName ?? movement.title} · ${movement.quantityUnits ?? 0} u. · ${movement.paymentMethod ?? 'Caja'}'
         : movement.kind == MovementKind.expense
-        ? '${movement.originLabel} / ${movement.category ?? 'Gasto'}'
+        ? '${movement.originLabel} · ${movement.category ?? 'Gasto'}'
         : movement.subtitle ?? movement.originLabel;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
         border: showDivider
-            ? Border(
-                bottom: BorderSide(
-                  color: scheme.outlineVariant.withValues(alpha: 0.44),
-                ),
-              )
+            ? const Border(bottom: BorderSide(color: BpcColors.line))
             : null,
       ),
       child: Row(
@@ -297,14 +405,14 @@ class MovementsListTile extends StatelessWidget {
             height: 40,
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               movement.isNeutral
                   ? Icons.sync_alt_rounded
                   : movement.isIncome
-                  ? Icons.add_rounded
-                  : Icons.remove_rounded,
+                  ? Icons.south_west_rounded
+                  : Icons.north_east_rounded,
               color: color,
               size: 20,
             ),
@@ -318,10 +426,10 @@ class MovementsListTile extends StatelessWidget {
                   movement.title,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: BpcColors.ink,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   subtitle,
                   maxLines: 1,
@@ -331,7 +439,8 @@ class MovementsListTile extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                if (movement.isFreeSale && onCreateProductFromFreeSale != null) ...[
+                if (movement.isFreeSale &&
+                    onCreateProductFromFreeSale != null) ...[
                   const SizedBox(height: 8),
                   TextButton.icon(
                     onPressed: onCreateProductFromFreeSale,
@@ -357,7 +466,7 @@ class MovementsListTile extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: color,
                   fontWeight: FontWeight.w900,
-                  fontSize: 20,
+                  fontSize: 19,
                   letterSpacing: -0.35,
                 ),
               ),
@@ -377,6 +486,7 @@ class MovementsListTile extends StatelessWidget {
   }
 }
 
+/// Estado vacío con icono, mensaje humano y acción opcional.
 class EmptyCard extends StatelessWidget {
   const EmptyCard({
     super.key,
@@ -393,22 +503,29 @@ class EmptyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return BpcPanel(
+      padding: const EdgeInsets.fromLTRB(22, 26, 22, 26),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 56,
-            height: 56,
+            width: 60,
+            height: 60,
             decoration: BoxDecoration(
-              color: scheme.primary.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
+              color: BpcColors.greenDark.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(20),
             ),
-            child: Icon(icon, color: scheme.primary),
+            child: Icon(icon, color: BpcColors.greenDark, size: 26),
           ),
-          const SizedBox(height: 14),
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: BpcColors.ink,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
           const SizedBox(height: 6),
           Text(
             message,
@@ -417,13 +534,14 @@ class EmptyCard extends StatelessWidget {
               context,
             ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
           ),
-          if (action != null) ...[const SizedBox(height: 14), action!],
+          if (action != null) ...[const SizedBox(height: 16), action!],
         ],
       ),
     );
   }
 }
 
+/// Distintivo de stock: "Stock bajo" o "Stock ok".
 class StockBadge extends StatelessWidget {
   const StockBadge({super.key, required this.product});
 
@@ -431,23 +549,35 @@ class StockBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final low = product.isLowStock;
-    final color = low ? scheme.error : scheme.primary;
+    final color = low ? BpcColors.expense : BpcColors.income;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.16)),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
       ),
-      child: Text(
-        low ? 'Stock bajo' : 'Stock ok',
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.w700,
-          fontSize: 12,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            low
+                ? Icons.warning_amber_rounded
+                : Icons.check_circle_rounded,
+            color: color,
+            size: 14,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            low ? 'Stock bajo' : 'Stock ok',
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -178,11 +178,11 @@ const List<StarterTemplateProductSeed> argentinianKioskTemplateProducts =
         category: 'Accesorios de mostrador',
       ),
       StarterTemplateProductSeed(
-        name: 'Cargador USB basico',
+        name: 'Cargador USB básico',
         category: 'Accesorios de mostrador',
       ),
       StarterTemplateProductSeed(
-        name: 'Cable USB basico',
+        name: 'Cable USB básico',
         category: 'Accesorios de mostrador',
       ),
     ];

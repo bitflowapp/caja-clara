@@ -75,8 +75,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 children: [
                   const SectionHeader(
                     title: 'Productos',
-                    subtitle:
-                        'Carga, busca y corrige productos sin perder de vista stock y precio',
+                    subtitle: 'Cargá, buscá y corregí tu catálogo en segundos',
                   ),
                   const SizedBox(height: 12),
                   Wrap(
@@ -101,7 +100,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       FilledButton.icon(
                         onPressed: () => showProductEditor(context, store),
                         icon: const Icon(Icons.add_rounded),
-                        label: const Text('Agregar producto'),
+                        label: const Text('Cargar producto'),
                       ),
                     ],
                   ),
@@ -127,7 +126,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                 prefixIcon: Icon(Icons.search_rounded),
                                 labelText: 'Buscar producto',
                                 hintText:
-                                    'Nombre, categoria o codigo de barras',
+                                    'Nombre, categoría o código de barras',
                               ),
                             ),
                           ),
@@ -153,11 +152,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   if (products.isEmpty)
                     EmptyCard(
                       title: emptyCatalog
-                          ? 'Todavia no cargaste productos'
-                          : 'Sin resultados',
+                          ? 'Carga tu primer producto para empezar a vender'
+                          : 'Sin resultados con ese filtro',
                       message: emptyCatalog
-                          ? 'Puedes empezar con la plantilla kiosco o crear tus productos a mano. Todo queda editable y se guarda localmente.'
-                          : 'No hay productos con ese filtro. Ajusta la busqueda o carga uno nuevo.',
+                          ? 'Podés arrancar con la plantilla kiosco o cargar tus productos a mano. Todo queda editable y guardado en tu equipo.'
+                          : 'No encontramos productos con esa busqueda. Probá con otro nombre o limpia los filtros.',
                       action: Wrap(
                         spacing: 10,
                         runSpacing: 10,
@@ -181,7 +180,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                             ),
                           TextButton(
                             onPressed: () => showProductEditor(context, store),
-                            child: const Text('Agregar producto'),
+                            child: const Text('Cargar primer producto'),
                           ),
                         ],
                       ),
@@ -295,7 +294,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       }
       messenger.showSnackBar(
         SnackBar(
-          content: Text('Stock actualizado para ${product.name}.'),
+          content: Text('Stock actualizado: ${product.name}.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -332,7 +331,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       }
       messenger.showSnackBar(
         SnackBar(
-          content: Text('${product.name} se elimino del catalogo'),
+          content: Text('${product.name} se eliminó del catálogo'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -391,7 +390,7 @@ class _ProductTile extends StatelessWidget {
                         Text(
                           product.category?.isNotEmpty == true
                               ? product.category!
-                              : 'Sin categoria',
+                              : 'Sin categoría',
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(color: scheme.outline),
                         ),
@@ -443,7 +442,7 @@ class _ProductTile extends StatelessWidget {
                       value: product.stockUnits.toString(),
                     ),
                     _InfoChip(
-                      label: 'Minimo',
+                      label: 'Mínimo',
                       value: product.minStockUnits.toString(),
                     ),
                     _InfoChip(

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import '../screens/expense_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/products_screen.dart';
-import '../screens/barcode_scan_screen.dart';
 import '../screens/sale_screen.dart';
 import '../screens/summary_screen.dart';
 import '../models/movement.dart';
@@ -34,6 +33,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
   CommerceTab _tab = CommerceTab.home;
   bool _exportingExcel = false;
   bool _applyingStarterTemplate = false;
+  bool _loadingCommercialDemo = false;
   bool _exportingBackup = false;
   bool _restoringBackup = false;
   bool _retryingSave = false;
@@ -60,14 +60,12 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     _showMovementSavedFeedback(message);
   }
 
-  void _openBarcodeScan() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const BarcodeScanScreen()));
-  }
-
   void _openProducts() {
     setState(() => _tab = CommerceTab.products);
+  }
+
+  void _openCash() {
+    setState(() => _tab = CommerceTab.summary);
   }
 
   Future<void> _openQuickHelp() async {
@@ -119,8 +117,8 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       SnackBar(
         content: Text(
           result.kind == ProductEditorResultKind.created
-              ? '"${result.product.name}" ya se sumo al catalogo.'
-              : 'Usaras "${result.product.name}" que ya existia en el catalogo.',
+              ? '"${result.product.name}" ya se sumó al catálogo.'
+              : 'Vas a usar "${result.product.name}" que ya existía en el catálogo.',
         ),
         behavior: SnackBarBehavior.floating,
       ),
@@ -218,6 +216,66 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     } finally {
       if (mounted) {
         setState(() => _retryingSave = false);
+      }
+    }
+  }
+
+  Future<void> _loadCommercialDemo() async {
+    if (_loadingCommercialDemo) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    final store = CommerceScope.of(context);
+
+    if (!store.canLoadCommercialDemo) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Los datos de demo solo se cargan cuando la app está vacía.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _loadingCommercialDemo = true);
+    try {
+      final result = await store.loadCommercialDemo();
+      if (!mounted) {
+        return;
+      }
+      if (!result.applied) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Los datos de demo no se cargaron.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Listo. Ahora probá registrar una venta.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'No se pudo cargar la demo: ${userFacingErrorMessage(error)}',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loadingCommercialDemo = false);
       }
     }
   }
@@ -386,7 +444,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         context,
         title: 'Restaurar backup',
         message:
-            'Se reemplazara el estado actual por el contenido de ${importData.fileName}. Esta accion no se puede revertir.',
+            'Se reemplazará el estado actual por el contenido de ${importData.fileName}. Esta acción no se puede revertir.',
         confirmLabel: 'Restaurar',
       );
       if (!confirmed || !mounted) {
@@ -437,9 +495,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     if (!skipConfirmation) {
       final confirmed = await showDangerConfirmationDialog(
         context,
-        title: 'Deshacer ultimo movimiento',
+        title: 'Deshacer último movimiento',
         message:
-            'Se va a deshacer "${movement.title}". Si fue una venta, tambien se repone el stock.',
+            'Se va a deshacer "${movement.title}". Si fue una venta, también se repone el stock.',
         confirmLabel: 'Deshacer',
       );
       if (!confirmed) {
@@ -455,7 +513,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       }
       messenger.showSnackBar(
         const SnackBar(
-          content: Text('Ultimo movimiento deshecho'),
+          content: Text('Último movimiento deshecho'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -492,7 +550,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
           : 'Apertura de caja',
       label: 'Caja inicial',
       confirmLabel: store.hasCashOpeningToday ? 'Actualizar' : 'Guardar',
-      helper: 'Ingresa el efectivo inicial del dia.',
+      helper: 'Ingresá el efectivo inicial del día.',
       initialValue: store.todayOpeningCashPesos,
     );
     if (amount == null) {
@@ -508,7 +566,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         context,
         title: 'Reemplazar apertura',
         message:
-            'Ya existe una apertura registrada hoy. Se reemplazara la apertura y se limpiara el cierre del dia.',
+            'Ya existe una apertura registrada hoy. Se reemplazará la apertura y se limpiará el cierre del día.',
         confirmLabel: 'Reemplazar',
       );
       if (!overwrite) {
@@ -560,7 +618,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       title: store.hasCashClosingToday ? 'Actualizar cierre' : 'Cierre de caja',
       label: 'Caja contada',
       confirmLabel: store.hasCashClosingToday ? 'Actualizar' : 'Guardar',
-      helper: 'Ingresa el monto contado al cierre.',
+      helper: 'Ingresá el monto contado al cierre.',
       initialValue: store.todayClosingCashPesos,
     );
     if (amount == null) {
@@ -576,7 +634,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         context,
         title: 'Reemplazar cierre',
         message:
-            'Ya existe un cierre registrado hoy. Se reemplazara por el nuevo valor.',
+            'Ya existe un cierre registrado hoy. Se reemplazará por el nuevo valor.',
         confirmLabel: 'Reemplazar',
       );
       if (!overwrite) {
@@ -623,15 +681,18 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       CommerceTab.home: HomeScreen(
         onNewSale: _openSale,
         onNewExpense: _openExpense,
-        onScanProduct: _openBarcodeScan,
         onOpenProducts: _openProducts,
+        onOpenCash: _openCash,
+        onOpenCashRegister: _registerCashOpening,
         onExportExcel: _exportExcel,
+        exportingExcel: _exportingExcel,
         onApplyStarterTemplate: _applyStarterTemplate,
+        onLoadCommercialDemo: _loadCommercialDemo,
         onCreateProductFromFreeSale: _createProductFromFreeSale,
         onCreateProductFromSuggestion: _createProductFromSuggestion,
         onDismissFreeSaleSuggestion: _dismissFreeSaleSuggestion,
-        exportingExcel: _exportingExcel,
         applyingStarterTemplate: _applyingStarterTemplate,
+        loadingCommercialDemo: _loadingCommercialDemo,
       ),
       CommerceTab.products: ProductsScreen(
         onApplyStarterTemplate: _applyStarterTemplate,
@@ -728,43 +789,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                         ),
                         Padding(
                           padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                            decoration: BoxDecoration(
-                              color: BpcColors.surfaceStrong,
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 10,
-                                  height: 10,
-                                  decoration: const BoxDecoration(
-                                    color: BpcColors.income,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    store.lastError != null
-                                        ? 'Guardado con problema'
-                                        : store.isSaving
-                                        ? 'Guardando'
-                                        : 'Local listo',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          color: BpcColors.ink,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          child: _SaveStatusChip(store: store),
                         ),
                         const SizedBox(height: 10),
                         const Padding(
@@ -782,7 +807,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                           if (store.lastError != null) ...[
                             _SaveErrorBanner(
                               message:
-                                  'El ultimo cambio no se pudo guardar. Revisa el aviso y vuelve a intentar.',
+                                  'El último cambio no se pudo guardar. Reintentá y seguimos.',
                               retrying: _retryingSave || store.isSaving,
                               onRetry: _retrySave,
                             ),
@@ -817,7 +842,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                   if (store.lastError != null) ...[
                     _SaveErrorBanner(
                       message:
-                          'El ultimo cambio no se pudo guardar. Puedes reintentar sin perder el control.',
+                          'El último cambio no se pudo guardar. Reintentá sin perder lo que cargaste.',
                       retrying: _retryingSave || store.isSaving,
                       onRetry: _retrySave,
                     ),
@@ -831,9 +856,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                       label: const Text('Ayuda'),
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  const _BuildInfoStrip(),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   Expanded(child: page),
                 ],
               ),
@@ -928,13 +951,65 @@ class _RailBrand extends StatelessWidget {
         const CajaClaraLogo(height: 52),
         const SizedBox(height: 10),
         Text(
-          'Caja, ventas, stock y barcode',
+          'Ordena tu negocio sin Excel',
           style: theme.textTheme.bodySmall?.copyWith(
             color: BpcColors.subtleInk,
             fontWeight: FontWeight.w700,
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Indicador discreto de guardado: refleja el estado real del store.
+class _SaveStatusChip extends StatelessWidget {
+  const _SaveStatusChip({required this.store});
+
+  final CommerceStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color color;
+    final String label;
+    final IconData icon;
+    if (store.lastError != null) {
+      color = BpcColors.expense;
+      label = 'Guardado con problema';
+      icon = Icons.error_outline_rounded;
+    } else if (store.isSaving) {
+      color = BpcColors.warning;
+      label = 'Guardando...';
+      icon = Icons.sync_rounded;
+    } else {
+      color = BpcColors.income;
+      label = 'Todo guardado';
+      icon = Icons.cloud_done_rounded;
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

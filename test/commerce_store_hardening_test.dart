@@ -78,7 +78,7 @@ void main() {
         final store = CommerceStore.emptyForTest();
 
         await store.recordFreeSale(
-          description: 'Cable USB rapido',
+          description: 'Cable USB rápido',
           quantityUnits: 1,
           unitPricePesos: 4500,
           paymentMethod: 'Transferencia',
@@ -89,7 +89,7 @@ void main() {
         await store.addProduct(
           const Product(
             id: 'p-cable',
-            name: 'Cable USB rapido',
+            name: 'Cable USB rápido',
             stockUnits: 6,
             minStockUnits: 1,
             costPesos: 2200,
@@ -103,7 +103,7 @@ void main() {
         expect(store.movements.first.id, freeSale.id);
         expect(store.movements.first.isFreeSale, isTrue);
         expect(store.movements.first.productId, isNull);
-        expect(store.movements.first.subtitle, 'Cable USB rapido');
+        expect(store.movements.first.subtitle, 'Cable USB rápido');
       },
     );
 
@@ -156,21 +156,21 @@ void main() {
         final newestSaleAt = DateTime(2026, 3, 23, 19, 15);
 
         await store.recordFreeSale(
-          description: 'Cable USB rapido',
+          description: 'Cable USB rápido',
           quantityUnits: 1,
           unitPricePesos: 4200,
           paymentMethod: 'Transferencia',
           createdAt: newestSaleAt,
         );
         await store.recordFreeSale(
-          description: 'Cable USB rapido',
+          description: 'Cable USB rápido',
           quantityUnits: 1,
           unitPricePesos: 3900,
           paymentMethod: 'Transferencia',
           createdAt: DateTime(2026, 3, 21, 11, 0),
         );
         await store.recordFreeSale(
-          description: 'Cable USB rapido',
+          description: 'Cable USB rápido',
           quantityUnits: 2,
           unitPricePesos: 4000,
           paymentMethod: 'Transferencia',
@@ -312,7 +312,7 @@ void main() {
         expect(restored.products.length, source.products.length);
         expect(restored.cashBalancePesos, source.cashBalancePesos);
         expect(restored.todayOpeningCashPesos, 50000);
-        expect(restored.movements.first.title, 'Restauracion de backup');
+        expect(restored.movements.first.title, 'Restauración de backup');
         expect(restored.movements.length, source.movements.length + 1);
       },
     );

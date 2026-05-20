@@ -1,6 +1,6 @@
 String userFacingErrorMessage(
   Object error, {
-  String fallback = 'No se pudo completar la accion.',
+  String fallback = 'No se pudo completar la acción.',
 }) {
   final raw = error.toString().trim();
   if (raw.isEmpty) {
@@ -17,13 +17,13 @@ String userFacingErrorMessage(
 
   final lower = raw.toLowerCase();
   if (lower.contains('access denied') || lower.contains('permission denied')) {
-    return 'No hay permiso para completar la accion.';
+    return 'No hay permiso para completar la acción.';
   }
   if (lower.contains('no such file') || lower.contains('file not found')) {
-    return 'No se encontro el archivo o la carpeta elegida.';
+    return 'No se encontró el archivo o la carpeta elegida.';
   }
   if (lower.contains('user canceled') || lower.contains('cancelled')) {
-    return 'La accion fue cancelada.';
+    return 'La acción fue cancelada.';
   }
 
   return raw;

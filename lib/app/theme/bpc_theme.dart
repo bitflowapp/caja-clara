@@ -37,32 +37,37 @@ class BpcTheme {
         ),
       ),
       navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: BpcColors.paper,
+        backgroundColor: Colors.transparent,
         selectedIconTheme: const IconThemeData(
           color: BpcColors.greenDark,
-          size: 23,
+          size: 22,
         ),
         unselectedIconTheme: const IconThemeData(
           color: BpcColors.mutedInk,
           size: 22,
         ),
         selectedLabelTextStyle: const TextStyle(
-          color: BpcColors.ink,
+          color: BpcColors.greenDark,
           fontWeight: FontWeight.w800,
-          fontSize: 13,
+          fontSize: 12.5,
+          letterSpacing: -0.1,
         ),
         unselectedLabelTextStyle: const TextStyle(
           color: BpcColors.mutedInk,
           fontWeight: FontWeight.w700,
-          fontSize: 13,
+          fontSize: 12.5,
+          letterSpacing: -0.1,
         ),
-        indicatorColor: BpcColors.sandSoft,
+        indicatorColor: BpcColors.incomeSoft,
+        indicatorShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
         minWidth: 108,
         minExtendedWidth: 220,
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: BpcColors.surface,
-        indicatorColor: BpcColors.sandSoft,
+        indicatorColor: BpcColors.incomeSoft,
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return IconThemeData(

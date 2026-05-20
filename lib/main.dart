@@ -8,4 +8,3 @@ Future<void> main() async {
   final store = await CommerceStore.loadOrSeed();
   runApp(BPlusCommerceApp(store: store));
 }
-

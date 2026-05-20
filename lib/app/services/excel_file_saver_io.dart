@@ -23,9 +23,7 @@ class IoExcelFileSaver implements ExcelFileSaver {
     );
 
     if (location == null) {
-      return const ExcelSaveResult(
-        disposition: ExcelSaveDisposition.cancelled,
-      );
+      return const ExcelSaveResult(disposition: ExcelSaveDisposition.cancelled);
     }
 
     final file = File(location.path);

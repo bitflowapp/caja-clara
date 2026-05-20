@@ -65,7 +65,7 @@ void main() {
   }
 
   testWidgets(
-    'Nueva venta exige seleccionar un producto y guarda despues del tap explicito',
+    'Nueva venta exige seleccionar un producto y guarda después del tap explicito',
     (tester) async {
       final store = CommerceStore.seededForTest();
       final initialMovements = store.movements.length;
@@ -80,7 +80,7 @@ void main() {
 
       expect(find.text('8 u.'), findsOneWidget);
       expect(
-        find.text('Toca un resultado para confirmar el producto.'),
+        find.text('Tocá un resultado para confirmar el producto.'),
         findsOneWidget,
       );
       expect(find.text('Sin seleccionar'), findsOneWidget);
@@ -102,12 +102,15 @@ void main() {
 
       expect(store.movements.length, initialMovements + 1);
       expect(store.productById('p-1')!.stockUnits, initialStock - 1);
-      expect(find.text('Venta guardada. Caja y stock al dia.'), findsOneWidget);
+      expect(
+        find.text('Venta registrada. Caja y stock actualizados.'),
+        findsOneWidget,
+      );
     },
   );
 
   testWidgets(
-    'editar el texto despues de seleccionar invalida la venta y deja el feedback solo inline',
+    'editar el texto después de seleccionar invalida la venta y deja el feedback solo inline',
     (tester) async {
       final store = CommerceStore.seededForTest();
 
@@ -131,7 +134,7 @@ void main() {
       expect(find.text('Sin seleccionar'), findsOneWidget);
       expect(find.text('No se encontraron productos'), findsOneWidget);
       expect(
-        find.text('Prueba con otro nombre, categoria o codigo.'),
+        find.text('Probá con otro nombre, categoría o código.'),
         findsOneWidget,
       );
       expect(find.byType(SnackBar), findsNothing);
@@ -140,7 +143,7 @@ void main() {
   );
 
   testWidgets(
-    'cambiar entre catalogo y venta libre limpia el feedback anterior del buscador',
+    'cambiar entre catálogo y venta libre limpia el feedback anterior del buscador',
     (tester) async {
       final store = CommerceStore.seededForTest();
 
@@ -158,14 +161,14 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.widgetWithText(TextFormField, 'Descripcion'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'Descripción'), findsOneWidget);
       expect(find.text('No se encontraron productos'), findsNothing);
       expect(find.byType(SnackBar), findsNothing);
     },
   );
 
   testWidgets(
-    'venta libre guarda sin producto seleccionado y no necesita catalogo',
+    'venta libre guarda sin producto seleccionado y no necesita catálogo',
     (tester) async {
       final store = CommerceStore.emptyForTest();
       final initialCash = store.cashBalancePesos;
@@ -178,11 +181,11 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('Todavia no hay productos cargados'), findsNothing);
+      expect(find.text('Todavía no hay productos cargados'), findsNothing);
       expect(saveButton(tester).onPressed, isNull);
 
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Descripcion'),
+        find.widgetWithText(TextFormField, 'Descripción'),
         'Preservativos mostrador',
       );
       await tester.enterText(
@@ -204,12 +207,15 @@ void main() {
       expect(store.cashBalancePesos, initialCash + 2500);
       expect(store.movements.first.isFreeSale, isTrue);
       expect(store.movements.first.subtitle, 'Preservativos mostrador');
-      expect(find.text('Venta libre guardada. Caja al dia.'), findsOneWidget);
+      expect(
+        find.text('Venta libre registrada. Caja actualizada.'),
+        findsOneWidget,
+      );
     },
   );
 
   testWidgets(
-    'venta libre permite abrir alta de producto con descripcion y precio precargados',
+    'venta libre permite abrir alta de producto con descripción y precio precargados',
     (tester) async {
       final store = CommerceStore.emptyForTest();
 
@@ -221,7 +227,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
 
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Descripcion'),
+        find.widgetWithText(TextFormField, 'Descripción'),
         'Cable USB mostrador',
       );
       await tester.enterText(
@@ -235,7 +241,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      expect(find.text('Agregar producto'), findsOneWidget);
+      expect(find.text('Cargar producto'), findsOneWidget);
       expect(find.text('Cable USB mostrador'), findsWidgets);
       expect(
         find.text('Vista previa: Cable USB mostrador / \$3.900'),
@@ -257,13 +263,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Descripcion'),
+        find.widgetWithText(TextFormField, 'Descripción'),
         '7791234500011',
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('Ya existe en catalogo'), findsOneWidget);
+      expect(find.text('Ya existe en catálogo'), findsOneWidget);
       expect(find.text('Yerba premium'), findsOneWidget);
       expect(find.text('Usar este producto'), findsOneWidget);
 

@@ -55,89 +55,10 @@ class SummaryScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SectionHeader(
-                title: 'Caja / Resumen',
-                subtitle: 'Caja del dia, exportacion y respaldo local',
+                title: 'Caja del día',
+                subtitle: 'Entradas, salidas, saldo y movimientos de hoy',
               ),
               const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  FilledButton.icon(
-                    onPressed: exportingExcel ? null : onExportExcel,
-                    icon: exportingExcel
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.file_download_rounded),
-                    label: Text(
-                      exportingExcel ? 'Exportando Excel' : 'Exportar Excel',
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: exportingBackup ? null : onExportBackup,
-                    icon: exportingBackup
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.save_alt_rounded),
-                    label: Text(
-                      exportingBackup ? 'Exportando backup' : 'Exportar backup',
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: restoringBackup ? null : onRestoreBackup,
-                    icon: restoringBackup
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.restore_page_rounded),
-                    label: Text(
-                      restoringBackup ? 'Restaurando' : 'Restaurar backup',
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: undoingMovement || !store.canUndoLastMovement
-                        ? null
-                        : onUndoLastMovement,
-                    icon: undoingMovement
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.undo_rounded),
-                    label: Text(
-                      undoingMovement ? 'Deshaciendo' : 'Deshacer ultimo',
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: savingCashEvent ? null : onRegisterCashOpening,
-                    icon: const Icon(Icons.login_rounded),
-                    label: Text(
-                      store.hasCashOpeningToday
-                          ? 'Editar apertura'
-                          : 'Apertura de caja',
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: savingCashEvent ? null : onRegisterCashClosing,
-                    icon: const Icon(Icons.logout_rounded),
-                    label: Text(
-                      store.hasCashClosingToday
-                          ? 'Editar cierre'
-                          : 'Cierre de caja',
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
               BpcPanel(
                 padding: const EdgeInsets.all(16),
                 color: Colors.white.withValues(alpha: 0.78),
@@ -145,11 +66,9 @@ class SummaryScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Resumen de caja',
+                      'Tu caja, clara',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
-                    const SizedBox(height: 12),
-                    _CashFormulaCard(store: store),
                     const SizedBox(height: 12),
                     LayoutBuilder(
                       builder: (context, constraints) {
@@ -164,47 +83,25 @@ class SummaryScreen extends StatelessWidget {
                             SizedBox(
                               width: width,
                               child: MetricCard(
-                                label: 'Caja acumulada',
-                                value: formatMoney(store.cashBalancePesos),
-                                helper: 'Saldo total registrado',
-                              ),
-                            ),
-                            SizedBox(
-                              width: width,
-                              child: MetricCard(
-                                label: 'Saldo inicial',
-                                value: store.todayOpeningCashPesos == null
-                                    ? 'Sin abrir'
-                                    : formatMoney(store.todayOpeningCashPesos!),
-                                helper: 'Apertura del dia',
-                              ),
-                            ),
-                            SizedBox(
-                              width: width,
-                              child: MetricCard(
-                                label: 'Caja del dia',
-                                value: store.todayExpectedCashPesos == null
-                                    ? 'Sin apertura'
-                                    : formatMoney(
-                                        store.todayExpectedCashPesos!,
-                                      ),
-                                helper: 'Saldo inicial + ventas - gastos',
-                              ),
-                            ),
-                            SizedBox(
-                              width: width,
-                              child: MetricCard(
-                                label: 'Ventas del dia',
+                                label: 'Entró hoy',
                                 value: formatMoney(store.todaySalesPesos),
-                                helper: 'Ingresos de hoy',
+                                helper: 'Ventas registradas',
                               ),
                             ),
                             SizedBox(
                               width: width,
                               child: MetricCard(
-                                label: 'Gastos del dia',
+                                label: 'Salió hoy',
                                 value: formatMoney(store.todayExpensesPesos),
-                                helper: 'Egresos de hoy',
+                                helper: 'Gastos registrados',
+                              ),
+                            ),
+                            SizedBox(
+                              width: width,
+                              child: MetricCard(
+                                label: 'Queda en caja',
+                                value: formatMoney(store.cashBalancePesos),
+                                helper: 'Lo que tenés ahora',
                               ),
                             ),
                             SizedBox(
@@ -218,7 +115,17 @@ class SummaryScreen extends StatelessWidget {
                             SizedBox(
                               width: width,
                               child: MetricCard(
-                                label: 'Cierre registrado',
+                                label: 'Apertura',
+                                value: store.todayOpeningCashPesos == null
+                                    ? 'Sin abrir'
+                                    : formatMoney(store.todayOpeningCashPesos!),
+                                helper: 'Plata inicial del día',
+                              ),
+                            ),
+                            SizedBox(
+                              width: width,
+                              child: MetricCard(
+                                label: 'Cierre',
                                 value: store.todayClosingCashPesos == null
                                     ? 'Sin cierre'
                                     : formatMoney(store.todayClosingCashPesos!),
@@ -232,8 +139,59 @@ class SummaryScreen extends StatelessWidget {
                         );
                       },
                     ),
+                    if (store.todayOpeningCashPesos != null) ...[
+                      const SizedBox(height: 12),
+                      _CashFormulaCard(store: store),
+                    ],
                   ],
                 ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  FilledButton.tonalIcon(
+                    onPressed: savingCashEvent ? null : onRegisterCashOpening,
+                    icon: const Icon(Icons.login_rounded),
+                    label: Text(
+                      store.hasCashOpeningToday
+                          ? 'Editar apertura'
+                          : 'Apertura de caja',
+                    ),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: savingCashEvent ? null : onRegisterCashClosing,
+                    icon: const Icon(Icons.logout_rounded),
+                    label: Text(
+                      store.hasCashClosingToday
+                          ? 'Editar cierre'
+                          : 'Cierre de caja',
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: exportingExcel ? null : onExportExcel,
+                    icon: exportingExcel
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.file_download_rounded),
+                    label: Text(
+                      exportingExcel ? 'Exportando Excel' : 'Exportar Excel',
+                    ),
+                  ),
+                  _CashMoreActionsMenu(
+                    store: store,
+                    exportingBackup: exportingBackup,
+                    restoringBackup: restoringBackup,
+                    undoingMovement: undoingMovement,
+                    onExportBackup: onExportBackup,
+                    onRestoreBackup: onRestoreBackup,
+                    onUndoLastMovement: onUndoLastMovement,
+                  ),
+                ],
               ),
               const SizedBox(height: 18),
               if (suggestions.isNotEmpty) ...[
@@ -248,14 +206,14 @@ class SummaryScreen extends StatelessWidget {
               ],
               const SectionHeader(
                 title: 'Movimientos recientes',
-                subtitle: 'Todo lo que impacta en caja y stock',
+                subtitle: 'Lo último que entró y salió de tu caja',
               ),
               const SizedBox(height: 10),
               if (recent.isEmpty)
                 const EmptyCard(
-                  title: 'Sin movimientos',
+                  title: 'Todavía no hay movimientos',
                   message:
-                      'Cuando registres ventas, gastos o ajustes, se veran aqui.',
+                      'Cuando registres una venta o un gasto, lo ves acá al instante.',
                 )
               else
                 BpcPanel(
@@ -288,6 +246,111 @@ class SummaryScreen extends StatelessWidget {
   }
 }
 
+enum _CashMoreAction { undo, exportBackup, restoreBackup }
+
+class _CashMoreActionsMenu extends StatelessWidget {
+  const _CashMoreActionsMenu({
+    required this.store,
+    required this.exportingBackup,
+    required this.restoringBackup,
+    required this.undoingMovement,
+    required this.onExportBackup,
+    required this.onRestoreBackup,
+    required this.onUndoLastMovement,
+  });
+
+  final CommerceStore store;
+  final bool exportingBackup;
+  final bool restoringBackup;
+  final bool undoingMovement;
+  final VoidCallback onExportBackup;
+  final VoidCallback onRestoreBackup;
+  final VoidCallback onUndoLastMovement;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return PopupMenuButton<_CashMoreAction>(
+      tooltip: 'Más acciones',
+      onSelected: (action) {
+        switch (action) {
+          case _CashMoreAction.undo:
+            onUndoLastMovement();
+            break;
+          case _CashMoreAction.exportBackup:
+            onExportBackup();
+            break;
+          case _CashMoreAction.restoreBackup:
+            onRestoreBackup();
+            break;
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: _CashMoreAction.undo,
+          enabled: !undoingMovement && store.canUndoLastMovement,
+          child: _CashMenuRow(
+            icon: Icons.undo_rounded,
+            label: undoingMovement ? 'Deshaciendo' : 'Deshacer último',
+          ),
+        ),
+        PopupMenuItem(
+          value: _CashMoreAction.exportBackup,
+          enabled: !exportingBackup,
+          child: _CashMenuRow(
+            icon: Icons.save_alt_rounded,
+            label: exportingBackup ? 'Exportando backup' : 'Exportar backup',
+          ),
+        ),
+        PopupMenuItem(
+          value: _CashMoreAction.restoreBackup,
+          enabled: !restoringBackup,
+          child: _CashMenuRow(
+            icon: Icons.restore_page_rounded,
+            label: restoringBackup ? 'Restaurando' : 'Restaurar backup',
+          ),
+        ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.more_horiz_rounded, color: scheme.primary),
+            const SizedBox(width: 8),
+            Text(
+              'Más acciones',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: scheme.primary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CashMenuRow extends StatelessWidget {
+  const _CashMenuRow({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [Icon(icon, size: 20), const SizedBox(width: 10), Text(label)],
+    );
+  }
+}
+
 class _CashFormulaCard extends StatelessWidget {
   const _CashFormulaCard({required this.store});
 
@@ -307,7 +370,7 @@ class _CashFormulaCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
         ),
         child: Text(
-          'Registra una apertura para ver la formula del dia: saldo inicial + ventas - gastos = caja del dia.',
+          'Registrá la apertura del día y vas a ver: saldo inicial + ventas - gastos = caja del día.',
           style: theme.textTheme.bodyMedium?.copyWith(color: outline),
         ),
       );
@@ -324,7 +387,7 @@ class _CashFormulaCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Saldo inicial + ventas - gastos = caja del dia',
+            'Saldo inicial + ventas - gastos = caja del día',
             style: theme.textTheme.labelLarge?.copyWith(
               color: outline,
               fontWeight: FontWeight.w900,
@@ -349,7 +412,7 @@ class _CashFormulaCard extends StatelessWidget {
               ),
               const Text('='),
               _FormulaChip(
-                label: 'Caja del dia',
+                label: 'Caja del día',
                 value: formatMoney(store.todayExpectedCashPesos ?? 0),
                 emphasized: true,
               ),
@@ -433,14 +496,14 @@ class _FreeSaleSuggestionBanner extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Sugerencia de catalogo',
+                'Sugerencia de catálogo',
                 style: Theme.of(
                   context,
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 4),
               Text(
-                '"${suggestion.displayDescription}" se vendio varias veces como venta libre. Puedes crear un producto sin tocar esas ventas pasadas.',
+                '"${suggestion.displayDescription}" se vendió varias veces como venta libre. Podés crear un producto sin tocar esas ventas pasadas.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.outline,
                 ),
@@ -451,12 +514,12 @@ class _FreeSaleSuggestionBanner extends StatelessWidget {
                 runSpacing: 8,
                 children: [
                   _SuggestionMetaChip(
-                    label: 'Se vendio',
+                    label: 'Se vendió',
                     value:
                         '${suggestion.repeatCount} ${suggestion.repeatCount == 1 ? 'vez' : 'veces'}',
                   ),
                   _SuggestionMetaChip(
-                    label: 'Ultima venta',
+                    label: 'Última venta',
                     value: formatCompactDateLabel(suggestion.latestSoldAt),
                   ),
                   _SuggestionMetaChip(
@@ -465,7 +528,7 @@ class _FreeSaleSuggestionBanner extends StatelessWidget {
                   ),
                   if (suggestion.latestUnitPricePesos != null)
                     _SuggestionMetaChip(
-                      label: 'Ultimo precio',
+                      label: 'Último precio',
                       value: formatMoney(suggestion.latestUnitPricePesos!),
                     ),
                 ],
@@ -482,7 +545,7 @@ class _FreeSaleSuggestionBanner extends StatelessWidget {
                   ),
                   TextButton(
                     onPressed: onDismiss,
-                    child: const Text('Mas tarde'),
+                    child: const Text('Más tarde'),
                   ),
                 ],
               ),

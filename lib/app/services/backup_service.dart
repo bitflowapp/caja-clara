@@ -23,10 +23,7 @@ class BackupExportResult {
 }
 
 class BackupImportData {
-  const BackupImportData({
-    required this.snapshot,
-    required this.fileName,
-  });
+  const BackupImportData({required this.snapshot, required this.fileName});
 
   final Map<String, dynamic> snapshot;
   final String fileName;
@@ -34,7 +31,7 @@ class BackupImportData {
 
 class BackupService {
   BackupService({BackupFileSaver? fileSaver})
-      : _fileSaver = fileSaver ?? createBackupFileSaver();
+    : _fileSaver = fileSaver ?? createBackupFileSaver();
 
   final BackupFileSaver _fileSaver;
 
@@ -74,10 +71,7 @@ class BackupService {
     final content = await file.readAsString();
     final snapshot = parseBackupJson(content);
 
-    return BackupImportData(
-      snapshot: snapshot,
-      fileName: file.name,
-    );
+    return BackupImportData(snapshot: snapshot, fileName: file.name);
   }
 
   @visibleForTesting
@@ -90,10 +84,7 @@ class BackupService {
   }
 
   @visibleForTesting
-  String buildBackupJson(
-    CommerceStore store, {
-    required DateTime generatedAt,
-  }) {
+  String buildBackupJson(CommerceStore store, {required DateTime generatedAt}) {
     final snapshot = <String, dynamic>{
       'backupGeneratedAt': generatedAt.toIso8601String(),
       ...store.buildSnapshot(generatedAt: generatedAt),
@@ -105,7 +96,7 @@ class BackupService {
   Map<String, dynamic> parseBackupJson(String content) {
     final decoded = jsonDecode(content);
     if (decoded is! Map) {
-      throw const FormatException('El archivo no contiene un backup valido.');
+      throw const FormatException('El archivo no contiene un backup válido.');
     }
     return decoded.cast<String, dynamic>();
   }

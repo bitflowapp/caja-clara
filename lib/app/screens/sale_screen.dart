@@ -192,7 +192,7 @@ class _SaleScreenState extends State<SaleScreen> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Elige si vendes un producto cargado o un item libre. Guardar impacta caja al instante.',
+                          'Elegí un producto del catálogo o hacé una venta libre. Al guardar, la caja se actualiza sola.',
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
                                 color: Theme.of(context).colorScheme.outline,
@@ -207,9 +207,9 @@ class _SaleScreenState extends State<SaleScreen> {
                         if (_saleMode == SaleEntryMode.catalog) ...[
                           if (!store.hasProducts) ...[
                             EmptyCard(
-                              title: 'Todavia no hay productos cargados',
+                              title: 'Todavía no hay productos cargados',
                               message:
-                                  'Puedes usar venta libre ahora mismo o cargar la plantilla kiosco para empezar con stock.',
+                                  'Podés usar venta libre ahora mismo o cargar la plantilla kiosco para empezar con stock.',
                               icon: Icons.inventory_2_rounded,
                               action: Wrap(
                                 spacing: 10,
@@ -226,7 +226,7 @@ class _SaleScreenState extends State<SaleScreen> {
                                   TextButton(
                                     onPressed: () =>
                                         showProductEditor(context, store),
-                                    child: const Text('Agregar producto'),
+                                    child: const Text('Cargar producto'),
                                   ),
                                 ],
                               ),
@@ -261,7 +261,7 @@ class _SaleScreenState extends State<SaleScreen> {
                               },
                               decoration: InputDecoration(
                                 labelText: 'Buscar producto',
-                                hintText: 'Escribe y toca un resultado',
+                                hintText: 'Escribí y tocá un resultado',
                                 prefixIcon: const Icon(Icons.search_rounded),
                                 suffixIcon: SpeechDictationActionButton(
                                   controller: _productSearchDictation,
@@ -300,13 +300,13 @@ class _SaleScreenState extends State<SaleScreen> {
                                   _manualDescriptionEditorController,
                               nextEditorController: _quantityEditorController,
                               nextFieldLabel: 'Cantidad',
-                              labelText: 'Descripcion',
+                              labelText: 'Descripción',
                               editorContext: 'Venta libre',
                               hintText: 'Ej. Preservativos Durex x3',
                               helperText:
-                                  'Usalo para ventas no cargadas en el catalogo.',
+                                  'Usalo para ventas no cargadas en el catálogo.',
                               emptyDisplayText:
-                                  'Toca para cargar la descripcion',
+                                  'Tocá para cargar la descripción',
                               keyboardType: TextInputType.text,
                               textCapitalization: TextCapitalization.sentences,
                               validator: (value) {
@@ -314,7 +314,7 @@ class _SaleScreenState extends State<SaleScreen> {
                                   return null;
                                 }
                                 return (value ?? '').trim().isEmpty
-                                    ? 'Escribe una descripcion.'
+                                    ? 'Escribí una descripción.'
                                     : null;
                               },
                             )
@@ -336,17 +336,17 @@ class _SaleScreenState extends State<SaleScreen> {
                                   controller: _quantityController,
                                 ),
                                 decoration: const InputDecoration(
-                                  labelText: 'Descripcion',
+                                  labelText: 'Descripción',
                                   hintText: 'Ej. Preservativos Durex x3',
                                   helperText:
-                                      'Usalo para ventas no cargadas en el catalogo.',
+                                      'Usalo para ventas no cargadas en el catálogo.',
                                 ),
                                 validator: (value) {
                                   if (_saleMode != SaleEntryMode.quick) {
                                     return null;
                                   }
                                   return (value ?? '').trim().isEmpty
-                                      ? 'Escribe una descripcion.'
+                                      ? 'Escribí una descripción.'
                                       : null;
                                 },
                               ),
@@ -366,7 +366,7 @@ class _SaleScreenState extends State<SaleScreen> {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    'La venta libre suma en caja y reportes, pero no descuenta stock porque no usa un producto del catalogo.',
+                                    'La venta libre suma en caja y reportes, pero no descuenta stock porque no usa un producto del catálogo.',
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodyMedium
@@ -452,7 +452,7 @@ class _SaleScreenState extends State<SaleScreen> {
                                               ? 'Venta libre'
                                               : 'Nueva venta',
                                           emptyDisplayText:
-                                              'Toca para cargar la cantidad',
+                                              'Tocá para cargar la cantidad',
                                           keyboardType: TextInputType.number,
                                           inputFormatters: [
                                             FilteringTextInputFormatter
@@ -463,12 +463,12 @@ class _SaleScreenState extends State<SaleScreen> {
                                             if (_saleMode ==
                                                 SaleEntryMode.quick) {
                                               return parsed <= 0
-                                                  ? 'Ingresa una cantidad'
+                                                  ? 'Ingresá una cantidad'
                                                   : null;
                                             }
                                             if (product == null) {
                                               return parsed <= 0
-                                                  ? 'Ingresa una cantidad'
+                                                  ? 'Ingresá una cantidad'
                                                   : null;
                                             }
                                             return store.saleReadinessMessage(
@@ -515,12 +515,12 @@ class _SaleScreenState extends State<SaleScreen> {
                                               if (_saleMode ==
                                                   SaleEntryMode.quick) {
                                                 return parsed <= 0
-                                                    ? 'Ingresa una cantidad'
+                                                    ? 'Ingresá una cantidad'
                                                     : null;
                                               }
                                               if (product == null) {
                                                 return parsed <= 0
-                                                    ? 'Ingresa una cantidad'
+                                                    ? 'Ingresá una cantidad'
                                                     : null;
                                               }
                                               return store.saleReadinessMessage(
@@ -543,7 +543,7 @@ class _SaleScreenState extends State<SaleScreen> {
                                             labelText: 'Precio unitario',
                                             editorContext: 'Venta libre',
                                             emptyDisplayText:
-                                                'Toca para cargar el precio',
+                                                'Tocá para cargar el precio',
                                             keyboardType:
                                                 const TextInputType.numberWithOptions(
                                                   decimal: true,
@@ -556,7 +556,7 @@ class _SaleScreenState extends State<SaleScreen> {
                                             displayValueBuilder: (value) {
                                               final parsed = _parseInt(value);
                                               return parsed <= 0
-                                                  ? 'Toca para cargar el precio'
+                                                  ? 'Tocá para cargar el precio'
                                                   : formatMoney(parsed);
                                             },
                                             validator: (value) {
@@ -566,7 +566,7 @@ class _SaleScreenState extends State<SaleScreen> {
                                               }
                                               final parsed = _parseInt(value);
                                               return parsed <= 0
-                                                  ? 'Ingresa un precio'
+                                                  ? 'Ingresá un precio'
                                                   : null;
                                             },
                                           )
@@ -606,7 +606,7 @@ class _SaleScreenState extends State<SaleScreen> {
                                                 }
                                                 final parsed = _parseInt(value);
                                                 return parsed <= 0
-                                                    ? 'Ingresa un precio'
+                                                    ? 'Ingresá un precio'
                                                     : null;
                                               },
                                             ),
@@ -629,8 +629,8 @@ class _SaleScreenState extends State<SaleScreen> {
                                           child: Text('Efectivo'),
                                         ),
                                         DropdownMenuItem(
-                                          value: 'Debito',
-                                          child: Text('Debito'),
+                                          value: 'Débito',
+                                          child: Text('Débito'),
                                         ),
                                         DropdownMenuItem(
                                           value: 'Transferencia',
@@ -677,9 +677,9 @@ class _SaleScreenState extends State<SaleScreen> {
                               ),
                               if (_saleMode == SaleEntryMode.quick)
                                 _SummaryRow(
-                                  label: 'Descripcion',
+                                  label: 'Descripción',
                                   value: manualDescription.isEmpty
-                                      ? 'Sin descripcion'
+                                      ? 'Sin descripción'
                                       : manualDescription,
                                 ),
                               _SummaryRow(
@@ -803,7 +803,7 @@ class _SaleScreenState extends State<SaleScreen> {
           content: Text(
             result.fullySkipped
                 ? 'La plantilla kiosco ya estaba cargada.'
-                : 'Plantilla kiosco cargada. Ya puedes buscar y vender.',
+                : 'Plantilla kiosco cargada. Ya podés buscar y vender.',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -942,13 +942,13 @@ class _SaleScreenState extends State<SaleScreen> {
       return null;
     }
     if (_selectedProduct != null) {
-      return 'Producto seleccionado. Puedes seguir con la venta o buscar otro.';
+      return 'Producto seleccionado. Podés seguir con la venta o buscar otro.';
     }
     if (_normalizedProductQuery.isEmpty) {
-      return 'Escribe, dicta o toca un producto para seleccionarlo.';
+      return 'Escribí, dictá o tocá un producto para seleccionarlo.';
     }
     if (filteredProducts.isNotEmpty) {
-      return 'Toca un resultado para confirmar el producto.';
+      return 'Tocá un resultado para confirmar el producto.';
     }
     return null;
   }
@@ -1032,7 +1032,7 @@ class _SaleScreenState extends State<SaleScreen> {
     final seed = _buildProductSeedFromFreeSale();
     if ((seed.name ?? '').trim().isEmpty) {
       _showBlockedFeedback(
-        'Escribe una descripcion antes de crear el producto.',
+        'Escribí una descripción antes de crear el producto.',
       );
       return;
     }
@@ -1054,8 +1054,8 @@ class _SaleScreenState extends State<SaleScreen> {
       SnackBar(
         content: Text(
           result.kind == ProductEditorResultKind.created
-              ? '"${result.product.name}" ya esta listo en el catalogo.'
-              : 'Usaras "${result.product.name}" que ya estaba en el catalogo.',
+              ? '"${result.product.name}" ya está listo en el catálogo.'
+              : 'Vas a usar "${result.product.name}" que ya estaba en el catálogo.',
         ),
         behavior: SnackBarBehavior.floating,
       ),
@@ -1092,7 +1092,7 @@ class _SaleScreenState extends State<SaleScreen> {
       _formKey.currentState!.validate();
       if (_saleMode == SaleEntryMode.quick) {
         _showBlockedFeedback(
-          validationMessage ?? 'Revisa los datos de la venta.',
+          validationMessage ?? 'Revisá los datos de la venta.',
         );
       }
       return;
@@ -1102,8 +1102,8 @@ class _SaleScreenState extends State<SaleScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     final successMessage = _saleMode == SaleEntryMode.catalog
-        ? 'Venta guardada. Caja y stock al dia.'
-        : 'Venta libre guardada. Caja al dia.';
+        ? 'Venta registrada. Caja y stock actualizados.'
+        : 'Venta libre registrada. Caja actualizada.';
 
     try {
       if (_saleMode == SaleEntryMode.catalog) {
@@ -1162,7 +1162,7 @@ class _SaleModeSelector extends StatelessWidget {
           children: [
             _SaleModeChip(
               tapKey: const Key('sale-mode-catalog'),
-              label: 'Catalogo',
+              label: 'Catálogo',
               icon: Icons.inventory_2_rounded,
               selected: currentMode == SaleEntryMode.catalog,
               onTap: onChanged == null
@@ -1281,7 +1281,7 @@ class _ExactProductSuggestionCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Ya existe en catalogo',
+                  'Ya existe en catálogo',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     color: scheme.primary,
                     fontWeight: FontWeight.w900,
@@ -1316,7 +1316,7 @@ class _ExactProductSuggestionCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Conviene usar ese producto para no duplicar catalogo ni stock.',
+                  'Conviene usar ese producto para no duplicar catálogo ni stock.',
                   style: Theme.of(
                     context,
                   ).textTheme.bodyMedium?.copyWith(color: scheme.outline),
@@ -1478,8 +1478,8 @@ class _ProductSearchResults extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               hasActiveQuery
-                  ? 'Prueba con otro nombre, categoria o codigo.'
-                  : 'Todavia no hay productos para elegir.',
+                  ? 'Probá con otro nombre, categoría o código.'
+                  : 'Todavía no hay productos para elegir.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.outline,
@@ -1564,7 +1564,7 @@ class _ProductSearchResultTile extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       [
-                        product.category ?? 'Sin categoria',
+                        product.category ?? 'Sin categoría',
                         formatMoney(product.pricePesos),
                         if ((product.barcode ?? '').isNotEmpty)
                           product.barcode!,

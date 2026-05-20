@@ -6,10 +6,7 @@ import 'excel_file_saver_io.dart'
 enum ExcelSaveDisposition { saved, downloaded, cancelled }
 
 class ExcelSaveResult {
-  const ExcelSaveResult({
-    required this.disposition,
-    this.path,
-  });
+  const ExcelSaveResult({required this.disposition, this.path});
 
   final ExcelSaveDisposition disposition;
   final String? path;

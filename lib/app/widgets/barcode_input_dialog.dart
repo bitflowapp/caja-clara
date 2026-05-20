@@ -10,8 +10,8 @@ import 'keyboard_aware_form.dart';
 Future<String?> showBarcodeInputDialog(
   BuildContext context, {
   String? initialValue,
-  String title = 'Ingresar codigo',
-  String helper = 'Escanea o pega el codigo. Enter busca al instante.',
+  String title = 'Ingresar código',
+  String helper = 'Escaneá o pegá el código. Enter busca al instante.',
   String confirmLabel = 'Buscar producto',
 }) async {
   final controller = TextEditingController(text: initialValue ?? '');
@@ -66,14 +66,14 @@ Future<String?> showBarcodeInputDialog(
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   textInputAction: TextInputAction.search,
                   decoration: const InputDecoration(
-                    labelText: 'Codigo de barras',
+                    labelText: 'Código de barras',
                     hintText: 'Ej. 7791234500011',
                     prefixIcon: Icon(Icons.qr_code_2_rounded),
                   ),
                   onTapOutside: (_) => focusNode.unfocus(),
                   validator: (value) {
                     if (CommerceStore.normalizeBarcode(value) == null) {
-                      return 'Ingresa un codigo valido.';
+                      return 'Ingresá un código válido.';
                     }
                     return null;
                   },

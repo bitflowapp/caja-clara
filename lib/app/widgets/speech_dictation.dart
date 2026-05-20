@@ -12,7 +12,7 @@ enum SpeechDictationState {
 }
 
 class SpeechDictationController extends ChangeNotifier {
-  SpeechDictationController({this.idleHint = 'Toca el microfono para dictar.'});
+  SpeechDictationController({this.idleHint = 'Tocá el micrófono para dictar.'});
 
   final String idleHint;
   final SpeechToText _speech = SpeechToText();
@@ -42,7 +42,7 @@ class SpeechDictationController extends ChangeNotifier {
       case SpeechDictationState.idle:
         return _message.isEmpty ? idleHint : _message;
       case SpeechDictationState.starting:
-        return 'Activando microfono...';
+        return 'Activando micrófono...';
       case SpeechDictationState.listening:
         return 'Escuchando... Habla ahora.';
       case SpeechDictationState.processing:
@@ -75,7 +75,7 @@ class SpeechDictationController extends ChangeNotifier {
       _initialized = true;
       if (!available) {
         _state = SpeechDictationState.unsupported;
-        _lastError = 'El dictado no esta disponible en este dispositivo.';
+        _lastError = 'El dictado no está disponible en este dispositivo.';
         _message = _lastError!;
       } else {
         _state = SpeechDictationState.idle;
@@ -123,7 +123,7 @@ class SpeechDictationController extends ChangeNotifier {
     _stopRequested = false;
     _lastError = null;
     _state = SpeechDictationState.starting;
-    _message = 'Activando microfono...';
+    _message = 'Activando micrófono...';
     _safeNotify();
 
     try {
@@ -316,7 +316,7 @@ class SpeechDictationController extends ChangeNotifier {
     if (_recognizedSpeechInSession) {
       _message = 'Texto agregado al campo.';
     } else if (_stopRequested || endedWhileCapturing) {
-      _message = 'No detecte voz. Prueba hablar mas cerca o revisar permisos.';
+      _message = 'No detecté voz. Probá hablar más cerca o revisar permisos.';
     } else {
       _message = idleHint;
     }
@@ -334,32 +334,32 @@ class SpeechDictationController extends ChangeNotifier {
         message.contains('not allowed') ||
         message.contains('denied') ||
         message.contains('permanently_denied')) {
-      return 'El microfono no tiene permiso. Revisa permisos del navegador o del sistema.';
+      return 'El micrófono no tiene permiso. Revisá permisos del navegador o del sistema.';
     }
 
     if (message.contains('no match') ||
         message.contains('no_speech') ||
         message.contains('speech timeout') ||
         message.contains('error_speech_timeout')) {
-      return 'No detecte voz. Prueba hablar mas cerca o revisar el microfono.';
+      return 'No detecté voz. Probá hablar más cerca o revisar el micrófono.';
     }
 
     if (message.contains('busy') || message.contains('recognizerbusy')) {
-      return 'El microfono esta en uso. Cierra otra captura y prueba de nuevo.';
+      return 'El micrófono está en uso. Cerrá otra captura y probá de nuevo.';
     }
 
     if (message.contains('network') || message.contains('connection')) {
-      return 'No pude usar el dictado ahora. Revisa la conexion e intenta de nuevo.';
+      return 'No pude usar el dictado ahora. Revisá la conexión e intentá de nuevo.';
     }
 
     if (unsupported ||
         message.contains('unsupported') ||
         message.contains('not available') ||
         message.contains('not supported')) {
-      return 'El dictado no esta disponible en esta plataforma o navegador.';
+      return 'El dictado no está disponible en esta plataforma o navegador.';
     }
 
-    return 'No se pudo iniciar el dictado. Intenta otra vez.';
+    return 'No se pudo iniciar el dictado. Intentá otra vez.';
   }
 
   void _safeNotify() {

@@ -6,10 +6,7 @@ import 'backup_file_saver_io.dart'
 enum BackupSaveDisposition { saved, downloaded, cancelled }
 
 class BackupSaveResult {
-  const BackupSaveResult({
-    required this.disposition,
-    this.path,
-  });
+  const BackupSaveResult({required this.disposition, this.path});
 
   final BackupSaveDisposition disposition;
   final String? path;

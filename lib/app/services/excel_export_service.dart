@@ -25,14 +25,11 @@ class ExcelExportResult {
 
 class ExcelExportService {
   ExcelExportService({ExcelFileSaver? fileSaver})
-      : _fileSaver = fileSaver ?? createExcelFileSaver();
+    : _fileSaver = fileSaver ?? createExcelFileSaver();
 
   final ExcelFileSaver _fileSaver;
 
-  Future<ExcelExportResult> export(
-    CommerceStore store, {
-    DateTime? now,
-  }) async {
+  Future<ExcelExportResult> export(CommerceStore store, {DateTime? now}) async {
     final exportAt = now ?? DateTime.now();
     final fileName = buildSuggestedFileName(exportAt);
     final workbook = buildWorkbookBytes(store, exportAt: exportAt);
@@ -90,11 +87,11 @@ class ExcelExportService {
       TextCellValue(_formatDateTime(exportAt)),
     ]);
     _writeRow(sheet, 2, <CellValue>[
-      TextCellValue('Ventas del dia'),
+      TextCellValue('Ventas del día'),
       IntCellValue(store.todaySalesPesos),
     ]);
     _writeRow(sheet, 3, <CellValue>[
-      TextCellValue('Gastos del dia'),
+      TextCellValue('Gastos del día'),
       IntCellValue(store.todayExpensesPesos),
     ]);
     _writeRow(sheet, 4, <CellValue>[
@@ -113,10 +110,10 @@ class ExcelExportService {
       'Nombre',
       'Barcode',
       'Stock',
-      'Stock minimo',
+      'Stock mínimo',
       'Costo',
       'Precio',
-      'Categoria',
+      'Categoría',
     ]);
 
     for (var i = 0; i < products.length; i++) {
@@ -168,7 +165,7 @@ class ExcelExportService {
     _writeHeaderRow(sheet, 0, const <String>[
       'Fecha/hora',
       'Concepto',
-      'Categoria',
+      'Categoría',
       'Monto',
     ]);
 
@@ -221,13 +218,14 @@ class ExcelExportService {
   void _writeRow(Sheet sheet, int rowIndex, List<CellValue> values) {
     for (var columnIndex = 0; columnIndex < values.length; columnIndex++) {
       sheet
-          .cell(
-            CellIndex.indexByColumnRow(
-              rowIndex: rowIndex,
-              columnIndex: columnIndex,
-            ),
-          )
-          .value = values[columnIndex];
+              .cell(
+                CellIndex.indexByColumnRow(
+                  rowIndex: rowIndex,
+                  columnIndex: columnIndex,
+                ),
+              )
+              .value =
+          values[columnIndex];
     }
   }
 

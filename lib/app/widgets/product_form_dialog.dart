@@ -100,7 +100,7 @@ class _ProductFormPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = product == null ? 'Agregar producto' : 'Editar producto';
+    final title = product == null ? 'Cargar producto' : 'Editar producto';
     return KeyboardAwareFormScaffold(
       title: title,
       child: BpcPanel(
@@ -229,7 +229,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   }
 
   String get _title =>
-      widget.product == null ? 'Agregar producto' : 'Editar producto';
+      widget.product == null ? 'Cargar producto' : 'Editar producto';
 
   Widget _buildDialogContent(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
@@ -285,7 +285,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Completa lo basico y guarda. Si todavia no definiste costo o precio, puedes dejarlo en 0 y ajustarlo despues.',
+                'Completá lo básico y guardá. Si todavía no definiste costo o precio, podés dejarlo en 0 y ajustarlo después.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.outline,
                 ),
@@ -314,7 +314,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
               Text(_title, style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 6),
               Text(
-                'Completa lo basico y guarda. Si todavia no definiste costo o precio, puedes dejarlo en 0 y ajustarlo despues.',
+                'Completá lo básico y guardá. Si todavía no definiste costo o precio, podés dejarlo en 0 y ajustarlo después.',
                 style: Theme.of(
                   context,
                 ).textTheme.bodyMedium?.copyWith(color: scheme.outline),
@@ -347,7 +347,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                   editorController: _nameEditorController,
                   labelText: 'Nombre',
                   editorContext: _title,
-                  emptyDisplayText: 'Toca para cargar el nombre',
+                  emptyDisplayText: 'Tocá para cargar el nombre',
                   keyboardType: TextInputType.text,
                   textCapitalization: TextCapitalization.words,
                   validator: _required,
@@ -399,15 +399,15 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                 MobileFieldEditorFormField(
                   controller: _categoryController,
                   editorController: _categoryEditorController,
-                  labelText: 'Categoria (opcional)',
+                  labelText: 'Categoría (opcional)',
                   editorContext: _title,
-                  emptyDisplayText: 'Toca para cargar la categoria',
+                  emptyDisplayText: 'Tocá para cargar la categoría',
                   keyboardType: TextInputType.text,
                   textCapitalization: TextCapitalization.words,
                   suffixBuilder: (controller) => SpeechDictationActionButton(
                     controller: _categoryDictation,
                     textController: controller,
-                    tooltip: 'Dictar categoria',
+                    tooltip: 'Dictar categoría',
                   ),
                   supportingBuilder: () =>
                       SpeechDictationHint(controller: _categoryDictation),
@@ -422,11 +422,11 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                     textInputAction: TextInputAction.next,
                     textCapitalization: TextCapitalization.words,
                     decoration: InputDecoration(
-                      labelText: 'Categoria (opcional)',
+                      labelText: 'Categoría (opcional)',
                       suffixIcon: SpeechDictationActionButton(
                         controller: _categoryDictation,
                         textController: _categoryController,
-                        tooltip: 'Dictar categoria',
+                        tooltip: 'Dictar categoría',
                       ),
                     ),
                     onTapOutside: (_) => _categoryFocusNode.unfocus(),
@@ -447,9 +447,9 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
               ? MobileFieldEditorFormField(
                   controller: _barcodeController,
                   editorController: _barcodeEditorController,
-                  labelText: 'Codigo de barras (opcional)',
+                  labelText: 'Código de barras (opcional)',
                   editorContext: _title,
-                  emptyDisplayText: 'Toca para cargar el codigo',
+                  emptyDisplayText: 'Tocá para cargar el código',
                   keyboardType: TextInputType.number,
                 )
               : EnsureVisibleWhenFocused(
@@ -460,7 +460,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                     keyboardType: TextInputType.number,
                     textInputAction: TextInputAction.next,
                     decoration: const InputDecoration(
-                      labelText: 'Codigo de barras (opcional)',
+                      labelText: 'Código de barras (opcional)',
                     ),
                     onTapOutside: (_) => _barcodeFocusNode.unfocus(),
                     onFieldSubmitted: (_) => _moveFocusTo(
@@ -477,10 +477,10 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                   controller: _stockController,
                   editorController: _stockEditorController,
                   nextEditorController: _minStockEditorController,
-                  nextFieldLabel: 'Stock minimo',
+                  nextFieldLabel: 'Stock mínimo',
                   labelText: 'Stock',
                   editorContext: _title,
-                  emptyDisplayText: 'Toca para cargar el stock',
+                  emptyDisplayText: 'Tocá para cargar el stock',
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   validator: (value) => _intMin(value, 0, 'El stock'),
@@ -511,12 +511,12 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                   editorController: _minStockEditorController,
                   nextEditorController: _costEditorController,
                   nextFieldLabel: 'Costo',
-                  labelText: 'Stock minimo',
+                  labelText: 'Stock mínimo',
                   editorContext: _title,
-                  emptyDisplayText: 'Toca para cargar el minimo',
+                  emptyDisplayText: 'Tocá para cargar el mínimo',
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  validator: (value) => _intMin(value, 0, 'El stock minimo'),
+                  validator: (value) => _intMin(value, 0, 'El stock mínimo'),
                 )
               : EnsureVisibleWhenFocused(
                   focusNode: _minStockFocusNode,
@@ -524,7 +524,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                     controller: _minStockController,
                     focusNode: _minStockFocusNode,
                     decoration: const InputDecoration(
-                      labelText: 'Stock minimo',
+                      labelText: 'Stock mínimo',
                     ),
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -534,7 +534,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                       _costFocusNode,
                       controller: _costController,
                     ),
-                    validator: (value) => _intMin(value, 0, 'El stock minimo'),
+                    validator: (value) => _intMin(value, 0, 'El stock mínimo'),
                   ),
                 ),
         ),
@@ -548,7 +548,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                   nextFieldLabel: 'Precio',
                   labelText: 'Costo',
                   editorContext: _title,
-                  emptyDisplayText: 'Toca para cargar el costo',
+                  emptyDisplayText: 'Tocá para cargar el costo',
                   prefixText: '\$ ',
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
@@ -557,7 +557,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                   displayValueBuilder: (value) {
                     final parsed = _parseInt(value);
                     return parsed <= 0
-                        ? 'Toca para cargar el costo'
+                        ? 'Tocá para cargar el costo'
                         : formatMoney(parsed);
                   },
                   validator: (value) => _intMin(value, 0, 'El costo'),
@@ -590,7 +590,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                   editorController: _priceEditorController,
                   labelText: 'Precio',
                   editorContext: _title,
-                  emptyDisplayText: 'Toca para cargar el precio',
+                  emptyDisplayText: 'Tocá para cargar el precio',
                   prefixText: '\$ ',
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
@@ -599,7 +599,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                   displayValueBuilder: (value) {
                     final parsed = _parseInt(value);
                     return parsed <= 0
-                        ? 'Toca para cargar el precio'
+                        ? 'Tocá para cargar el precio'
                         : formatMoney(parsed);
                   },
                   validator: (value) => _intMin(value, 0, 'El precio'),
@@ -829,7 +829,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
         return AlertDialog(
           title: const Text('Ya existe un producto con ese nombre'),
           content: Text(
-            'Se encontro "${existing.name}" en el catalogo. Puedes usar ese producto, cancelar o crear otro igual si de verdad lo necesitas.',
+            'Se encontró "${existing.name}" en el catálogo. Podés usar ese producto, cancelar o crear otro igual si de verdad lo necesitás.',
           ),
           actions: [
             TextButton(
@@ -862,9 +862,9 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Ese codigo ya existe'),
+          title: const Text('Ese código ya existe'),
           content: Text(
-            'El codigo de barras ya pertenece a "${existing.name}". Conviene usar ese producto para no duplicar catalogo ni stock.',
+            'El código de barras ya pertenece a "${existing.name}". Conviene usar ese producto para no duplicar catálogo ni stock.',
           ),
           actions: [
             TextButton(

@@ -10,14 +10,16 @@ class CommercePersistence {
     final box = await _openBox();
     final raw = box.get(_snapshotKey);
     if (raw is Map) {
-      return raw.map<String, dynamic>((key, value) =>
-          MapEntry(key.toString(), value));
+      return raw.map<String, dynamic>(
+        (key, value) => MapEntry(key.toString(), value),
+      );
     }
     if (raw is String && raw.isNotEmpty) {
       final decoded = jsonDecode(raw);
       if (decoded is Map) {
-        return decoded.map<String, dynamic>((key, value) =>
-            MapEntry(key.toString(), value));
+        return decoded.map<String, dynamic>(
+          (key, value) => MapEntry(key.toString(), value),
+        );
       }
     }
     return null;
