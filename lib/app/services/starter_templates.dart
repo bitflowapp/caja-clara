@@ -64,30 +64,12 @@ const List<StarterTemplateProductSeed> argentinianKioskTemplateProducts =
         name: 'Agua saborizada',
         category: 'Bebidas sin alcohol',
       ),
-      StarterTemplateProductSeed(
-        name: 'Cerveza lata 473 ml',
-        category: 'Bebidas alcoholicas',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Cerveza litro',
-        category: 'Bebidas alcoholicas',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Fernet botella',
-        category: 'Bebidas alcoholicas',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Vodka chico',
-        category: 'Bebidas alcoholicas',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Vino botella',
-        category: 'Bebidas alcoholicas',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Vino tetra',
-        category: 'Bebidas alcoholicas',
-      ),
+      StarterTemplateProductSeed(name: 'Yerba mate', category: 'Almacen'),
+      StarterTemplateProductSeed(name: 'Café', category: 'Almacen'),
+      StarterTemplateProductSeed(name: 'Leche', category: 'Almacen'),
+      StarterTemplateProductSeed(name: 'Pan', category: 'Almacen'),
+      StarterTemplateProductSeed(name: 'Arroz', category: 'Almacen'),
+      StarterTemplateProductSeed(name: 'Azúcar', category: 'Almacen'),
       StarterTemplateProductSeed(name: 'Hielo bolsa', category: 'Hielo'),
       StarterTemplateProductSeed(name: 'Alfajor simple', category: 'Golosinas'),
       StarterTemplateProductSeed(name: 'Alfajor triple', category: 'Golosinas'),
@@ -105,37 +87,14 @@ const List<StarterTemplateProductSeed> argentinianKioskTemplateProducts =
       StarterTemplateProductSeed(name: 'Mani', category: 'Snacks'),
       StarterTemplateProductSeed(name: 'Mix snack', category: 'Snacks'),
       StarterTemplateProductSeed(name: 'Nachos', category: 'Snacks'),
+      StarterTemplateProductSeed(name: 'Aceite', category: 'Almacen'),
       StarterTemplateProductSeed(
-        name: 'Cigarrillos Marlboro box',
-        category: 'Cigarrillos y tabaco',
+        name: 'Cuaderno',
+        category: 'Libreria',
       ),
       StarterTemplateProductSeed(
-        name: 'Cigarrillos Philip Morris box',
-        category: 'Cigarrillos y tabaco',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Cigarrillos Lucky Strike box',
-        category: 'Cigarrillos y tabaco',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Cigarrillos Chesterfield box',
-        category: 'Cigarrillos y tabaco',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Encendedor comun',
-        category: 'Encendedores',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Encendedor recargable',
-        category: 'Encendedores',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Preservativos x3',
-        category: 'Preservativos',
-      ),
-      StarterTemplateProductSeed(
-        name: 'Preservativos x6',
-        category: 'Preservativos',
+        name: 'Lapicera',
+        category: 'Libreria',
       ),
       StarterTemplateProductSeed(
         name: 'Galletitas dulces',
@@ -158,7 +117,7 @@ const List<StarterTemplateProductSeed> argentinianKioskTemplateProducts =
         category: 'Higiene rapida / impulso',
       ),
       StarterTemplateProductSeed(
-        name: 'Toallitas femeninas',
+        name: 'Servilletas',
         category: 'Higiene rapida / impulso',
       ),
       StarterTemplateProductSeed(

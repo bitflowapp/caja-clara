@@ -35,7 +35,7 @@ Future<void> showQuickHelpDialog(BuildContext context) async {
               _HelpBlock(
                 title: 'Vender rápido',
                 text:
-                    'Buscás el producto, elegís la cantidad y guardás. La caja y el stock se actualizan solos.',
+                    'Escribís qué vendés, la cantidad y el precio, y guardás. La caja del día se actualiza sola.',
               ),
               _HelpBlock(
                 title: 'Código de barras',

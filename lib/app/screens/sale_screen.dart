@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../models/product.dart';
 import '../services/commerce_store.dart';
+import '../theme/bpc_colors.dart';
 import '../utils/formatters.dart';
 import '../utils/user_facing_errors.dart';
 import '../utils/text_field_selection.dart';
@@ -11,37 +12,34 @@ import '../widgets/commerce_scope.dart';
 import '../widgets/input_shortcuts.dart';
 import '../widgets/keyboard_aware_form.dart';
 import '../widgets/mobile_field_editor.dart';
-import '../widgets/product_form_dialog.dart';
-import '../widgets/speech_dictation.dart';
 
+/// Pantalla Nueva venta — flujo único de venta rápida (venta libre).
+///
+/// Se cargan descripción, cantidad y precio a mano. Al guardar, la caja del
+/// día se actualiza sola. No depende del catálogo de productos.
 class SaleScreen extends StatefulWidget {
   const SaleScreen({super.key, this.initialProduct});
 
+  /// Producto opcional para precargar descripción y precio (uso del escáner).
   final Product? initialProduct;
 
   @override
   State<SaleScreen> createState() => _SaleScreenState();
 }
 
-enum SaleEntryMode { catalog, quick }
-
 class _SaleScreenState extends State<SaleScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _productSearchController = TextEditingController();
-  final _manualDescriptionController = TextEditingController();
+  final _descriptionController = TextEditingController();
   final _quantityController = TextEditingController(text: '1');
-  final _manualUnitPriceController = TextEditingController();
-  final _productFocusNode = FocusNode();
-  final _manualDescriptionFocusNode = FocusNode();
+  final _unitPriceController = TextEditingController();
+  final _descriptionFocusNode = FocusNode();
   final _quantityFocusNode = FocusNode();
-  final _manualUnitPriceFocusNode = FocusNode();
+  final _unitPriceFocusNode = FocusNode();
   final _paymentFocusNode = FocusNode();
-  final _manualDescriptionEditorController = MobileFieldEditorController();
+  final _descriptionEditorController = MobileFieldEditorController();
   final _quantityEditorController = MobileFieldEditorController();
-  final _manualUnitPriceEditorController = MobileFieldEditorController();
-  final _productSearchDictation = SpeechDictationController();
-  Product? _selectedProduct;
-  SaleEntryMode _saleMode = SaleEntryMode.catalog;
+  final _unitPriceEditorController = MobileFieldEditorController();
+
   String _paymentMethod = 'Efectivo';
   AutovalidateMode _autoValidateMode = AutovalidateMode.disabled;
   bool _didSeedDefaults = false;
@@ -50,16 +48,18 @@ class _SaleScreenState extends State<SaleScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedProduct = widget.initialProduct;
-    _productSearchController.text = widget.initialProduct?.name ?? '';
-    _productSearchController.addListener(_handleProductSearchChanged);
-    _manualDescriptionController.addListener(_handleSaleDraftChanged);
-    _manualUnitPriceController.addListener(_handleSaleDraftChanged);
-    _quantityController.addListener(_handleSaleDraftChanged);
-    _productFocusNode.addListener(_handleProductFocusChanged);
+    final initial = widget.initialProduct;
+    if (initial != null) {
+      _descriptionController.text = initial.name;
+      if (initial.pricePesos > 0) {
+        _unitPriceController.text = initial.pricePesos.toString();
+      }
+    }
+    _descriptionController.addListener(_handleDraftChanged);
+    _quantityController.addListener(_handleDraftChanged);
+    _unitPriceController.addListener(_handleDraftChanged);
     selectAllTextOnFocus(_quantityFocusNode, _quantityController);
-    selectAllTextOnFocus(_manualUnitPriceFocusNode, _manualUnitPriceController);
-    _productSearchDictation.initialize();
+    selectAllTextOnFocus(_unitPriceFocusNode, _unitPriceController);
   }
 
   @override
@@ -75,109 +75,50 @@ class _SaleScreenState extends State<SaleScreen> {
 
   @override
   void dispose() {
-    _productSearchController
-      ..removeListener(_handleProductSearchChanged)
-      ..dispose();
-    _manualDescriptionController
-      ..removeListener(_handleSaleDraftChanged)
+    _descriptionController
+      ..removeListener(_handleDraftChanged)
       ..dispose();
     _quantityController
-      ..removeListener(_handleSaleDraftChanged)
+      ..removeListener(_handleDraftChanged)
       ..dispose();
-    _manualUnitPriceController
-      ..removeListener(_handleSaleDraftChanged)
+    _unitPriceController
+      ..removeListener(_handleDraftChanged)
       ..dispose();
-    _productFocusNode.removeListener(_handleProductFocusChanged);
-    _productFocusNode.dispose();
-    _manualDescriptionFocusNode.dispose();
+    _descriptionFocusNode.dispose();
     _quantityFocusNode.dispose();
-    _manualUnitPriceFocusNode.dispose();
+    _unitPriceFocusNode.dispose();
     _paymentFocusNode.dispose();
-    _productSearchDictation.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final store = CommerceScope.of(context);
-    final useMobileSensitiveFieldEditor = useMobileFieldEditor(context);
+    final useMobileEditor = useMobileFieldEditor(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Nueva venta')),
       body: AnimatedBuilder(
         animation: store,
         builder: (context, _) {
-          final product =
-              _saleMode == SaleEntryMode.catalog && _selectedProduct != null
-              ? store.productById(_selectedProduct!.id)
-              : null;
-          if (_saleMode == SaleEntryMode.catalog &&
-              _selectedProduct != null &&
-              product == null) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) {
-                return;
-              }
-              final selected = _selectedProduct;
-              if (selected == null || store.productById(selected.id) != null) {
-                return;
-              }
-              setState(() => _selectedProduct = null);
-            });
-          }
           final quantity = _parseInt(_quantityController.text);
-          final manualDescription = _manualDescriptionController.text.trim();
-          final manualUnitPrice = _parseInt(_manualUnitPriceController.text);
-          final exactQuickMatch = _saleMode == SaleEntryMode.quick
-              ? _exactQuickMatchProduct(store)
-              : null;
-          final filteredProducts = _filteredProducts(store);
-          final productFieldError = _saleMode == SaleEntryMode.catalog
-              ? _productFieldErrorText(filteredProducts)
-              : null;
-          final productFieldHelper = _saleMode == SaleEntryMode.catalog
-              ? _productFieldHelperText(filteredProducts, productFieldError)
-              : null;
-          final saleWarning = _saleMode == SaleEntryMode.catalog
-              ? (product == null
-                    ? null
-                    : store.saleReadinessMessage(
-                        product.id,
-                        quantityUnits: quantity,
-                      ))
-              : store.freeSaleReadinessMessage(
-                  description: manualDescription,
-                  quantityUnits: quantity,
-                  unitPricePesos: manualUnitPrice,
-                );
-          final total = _saleMode == SaleEntryMode.catalog
-              ? (product == null ? 0 : product.pricePesos * quantity)
-              : manualUnitPrice * quantity;
-          final remaining =
-              _saleMode == SaleEntryMode.catalog && product != null
-              ? product.stockUnits - quantity
-              : null;
-          final canSaveSale =
-              !_saving &&
-              (_saleMode == SaleEntryMode.catalog
-                  ? product != null && saleWarning == null && quantity > 0
-                  : saleWarning == null && quantity > 0);
+          final description = _descriptionController.text.trim();
+          final unitPrice = _parseInt(_unitPriceController.text);
+          final total = unitPrice * quantity;
+          final saleWarning = store.freeSaleReadinessMessage(
+            description: description,
+            quantityUnits: quantity,
+            unitPricePesos: unitPrice,
+          );
+          final canSaveSale = !_saving && saleWarning == null;
+
           return KeyboardAwarePageBody(
             child: InputShortcutScope(
               onSave: _saving ? null : () => _submitSale(store),
               onCancel: _saving ? null : () => Navigator.of(context).maybePop(),
-              onFocusSearch: () {
-                if (_saleMode == SaleEntryMode.quick) {
-                  _moveFocusTo(
-                    _manualDescriptionFocusNode,
-                    controller: _manualDescriptionController,
-                  );
-                  return;
-                }
-                _moveFocusTo(
-                  _productFocusNode,
-                  controller: _productSearchController,
-                );
-              },
+              onFocusSearch: () => _moveFocusTo(
+                _descriptionFocusNode,
+                controller: _descriptionController,
+              ),
               child: BpcPanel(
                 child: FocusTraversalGroup(
                   child: Form(
@@ -187,598 +128,29 @@ class _SaleScreenState extends State<SaleScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Registrar venta',
+                          'Venta rápida',
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Elegí un producto del catálogo o hacé una venta libre. Al guardar, la caja se actualiza sola.',
+                          'Cargá una venta rápida. Al guardar, la caja del día se actualiza sola.',
                           style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.outline,
-                              ),
+                              ?.copyWith(color: BpcColors.subtleInk),
                         ),
                         const SizedBox(height: 18),
-                        _SaleModeSelector(
-                          currentMode: _saleMode,
-                          onChanged: _saving ? null : _handleSaleModeChanged,
-                        ),
-                        const SizedBox(height: 16),
-                        if (_saleMode == SaleEntryMode.catalog) ...[
-                          if (!store.hasProducts) ...[
-                            EmptyCard(
-                              title: 'Todavía no hay productos cargados',
-                              message:
-                                  'Podés usar venta libre ahora mismo o cargar la plantilla kiosco para empezar con stock.',
-                              icon: Icons.inventory_2_rounded,
-                              action: Wrap(
-                                spacing: 10,
-                                runSpacing: 10,
-                                alignment: WrapAlignment.center,
-                                children: [
-                                  FilledButton(
-                                    onPressed: () =>
-                                        _loadStarterTemplate(store),
-                                    child: const Text(
-                                      'Cargar plantilla kiosco',
-                                    ),
-                                  ),
-                                  TextButton(
-                                    onPressed: () =>
-                                        showProductEditor(context, store),
-                                    child: const Text('Cargar producto'),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                          ],
-                          EnsureVisibleWhenFocused(
-                            focusNode: _productFocusNode,
-                            child: TextFormField(
-                              controller: _productSearchController,
-                              focusNode: _productFocusNode,
-                              autofocus: widget.initialProduct == null,
-                              keyboardType: TextInputType.text,
-                              textInputAction: TextInputAction.search,
-                              onTapOutside: (_) => _productFocusNode.unfocus(),
-                              onFieldSubmitted: (_) {
-                                if (_selectedProduct != null) {
-                                  _moveFocusTo(
-                                    _quantityFocusNode,
-                                    controller: _quantityController,
-                                  );
-                                  return;
-                                }
-                                if (_autoValidateMode ==
-                                    AutovalidateMode.disabled) {
-                                  setState(() {
-                                    _autoValidateMode =
-                                        AutovalidateMode.onUserInteraction;
-                                  });
-                                }
-                                _formKey.currentState!.validate();
-                              },
-                              decoration: InputDecoration(
-                                labelText: 'Buscar producto',
-                                hintText: 'Escribí y tocá un resultado',
-                                prefixIcon: const Icon(Icons.search_rounded),
-                                suffixIcon: SpeechDictationActionButton(
-                                  controller: _productSearchDictation,
-                                  textController: _productSearchController,
-                                  tooltip: 'Dictar busqueda',
-                                ),
-                                errorText: productFieldError,
-                                helperText: productFieldHelper,
-                              ),
-                            ),
-                          ),
-                          SpeechDictationHint(
-                            controller: _productSearchDictation,
-                          ),
-                          if (_shouldShowProductResults(filteredProducts)) ...[
-                            const SizedBox(height: 14),
-                            _ProductSearchResults(
-                              products: filteredProducts,
-                              hasActiveQuery:
-                                  _normalizedProductQuery.isNotEmpty,
-                              onSelect: _selectProduct,
-                            ),
-                          ],
-                          if (product != null) ...[
-                            const SizedBox(height: 14),
-                            _SelectedProductCard(
-                              product: product,
-                              onChangeProduct: _clearSelectedProduct,
-                            ),
-                          ],
-                        ] else ...[
-                          if (useMobileSensitiveFieldEditor)
-                            MobileFieldEditorFormField(
-                              controller: _manualDescriptionController,
-                              editorController:
-                                  _manualDescriptionEditorController,
-                              nextEditorController: _quantityEditorController,
-                              nextFieldLabel: 'Cantidad',
-                              labelText: 'Descripción',
-                              editorContext: 'Venta libre',
-                              hintText: 'Ej. Preservativos Durex x3',
-                              helperText:
-                                  'Usalo para ventas no cargadas en el catálogo.',
-                              emptyDisplayText:
-                                  'Tocá para cargar la descripción',
-                              keyboardType: TextInputType.text,
-                              textCapitalization: TextCapitalization.sentences,
-                              validator: (value) {
-                                if (_saleMode != SaleEntryMode.quick) {
-                                  return null;
-                                }
-                                return (value ?? '').trim().isEmpty
-                                    ? 'Escribí una descripción.'
-                                    : null;
-                              },
-                            )
-                          else
-                            EnsureVisibleWhenFocused(
-                              focusNode: _manualDescriptionFocusNode,
-                              child: TextFormField(
-                                controller: _manualDescriptionController,
-                                focusNode: _manualDescriptionFocusNode,
-                                autofocus: widget.initialProduct == null,
-                                keyboardType: TextInputType.text,
-                                textInputAction: TextInputAction.next,
-                                textCapitalization:
-                                    TextCapitalization.sentences,
-                                onTapOutside: (_) =>
-                                    _manualDescriptionFocusNode.unfocus(),
-                                onFieldSubmitted: (_) => _moveFocusTo(
-                                  _quantityFocusNode,
-                                  controller: _quantityController,
-                                ),
-                                decoration: const InputDecoration(
-                                  labelText: 'Descripción',
-                                  hintText: 'Ej. Preservativos Durex x3',
-                                  helperText:
-                                      'Usalo para ventas no cargadas en el catálogo.',
-                                ),
-                                validator: (value) {
-                                  if (_saleMode != SaleEntryMode.quick) {
-                                    return null;
-                                  }
-                                  return (value ?? '').trim().isEmpty
-                                      ? 'Escribí una descripción.'
-                                      : null;
-                                },
-                              ),
-                            ),
-                          const SizedBox(height: 12),
-                          BpcPanel(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerLow,
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(
-                                  Icons.flash_on_rounded,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    'La venta libre suma en caja y reportes, pero no descuenta stock porque no usa un producto del catálogo.',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.outline,
-                                        ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          if (exactQuickMatch != null) ...[
-                            _ExactProductSuggestionCard(
-                              product: exactQuickMatch,
-                              onUseProduct: () =>
-                                  _useExistingProductFromQuickSale(
-                                    exactQuickMatch,
-                                  ),
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                          OutlinedButton.icon(
-                            onPressed: manualDescription.isEmpty || _saving
-                                ? null
-                                : () {
-                                    if (exactQuickMatch != null) {
-                                      _useExistingProductFromQuickSale(
-                                        exactQuickMatch,
-                                      );
-                                      return;
-                                    }
-                                    _createProductFromFreeSale(store);
-                                  },
-                            icon: const Icon(Icons.add_box_rounded),
-                            label: Text(
-                              exactQuickMatch == null
-                                  ? 'Crear producto con estos datos'
-                                  : 'Usar producto existente',
-                            ),
-                          ),
-                        ],
+                        _buildDescriptionField(useMobileEditor),
                         const SizedBox(height: 14),
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final quickColumns =
-                                _saleMode == SaleEntryMode.quick
-                                ? (constraints.maxWidth >= 840
-                                      ? 3
-                                      : constraints.maxWidth >= 560
-                                      ? 2
-                                      : 1)
-                                : (constraints.maxWidth >= 600 ? 2 : 1);
-                            final gaps = quickColumns > 1
-                                ? 12.0 * (quickColumns - 1)
-                                : 0.0;
-                            final fieldWidth =
-                                (constraints.maxWidth - gaps) / quickColumns;
-                            return Wrap(
-                              spacing: 12,
-                              runSpacing: 12,
-                              children: [
-                                SizedBox(
-                                  width: fieldWidth,
-                                  child: useMobileSensitiveFieldEditor
-                                      ? MobileFieldEditorFormField(
-                                          controller: _quantityController,
-                                          editorController:
-                                              _quantityEditorController,
-                                          nextEditorController:
-                                              _saleMode == SaleEntryMode.quick
-                                              ? _manualUnitPriceEditorController
-                                              : null,
-                                          nextFieldLabel:
-                                              _saleMode == SaleEntryMode.quick
-                                              ? 'Precio unitario'
-                                              : null,
-                                          labelText: 'Cantidad',
-                                          editorContext:
-                                              _saleMode == SaleEntryMode.quick
-                                              ? 'Venta libre'
-                                              : 'Nueva venta',
-                                          emptyDisplayText:
-                                              'Tocá para cargar la cantidad',
-                                          keyboardType: TextInputType.number,
-                                          inputFormatters: [
-                                            FilteringTextInputFormatter
-                                                .digitsOnly,
-                                          ],
-                                          validator: (value) {
-                                            final parsed = _parseInt(value);
-                                            if (_saleMode ==
-                                                SaleEntryMode.quick) {
-                                              return parsed <= 0
-                                                  ? 'Ingresá una cantidad'
-                                                  : null;
-                                            }
-                                            if (product == null) {
-                                              return parsed <= 0
-                                                  ? 'Ingresá una cantidad'
-                                                  : null;
-                                            }
-                                            return store.saleReadinessMessage(
-                                              product.id,
-                                              quantityUnits: parsed,
-                                            );
-                                          },
-                                        )
-                                      : EnsureVisibleWhenFocused(
-                                          focusNode: _quantityFocusNode,
-                                          child: TextFormField(
-                                            controller: _quantityController,
-                                            focusNode: _quantityFocusNode,
-                                            autofocus:
-                                                widget.initialProduct != null &&
-                                                _saleMode ==
-                                                    SaleEntryMode.catalog,
-                                            keyboardType: TextInputType.number,
-                                            inputFormatters: [
-                                              FilteringTextInputFormatter
-                                                  .digitsOnly,
-                                            ],
-                                            textInputAction:
-                                                TextInputAction.next,
-                                            decoration: const InputDecoration(
-                                              labelText: 'Cantidad',
-                                            ),
-                                            onTapOutside: (_) =>
-                                                _quantityFocusNode.unfocus(),
-                                            onFieldSubmitted: (_) {
-                                              if (_saleMode ==
-                                                  SaleEntryMode.quick) {
-                                                _moveFocusTo(
-                                                  _manualUnitPriceFocusNode,
-                                                  controller:
-                                                      _manualUnitPriceController,
-                                                );
-                                                return;
-                                              }
-                                              _moveFocusTo(_paymentFocusNode);
-                                            },
-                                            validator: (value) {
-                                              final parsed = _parseInt(value);
-                                              if (_saleMode ==
-                                                  SaleEntryMode.quick) {
-                                                return parsed <= 0
-                                                    ? 'Ingresá una cantidad'
-                                                    : null;
-                                              }
-                                              if (product == null) {
-                                                return parsed <= 0
-                                                    ? 'Ingresá una cantidad'
-                                                    : null;
-                                              }
-                                              return store.saleReadinessMessage(
-                                                product.id,
-                                                quantityUnits: parsed,
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                ),
-                                if (_saleMode == SaleEntryMode.quick)
-                                  SizedBox(
-                                    width: fieldWidth,
-                                    child: useMobileSensitiveFieldEditor
-                                        ? MobileFieldEditorFormField(
-                                            controller:
-                                                _manualUnitPriceController,
-                                            editorController:
-                                                _manualUnitPriceEditorController,
-                                            labelText: 'Precio unitario',
-                                            editorContext: 'Venta libre',
-                                            emptyDisplayText:
-                                                'Tocá para cargar el precio',
-                                            keyboardType:
-                                                const TextInputType.numberWithOptions(
-                                                  decimal: true,
-                                                ),
-                                            inputFormatters: [
-                                              FilteringTextInputFormatter
-                                                  .digitsOnly,
-                                            ],
-                                            prefixText: '\$ ',
-                                            displayValueBuilder: (value) {
-                                              final parsed = _parseInt(value);
-                                              return parsed <= 0
-                                                  ? 'Tocá para cargar el precio'
-                                                  : formatMoney(parsed);
-                                            },
-                                            validator: (value) {
-                                              if (_saleMode !=
-                                                  SaleEntryMode.quick) {
-                                                return null;
-                                              }
-                                              final parsed = _parseInt(value);
-                                              return parsed <= 0
-                                                  ? 'Ingresá un precio'
-                                                  : null;
-                                            },
-                                          )
-                                        : EnsureVisibleWhenFocused(
-                                            focusNode:
-                                                _manualUnitPriceFocusNode,
-                                            child: TextFormField(
-                                              controller:
-                                                  _manualUnitPriceController,
-                                              focusNode:
-                                                  _manualUnitPriceFocusNode,
-                                              keyboardType:
-                                                  const TextInputType.numberWithOptions(
-                                                    decimal: true,
-                                                  ),
-                                              inputFormatters: [
-                                                FilteringTextInputFormatter
-                                                    .digitsOnly,
-                                              ],
-                                              textInputAction:
-                                                  TextInputAction.next,
-                                              decoration: const InputDecoration(
-                                                labelText: 'Precio unitario',
-                                                prefixText: '\$ ',
-                                              ),
-                                              onTapOutside: (_) =>
-                                                  _manualUnitPriceFocusNode
-                                                      .unfocus(),
-                                              onFieldSubmitted: (_) =>
-                                                  _moveFocusTo(
-                                                    _paymentFocusNode,
-                                                  ),
-                                              validator: (value) {
-                                                if (_saleMode !=
-                                                    SaleEntryMode.quick) {
-                                                  return null;
-                                                }
-                                                final parsed = _parseInt(value);
-                                                return parsed <= 0
-                                                    ? 'Ingresá un precio'
-                                                    : null;
-                                              },
-                                            ),
-                                          ),
-                                  ),
-                                SizedBox(
-                                  width: fieldWidth,
-                                  child: EnsureVisibleWhenFocused(
-                                    focusNode: _paymentFocusNode,
-                                    child: DropdownButtonFormField<String>(
-                                      focusNode: _paymentFocusNode,
-                                      initialValue: _paymentMethod,
-                                      isExpanded: true,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Medio de pago',
-                                      ),
-                                      items: const [
-                                        DropdownMenuItem(
-                                          value: 'Efectivo',
-                                          child: Text('Efectivo'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: 'Débito',
-                                          child: Text('Débito'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: 'Transferencia',
-                                          child: Text('Transferencia'),
-                                        ),
-                                      ],
-                                      onChanged: (value) {
-                                        if (value == null) {
-                                          return;
-                                        }
-                                        setState(() => _paymentMethod = value);
-                                      },
-                                      onTap: () {
-                                        _dismissKeyboard();
-                                        _paymentFocusNode.requestFocus();
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
+                        _buildFieldsRow(useMobileEditor),
                         const SizedBox(height: 16),
-                        BpcPanel(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surfaceContainerLow,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Resumen',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 12),
-                              _SummaryRow(
-                                label: _saleMode == SaleEntryMode.catalog
-                                    ? 'Producto'
-                                    : 'Tipo',
-                                value: _saleMode == SaleEntryMode.catalog
-                                    ? product?.name ?? 'Sin seleccionar'
-                                    : 'Venta libre',
-                              ),
-                              if (_saleMode == SaleEntryMode.quick)
-                                _SummaryRow(
-                                  label: 'Descripción',
-                                  value: manualDescription.isEmpty
-                                      ? 'Sin descripción'
-                                      : manualDescription,
-                                ),
-                              _SummaryRow(
-                                label: 'Cantidad',
-                                value: quantity.toString(),
-                              ),
-                              if (_saleMode == SaleEntryMode.quick)
-                                _SummaryRow(
-                                  label: 'Precio unitario',
-                                  value: manualUnitPrice <= 0
-                                      ? '-'
-                                      : formatMoney(manualUnitPrice),
-                                ),
-                              _SummaryRow(
-                                label: 'Total',
-                                value: formatMoney(total),
-                              ),
-                              _SummaryRow(
-                                label: 'Stock restante',
-                                value: _saleMode == SaleEntryMode.quick
-                                    ? 'No aplica'
-                                    : remaining == null
-                                    ? '-'
-                                    : remaining.toString(),
-                              ),
-                              if (saleWarning != null) ...[
-                                const SizedBox(height: 8),
-                                Text(
-                                  saleWarning,
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.error,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                ),
-                              ],
-                            ],
-                          ),
+                        _SaleSummary(
+                          description: description,
+                          quantity: quantity,
+                          unitPrice: unitPrice,
+                          total: total,
+                          warning: saleWarning,
                         ),
                         const SizedBox(height: 18),
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final compact = constraints.maxWidth < 520;
-                            final saveButton = FilledButton.icon(
-                              onPressed: canSaveSale
-                                  ? () => _submitSale(store)
-                                  : null,
-                              style: compact
-                                  ? FilledButton.styleFrom(
-                                      minimumSize: const Size.fromHeight(52),
-                                    )
-                                  : null,
-                              icon: _saving
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.save_rounded),
-                              label: Text(
-                                _saving ? 'Guardando' : 'Guardar venta',
-                              ),
-                            );
-
-                            if (compact) {
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  saveButton,
-                                  const SizedBox(height: 10),
-                                  TextButton(
-                                    onPressed: _saving
-                                        ? null
-                                        : () => Navigator.of(context).pop(),
-                                    child: const Text('Cancelar'),
-                                  ),
-                                ],
-                              );
-                            }
-
-                            return Row(
-                              children: [
-                                const Spacer(),
-                                TextButton(
-                                  onPressed: _saving
-                                      ? null
-                                      : () => Navigator.of(context).pop(),
-                                  child: const Text('Cancelar'),
-                                ),
-                                const SizedBox(width: 12),
-                                saveButton,
-                              ],
-                            );
-                          },
-                        ),
+                        _buildActions(context, store, canSaveSale),
                       ],
                     ),
                   ),
@@ -791,34 +163,231 @@ class _SaleScreenState extends State<SaleScreen> {
     );
   }
 
-  Future<void> _loadStarterTemplate(CommerceStore store) async {
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      final result = await store.applyArgentinianKioskTemplate();
-      if (!mounted) {
-        return;
-      }
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            result.fullySkipped
-                ? 'La plantilla kiosco ya estaba cargada.'
-                : 'Plantilla kiosco cargada. Ya podés buscar y vender.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(userFacingErrorMessage(error)),
-          behavior: SnackBarBehavior.floating,
-        ),
+  Widget _buildDescriptionField(bool useMobileEditor) {
+    if (useMobileEditor) {
+      return MobileFieldEditorFormField(
+        controller: _descriptionController,
+        editorController: _descriptionEditorController,
+        nextEditorController: _quantityEditorController,
+        nextFieldLabel: 'Cantidad',
+        labelText: 'Producto o detalle',
+        editorContext: 'Nueva venta',
+        hintText: 'Ej. Alfajor, gaseosa, servicio',
+        emptyDisplayText: 'Tocá para cargar el detalle',
+        keyboardType: TextInputType.text,
+        textCapitalization: TextCapitalization.sentences,
+        validator: _validateDescription,
       );
     }
+    return EnsureVisibleWhenFocused(
+      focusNode: _descriptionFocusNode,
+      child: TextFormField(
+        controller: _descriptionController,
+        focusNode: _descriptionFocusNode,
+        autofocus: true,
+        keyboardType: TextInputType.text,
+        textInputAction: TextInputAction.next,
+        textCapitalization: TextCapitalization.sentences,
+        onTapOutside: (_) => _descriptionFocusNode.unfocus(),
+        onFieldSubmitted: (_) =>
+            _moveFocusTo(_quantityFocusNode, controller: _quantityController),
+        decoration: const InputDecoration(
+          labelText: 'Producto o detalle',
+          hintText: 'Ej. Alfajor, gaseosa, servicio',
+          prefixIcon: Icon(Icons.sell_rounded),
+        ),
+        validator: _validateDescription,
+      ),
+    );
+  }
+
+  Widget _buildFieldsRow(bool useMobileEditor) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 720
+            ? 3
+            : constraints.maxWidth >= 480
+            ? 2
+            : 1;
+        const spacing = 12.0;
+        final fieldWidth =
+            (constraints.maxWidth - spacing * (columns - 1)) / columns;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            SizedBox(
+              width: fieldWidth,
+              child: _buildQuantityField(useMobileEditor),
+            ),
+            SizedBox(
+              width: fieldWidth,
+              child: _buildPriceField(useMobileEditor),
+            ),
+            SizedBox(width: fieldWidth, child: _buildPaymentField()),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildQuantityField(bool useMobileEditor) {
+    if (useMobileEditor) {
+      return MobileFieldEditorFormField(
+        controller: _quantityController,
+        editorController: _quantityEditorController,
+        nextEditorController: _unitPriceEditorController,
+        nextFieldLabel: 'Precio',
+        labelText: 'Cantidad',
+        editorContext: 'Nueva venta',
+        emptyDisplayText: 'Tocá para cargar la cantidad',
+        keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        validator: (value) =>
+            _parseInt(value) <= 0 ? 'Ingresá una cantidad' : null,
+      );
+    }
+    return EnsureVisibleWhenFocused(
+      focusNode: _quantityFocusNode,
+      child: TextFormField(
+        controller: _quantityController,
+        focusNode: _quantityFocusNode,
+        keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        textInputAction: TextInputAction.next,
+        decoration: const InputDecoration(labelText: 'Cantidad'),
+        onTapOutside: (_) => _quantityFocusNode.unfocus(),
+        onFieldSubmitted: (_) => _moveFocusTo(
+          _unitPriceFocusNode,
+          controller: _unitPriceController,
+        ),
+        validator: (value) =>
+            _parseInt(value) <= 0 ? 'Ingresá una cantidad' : null,
+      ),
+    );
+  }
+
+  Widget _buildPriceField(bool useMobileEditor) {
+    if (useMobileEditor) {
+      return MobileFieldEditorFormField(
+        controller: _unitPriceController,
+        editorController: _unitPriceEditorController,
+        labelText: 'Precio',
+        editorContext: 'Nueva venta',
+        emptyDisplayText: 'Tocá para cargar el precio',
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        prefixText: '\$ ',
+        displayValueBuilder: (value) {
+          final parsed = _parseInt(value);
+          return parsed <= 0 ? 'Tocá para cargar el precio' : formatMoney(parsed);
+        },
+        validator: (value) =>
+            _parseInt(value) <= 0 ? 'Ingresá un precio' : null,
+      );
+    }
+    return EnsureVisibleWhenFocused(
+      focusNode: _unitPriceFocusNode,
+      child: TextFormField(
+        controller: _unitPriceController,
+        focusNode: _unitPriceFocusNode,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        textInputAction: TextInputAction.next,
+        decoration: const InputDecoration(
+          labelText: 'Precio',
+          prefixText: '\$ ',
+        ),
+        onTapOutside: (_) => _unitPriceFocusNode.unfocus(),
+        onFieldSubmitted: (_) => _moveFocusTo(_paymentFocusNode),
+        validator: (value) =>
+            _parseInt(value) <= 0 ? 'Ingresá un precio' : null,
+      ),
+    );
+  }
+
+  Widget _buildPaymentField() {
+    return EnsureVisibleWhenFocused(
+      focusNode: _paymentFocusNode,
+      child: DropdownButtonFormField<String>(
+        focusNode: _paymentFocusNode,
+        initialValue: _paymentMethod,
+        isExpanded: true,
+        decoration: const InputDecoration(labelText: 'Medio de pago'),
+        items: const [
+          DropdownMenuItem(value: 'Efectivo', child: Text('Efectivo')),
+          DropdownMenuItem(value: 'Débito', child: Text('Débito')),
+          DropdownMenuItem(
+            value: 'Transferencia',
+            child: Text('Transferencia'),
+          ),
+        ],
+        onChanged: (value) {
+          if (value == null) {
+            return;
+          }
+          setState(() => _paymentMethod = value);
+        },
+        onTap: () {
+          _dismissKeyboard();
+          _paymentFocusNode.requestFocus();
+        },
+      ),
+    );
+  }
+
+  Widget _buildActions(
+    BuildContext context,
+    CommerceStore store,
+    bool canSaveSale,
+  ) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 520;
+        final saveButton = FilledButton.icon(
+          onPressed: canSaveSale ? () => _submitSale(store) : null,
+          style: compact
+              ? FilledButton.styleFrom(minimumSize: const Size.fromHeight(52))
+              : null,
+          icon: _saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.check_circle_rounded),
+          label: Text(_saving ? 'Guardando...' : 'Registrar venta'),
+        );
+
+        final cancelButton = TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        );
+
+        if (compact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              saveButton,
+              const SizedBox(height: 10),
+              cancelButton,
+            ],
+          );
+        }
+        return Row(
+          children: [
+            const Spacer(),
+            cancelButton,
+            const SizedBox(width: 12),
+            saveButton,
+          ],
+        );
+      },
+    );
+  }
+
+  String? _validateDescription(String? value) {
+    return (value ?? '').trim().isEmpty ? 'Escribí qué estás vendiendo.' : null;
   }
 
   int _parseInt(String? value) {
@@ -829,176 +398,11 @@ class _SaleScreenState extends State<SaleScreen> {
     return int.tryParse(normalized) ?? 0;
   }
 
-  String get _normalizedProductQuery => _productSearchController.text.trim();
-
-  void _handleSaleDraftChanged() {
+  void _handleDraftChanged() {
     if (!mounted) {
       return;
     }
     setState(() {});
-  }
-
-  void _handleSaleModeChanged(SaleEntryMode mode) {
-    if (_saleMode == mode) {
-      return;
-    }
-    _dismissKeyboard();
-    setState(() {
-      _saleMode = mode;
-      _autoValidateMode = AutovalidateMode.disabled;
-    });
-
-    if (mode == SaleEntryMode.catalog) {
-      _moveFocusTo(_productFocusNode, controller: _productSearchController);
-      return;
-    }
-
-    _moveFocusTo(
-      _manualDescriptionFocusNode,
-      controller: _manualDescriptionController,
-    );
-  }
-
-  void _handleProductSearchChanged() {
-    if (!mounted) {
-      return;
-    }
-
-    final selectedProduct = _selectedProduct;
-    if (selectedProduct != null &&
-        !_matchesSelectedProductName(
-          _productSearchController.text,
-          selectedProduct,
-        )) {
-      setState(() => _selectedProduct = null);
-      return;
-    }
-
-    setState(() {});
-  }
-
-  void _handleProductFocusChanged() {
-    if (!mounted) {
-      return;
-    }
-    setState(() {});
-  }
-
-  bool _matchesSelectedProductName(String value, Product product) {
-    return value.trim().toLowerCase() == product.name.trim().toLowerCase();
-  }
-
-  List<Product> _filteredProducts(CommerceStore store) {
-    final query = _normalizedProductQuery.toLowerCase();
-    if (query.isEmpty) {
-      return store.products.take(8).toList(growable: false);
-    }
-
-    return store.products
-        .where((product) {
-          return product.name.toLowerCase().contains(query) ||
-              (product.barcode ?? '').toLowerCase().contains(query) ||
-              (product.category ?? '').toLowerCase().contains(query);
-        })
-        .toList(growable: false);
-  }
-
-  bool _shouldShowProductResults(List<Product> filteredProducts) {
-    if (_selectedProduct != null) {
-      return false;
-    }
-    if (_productFocusNode.hasFocus) {
-      return true;
-    }
-    return _normalizedProductQuery.isNotEmpty;
-  }
-
-  String? _productFieldErrorText(List<Product> filteredProducts) {
-    if (_selectedProduct != null) {
-      return null;
-    }
-
-    if (_autoValidateMode != AutovalidateMode.onUserInteraction) {
-      return null;
-    }
-
-    final query = _normalizedProductQuery;
-    if (query.isEmpty) {
-      return 'Debes seleccionar un producto.';
-    }
-
-    if (filteredProducts.isNotEmpty) {
-      return 'Debes seleccionar un producto.';
-    }
-
-    return null;
-  }
-
-  String? _productFieldHelperText(
-    List<Product> filteredProducts,
-    String? errorText,
-  ) {
-    if (errorText != null) {
-      return null;
-    }
-    if (_selectedProduct != null) {
-      return 'Producto seleccionado. Podés seguir con la venta o buscar otro.';
-    }
-    if (_normalizedProductQuery.isEmpty) {
-      return 'Escribí, dictá o tocá un producto para seleccionarlo.';
-    }
-    if (filteredProducts.isNotEmpty) {
-      return 'Tocá un resultado para confirmar el producto.';
-    }
-    return null;
-  }
-
-  void _selectProduct(Product product) {
-    _productSearchController.value = TextEditingValue(
-      text: product.name,
-      selection: TextSelection.collapsed(offset: product.name.length),
-    );
-    setState(() => _selectedProduct = product);
-    _moveFocusTo(_quantityFocusNode, controller: _quantityController);
-  }
-
-  void _clearSelectedProduct() {
-    setState(() {
-      _selectedProduct = null;
-      _productSearchController.clear();
-    });
-    _productFocusNode.requestFocus();
-  }
-
-  Product? _exactQuickMatchProduct(CommerceStore store) {
-    final rawQuery = _manualDescriptionController.text.trim();
-    if (rawQuery.isEmpty) {
-      return null;
-    }
-    return store.productByBarcode(rawQuery) ??
-        store.productByNormalizedName(rawQuery);
-  }
-
-  void _useExistingProductFromQuickSale(Product product) {
-    _dismissKeyboard();
-    _productSearchController.value = TextEditingValue(
-      text: product.name,
-      selection: TextSelection.collapsed(offset: product.name.length),
-    );
-    setState(() {
-      _saleMode = SaleEntryMode.catalog;
-      _selectedProduct = product;
-      _autoValidateMode = AutovalidateMode.disabled;
-    });
-    _moveFocusTo(_quantityFocusNode, controller: _quantityController);
-  }
-
-  void _showBlockedFeedback(String message) {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
   }
 
   void _dismissKeyboard() {
@@ -1019,46 +423,11 @@ class _SaleScreenState extends State<SaleScreen> {
     });
   }
 
-  ProductEditorSeed _buildProductSeedFromFreeSale() {
-    return ProductEditorSeed(
-      name: _manualDescriptionController.text.trim(),
-      pricePesos: _parseInt(_manualUnitPriceController.text),
-      stockUnits: 0,
-      minStockUnits: 0,
-    );
-  }
-
-  Future<void> _createProductFromFreeSale(CommerceStore store) async {
-    final seed = _buildProductSeedFromFreeSale();
-    if ((seed.name ?? '').trim().isEmpty) {
-      _showBlockedFeedback(
-        'Escribí una descripción antes de crear el producto.',
-      );
-      return;
-    }
-
-    final exactMatch = _exactQuickMatchProduct(store);
-    if (exactMatch != null) {
-      _useExistingProductFromQuickSale(exactMatch);
-      return;
-    }
-
-    final result = await showProductEditor(context, store, seed: seed);
-    if (!mounted || result == null) {
-      return;
-    }
-
+  void _showBlockedFeedback(String message) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          result.kind == ProductEditorResultKind.created
-              ? '"${result.product.name}" ya está listo en el catálogo.'
-              : 'Vas a usar "${result.product.name}" que ya estaba en el catálogo.',
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 
@@ -1067,64 +436,38 @@ class _SaleScreenState extends State<SaleScreen> {
       return;
     }
     final quantity = _parseInt(_quantityController.text);
-    final resolvedProduct =
-        _saleMode == SaleEntryMode.catalog && _selectedProduct != null
-        ? store.productById(_selectedProduct!.id)
-        : null;
-    final validationMessage = _saleMode == SaleEntryMode.catalog
-        ? (resolvedProduct == null
-              ? 'Debes seleccionar un producto.'
-              : store.saleReadinessMessage(
-                  resolvedProduct.id,
-                  quantityUnits: quantity,
-                ))
-        : store.freeSaleReadinessMessage(
-            description: _manualDescriptionController.text,
-            quantityUnits: quantity,
-            unitPricePesos: _parseInt(_manualUnitPriceController.text),
-          );
+    final unitPrice = _parseInt(_unitPriceController.text);
+    final validationMessage = store.freeSaleReadinessMessage(
+      description: _descriptionController.text,
+      quantityUnits: quantity,
+      unitPricePesos: unitPrice,
+    );
 
-    if ((_saleMode == SaleEntryMode.catalog && resolvedProduct == null) ||
-        validationMessage != null) {
+    if (validationMessage != null) {
       if (_autoValidateMode == AutovalidateMode.disabled) {
         setState(() => _autoValidateMode = AutovalidateMode.onUserInteraction);
       }
       _formKey.currentState!.validate();
-      if (_saleMode == SaleEntryMode.quick) {
-        _showBlockedFeedback(
-          validationMessage ?? 'Revisá los datos de la venta.',
-        );
-      }
+      _showBlockedFeedback(validationMessage);
       return;
     }
 
     setState(() => _saving = true);
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
-    final successMessage = _saleMode == SaleEntryMode.catalog
-        ? 'Venta registrada. Caja y stock actualizados.'
-        : 'Venta libre registrada. Caja actualizada.';
 
     try {
-      if (_saleMode == SaleEntryMode.catalog) {
-        await store.recordSale(
-          productId: resolvedProduct!.id,
-          quantityUnits: quantity,
-          paymentMethod: _paymentMethod,
-        );
-      } else {
-        await store.recordFreeSale(
-          description: _manualDescriptionController.text,
-          quantityUnits: quantity,
-          unitPricePesos: _parseInt(_manualUnitPriceController.text),
-          paymentMethod: _paymentMethod,
-        );
-      }
+      await store.recordFreeSale(
+        description: _descriptionController.text,
+        quantityUnits: quantity,
+        unitPricePesos: unitPrice,
+        paymentMethod: _paymentMethod,
+      );
       if (!mounted) {
         return;
       }
       messenger.hideCurrentSnackBar();
-      navigator.pop(successMessage);
+      navigator.pop('Venta registrada.');
     } catch (error) {
       if (!mounted) {
         return;
@@ -1138,457 +481,91 @@ class _SaleScreenState extends State<SaleScreen> {
   }
 }
 
-class _SaleModeSelector extends StatelessWidget {
-  const _SaleModeSelector({required this.currentMode, required this.onChanged});
-
-  final SaleEntryMode currentMode;
-  final ValueChanged<SaleEntryMode>? onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Modo de carga',
-          style: Theme.of(
-            context,
-          ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            _SaleModeChip(
-              tapKey: const Key('sale-mode-catalog'),
-              label: 'Catálogo',
-              icon: Icons.inventory_2_rounded,
-              selected: currentMode == SaleEntryMode.catalog,
-              onTap: onChanged == null
-                  ? null
-                  : () => onChanged!(SaleEntryMode.catalog),
-            ),
-            _SaleModeChip(
-              tapKey: const Key('sale-mode-quick'),
-              label: 'Venta libre',
-              icon: Icons.flash_on_rounded,
-              selected: currentMode == SaleEntryMode.quick,
-              onTap: onChanged == null
-                  ? null
-                  : () => onChanged!(SaleEntryMode.quick),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _SaleModeChip extends StatelessWidget {
-  const _SaleModeChip({
-    this.tapKey,
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
+/// Resumen claro de la venta en curso.
+class _SaleSummary extends StatelessWidget {
+  const _SaleSummary({
+    required this.description,
+    required this.quantity,
+    required this.unitPrice,
+    required this.total,
+    required this.warning,
   });
 
-  final Key? tapKey;
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: selected
-          ? scheme.primary.withValues(alpha: 0.12)
-          : scheme.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        key: tapKey,
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          constraints: const BoxConstraints(minWidth: 168, maxWidth: 220),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: selected ? scheme.primary : scheme.outlineVariant,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.max,
-            children: [
-              Icon(
-                icon,
-                size: 18,
-                color: selected ? scheme.primary : scheme.outline,
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: selected ? scheme.primary : null,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ExactProductSuggestionCard extends StatelessWidget {
-  const _ExactProductSuggestionCard({
-    required this.product,
-    required this.onUseProduct,
-  });
-
-  final Product product;
-  final VoidCallback onUseProduct;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return BpcPanel(
-      color: scheme.surfaceContainerLow,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: scheme.primary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(Icons.inventory_2_rounded, color: scheme.primary),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Ya existe en catálogo',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: scheme.primary,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  product.name,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _SelectedProductMeta(
-                      icon: Icons.sell_rounded,
-                      label: formatMoney(product.pricePesos),
-                    ),
-                    _SelectedProductMeta(
-                      icon: Icons.inventory_2_rounded,
-                      label: 'Stock ${product.stockUnits}',
-                    ),
-                    if ((product.barcode ?? '').isNotEmpty)
-                      _SelectedProductMeta(
-                        icon: Icons.qr_code_rounded,
-                        label: product.barcode!,
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Conviene usar ese producto para no duplicar catálogo ni stock.',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: scheme.outline),
-                ),
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  onPressed: onUseProduct,
-                  icon: const Icon(Icons.check_circle_rounded),
-                  label: const Text('Usar este producto'),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SelectedProductCard extends StatelessWidget {
-  const _SelectedProductCard({
-    required this.product,
-    required this.onChangeProduct,
-  });
-
-  final Product product;
-  final VoidCallback onChangeProduct;
+  final String description;
+  final int quantity;
+  final int unitPrice;
+  final int total;
+  final String? warning;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return BpcPanel(
-      color: scheme.surfaceContainerLow,
-      child: Row(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: BpcColors.surfaceStrong,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: BpcColors.line),
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: scheme.primary.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.check_rounded, color: scheme.primary),
+          Text('Resumen', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 12),
+          _SummaryRow(
+            label: 'Producto o detalle',
+            value: description.isEmpty ? 'Sin cargar' : description,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Producto seleccionado',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: scheme.primary,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  product.name,
+          _SummaryRow(label: 'Cantidad', value: quantity.toString()),
+          _SummaryRow(
+            label: 'Precio',
+            value: unitPrice <= 0 ? '-' : formatMoney(unitPrice),
+          ),
+          const Divider(height: 20, color: BpcColors.line),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Total',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _SelectedProductMeta(
-                      icon: Icons.sell_rounded,
-                      label: formatMoney(product.pricePesos),
-                    ),
-                    _SelectedProductMeta(
-                      icon: Icons.inventory_2_rounded,
-                      label: 'Stock ${product.stockUnits}',
-                    ),
-                    if ((product.barcode ?? '').isNotEmpty)
-                      _SelectedProductMeta(
-                        icon: Icons.qr_code_rounded,
-                        label: product.barcode!,
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          TextButton(onPressed: onChangeProduct, child: const Text('Cambiar')),
-        ],
-      ),
-    );
-  }
-}
-
-class _SelectedProductMeta extends StatelessWidget {
-  const _SelectedProductMeta({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: scheme.surface.withValues(alpha: 0.82),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 15, color: scheme.primary),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ProductSearchResults extends StatelessWidget {
-  const _ProductSearchResults({
-    required this.products,
-    required this.hasActiveQuery,
-    required this.onSelect,
-  });
-
-  final List<Product> products;
-  final bool hasActiveQuery;
-  final ValueChanged<Product> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    if (products.isEmpty) {
-      return BpcPanel(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.search_off_rounded,
-              color: Theme.of(context).colorScheme.outline,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'No se encontraron productos',
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              hasActiveQuery
-                  ? 'Probá con otro nombre, categoría o código.'
-                  : 'Todavía no hay productos para elegir.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.outline,
               ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return BpcPanel(
-      padding: EdgeInsets.zero,
-      color: Theme.of(context).colorScheme.surfaceContainerLow,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 280),
-        child: ListView.separated(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          shrinkWrap: true,
-          itemCount: products.length,
-          separatorBuilder: (_, __) => Divider(
-            height: 1,
-            color: Theme.of(
-              context,
-            ).colorScheme.outlineVariant.withValues(alpha: 0.44),
-          ),
-          itemBuilder: (context, index) {
-            final product = products[index];
-            return _ProductSearchResultTile(
-              product: product,
-              onTap: () => onSelect(product),
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _ProductSearchResultTile extends StatelessWidget {
-  const _ProductSearchResultTile({required this.product, required this.onTap});
-
-  final Product product;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: scheme.primary.withValues(alpha: 0.10),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.inventory_2_rounded,
-                  color: scheme.primary,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      product.name,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      [
-                        product.category ?? 'Sin categoría',
-                        formatMoney(product.pricePesos),
-                        if ((product.barcode ?? '').isNotEmpty)
-                          product.barcode!,
-                      ].join(' / '),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: scheme.outline,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
               Text(
-                '${product.stockUnits} u.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
+                formatMoney(total),
+                style: theme.textTheme.titleLarge?.copyWith(
+                  color: BpcColors.income,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
             ],
           ),
-        ),
+          if (warning != null) ...[
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.info_outline_rounded,
+                  size: 18,
+                  color: BpcColors.warning,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    warning!,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: BpcColors.warning,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -1602,20 +579,28 @@ class _SummaryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: Text(
               label,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: scheme.outline),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: BpcColors.subtleInk,
+              ),
             ),
           ),
-          Text(value, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: theme.textTheme.titleMedium,
+            ),
+          ),
         ],
       ),
     );

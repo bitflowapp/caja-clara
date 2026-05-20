@@ -58,244 +58,123 @@ void main() {
 
   ButtonStyleButton saveButton(WidgetTester tester) {
     final finder = find.ancestor(
-      of: find.text('Guardar venta'),
+      of: find.text('Registrar venta'),
       matching: find.bySubtype<ButtonStyleButton>(),
     );
     return tester.widget<ButtonStyleButton>(finder.first);
   }
 
-  testWidgets(
-    'Nueva venta exige seleccionar un producto y guarda después del tap explicito',
-    (tester) async {
-      final store = CommerceStore.seededForTest();
-      final initialMovements = store.movements.length;
-      final initialStock = store.productById('p-1')!.stockUnits;
+  testWidgets('Nueva venta es venta libre directa, sin modo Catálogo', (
+    tester,
+  ) async {
+    final store = CommerceStore.seededForTest();
 
-      await pumpSaleScreen(tester, store);
+    await pumpSaleScreen(tester, store);
 
-      final searchField = find.widgetWithText(TextFormField, 'Buscar producto');
-      await tester.enterText(searchField, 'Yerba premium');
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Registrar venta'), findsWidgets);
+    expect(find.text('Catálogo'), findsNothing);
+    expect(find.textContaining('catálogo'), findsNothing);
+    expect(find.text('Buscar producto'), findsNothing);
+    expect(
+      find.widgetWithText(TextFormField, 'Producto o detalle'),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(TextFormField, 'Cantidad'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Precio'), findsOneWidget);
+  });
 
-      expect(find.text('8 u.'), findsOneWidget);
-      expect(
-        find.text('Tocá un resultado para confirmar el producto.'),
-        findsOneWidget,
-      );
-      expect(find.text('Sin seleccionar'), findsOneWidget);
-      expect(saveButton(tester).onPressed, isNull);
+  testWidgets('registra una venta libre válida y actualiza la caja', (
+    tester,
+  ) async {
+    final store = CommerceStore.emptyForTest();
+    final initialCash = store.cashBalancePesos;
+    final initialMovements = store.movements.length;
 
-      await tester.ensureVisible(find.text('8 u.'));
-      await tester.tap(find.text('8 u.'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+    await pumpSaleScreen(tester, store);
 
-      expect(find.text('Producto seleccionado'), findsOneWidget);
-      expect(find.text('Yerba premium'), findsWidgets);
-      expect(saveButton(tester).onPressed, isNotNull);
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Producto o detalle'),
+      'Alfajor triple',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Precio'),
+      '1500',
+    );
+    await tester.pump();
 
-      await tester.ensureVisible(find.text('Guardar venta'));
-      await tester.tap(find.text('Guardar venta'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
+    expect(saveButton(tester).onPressed, isNotNull);
 
-      expect(store.movements.length, initialMovements + 1);
-      expect(store.productById('p-1')!.stockUnits, initialStock - 1);
-      expect(
-        find.text('Venta registrada. Caja y stock actualizados.'),
-        findsOneWidget,
-      );
-    },
-  );
+    await tester.ensureVisible(find.text('Registrar venta'));
+    await tester.tap(find.text('Registrar venta'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
-  testWidgets(
-    'editar el texto después de seleccionar invalida la venta y deja el feedback solo inline',
-    (tester) async {
-      final store = CommerceStore.seededForTest();
+    expect(store.movements.length, initialMovements + 1);
+    expect(store.cashBalancePesos, initialCash + 1500);
+    expect(store.movements.first.isFreeSale, isTrue);
+    expect(store.movements.first.subtitle, 'Alfajor triple');
+    expect(find.text('Venta registrada.'), findsOneWidget);
+  });
 
-      await pumpSaleScreen(tester, store);
+  testWidgets('no permite guardar sin descripción', (tester) async {
+    final store = CommerceStore.emptyForTest();
 
-      final searchField = find.widgetWithText(TextFormField, 'Buscar producto');
-      await tester.enterText(searchField, 'Yerba premium');
-      await tester.pump();
-      await tester.ensureVisible(find.text('8 u.'));
-      await tester.tap(find.text('8 u.'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+    await pumpSaleScreen(tester, store);
 
-      expect(find.text('Producto seleccionado'), findsOneWidget);
-      expect(saveButton(tester).onPressed, isNotNull);
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Precio'),
+      '900',
+    );
+    await tester.pump();
 
-      await tester.enterText(searchField, 'zzzz');
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+    expect(saveButton(tester).onPressed, isNull);
+  });
 
-      expect(find.text('Sin seleccionar'), findsOneWidget);
-      expect(find.text('No se encontraron productos'), findsOneWidget);
-      expect(
-        find.text('Probá con otro nombre, categoría o código.'),
-        findsOneWidget,
-      );
-      expect(find.byType(SnackBar), findsNothing);
-      expect(saveButton(tester).onPressed, isNull);
-    },
-  );
+  testWidgets('no permite guardar con precio inválido', (tester) async {
+    final store = CommerceStore.emptyForTest();
 
-  testWidgets(
-    'cambiar entre catálogo y venta libre limpia el feedback anterior del buscador',
-    (tester) async {
-      final store = CommerceStore.seededForTest();
+    await pumpSaleScreen(tester, store);
 
-      await pumpSaleScreen(tester, store);
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Producto o detalle'),
+      'Gaseosa 500 ml',
+    );
+    await tester.pump();
 
-      final searchField = find.widgetWithText(TextFormField, 'Buscar producto');
-      await tester.enterText(searchField, 'zzzz');
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+    // Sin precio cargado, no se puede guardar.
+    expect(saveButton(tester).onPressed, isNull);
+  });
 
-      expect(find.text('No se encontraron productos'), findsOneWidget);
+  testWidgets('no permite guardar con cantidad en cero', (tester) async {
+    final store = CommerceStore.emptyForTest();
 
-      await tester.ensureVisible(find.byKey(const Key('sale-mode-quick')));
-      await tester.tap(find.byKey(const Key('sale-mode-quick')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+    await pumpSaleScreen(tester, store);
 
-      expect(find.widgetWithText(TextFormField, 'Descripción'), findsOneWidget);
-      expect(find.text('No se encontraron productos'), findsNothing);
-      expect(find.byType(SnackBar), findsNothing);
-    },
-  );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Producto o detalle'),
+      'Café',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Precio'),
+      '2000',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Cantidad'),
+      '0',
+    );
+    await tester.pump();
 
-  testWidgets(
-    'venta libre guarda sin producto seleccionado y no necesita catálogo',
-    (tester) async {
-      final store = CommerceStore.emptyForTest();
-      final initialCash = store.cashBalancePesos;
-      final initialMovements = store.movements.length;
+    expect(saveButton(tester).onPressed, isNull);
+  });
 
-      await pumpSaleScreen(tester, store);
+  testWidgets('usa efectivo por defecto cuando no hay historial previo', (
+    tester,
+  ) async {
+    final store = CommerceStore.emptyForTest();
 
-      await tester.ensureVisible(find.byKey(const Key('sale-mode-quick')));
-      await tester.tap(find.byKey(const Key('sale-mode-quick')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+    await pumpSaleScreen(tester, store);
 
-      expect(find.text('Todavía no hay productos cargados'), findsNothing);
-      expect(saveButton(tester).onPressed, isNull);
-
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Descripción'),
-        'Preservativos mostrador',
-      );
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Precio unitario'),
-        '2500',
-      );
-      await tester.pump();
-
-      expect(find.text('Venta libre'), findsWidgets);
-      expect(find.text('No aplica'), findsOneWidget);
-      expect(saveButton(tester).onPressed, isNotNull);
-
-      await tester.ensureVisible(find.text('Guardar venta'));
-      await tester.tap(find.text('Guardar venta'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-
-      expect(store.movements.length, initialMovements + 1);
-      expect(store.cashBalancePesos, initialCash + 2500);
-      expect(store.movements.first.isFreeSale, isTrue);
-      expect(store.movements.first.subtitle, 'Preservativos mostrador');
-      expect(
-        find.text('Venta libre registrada. Caja actualizada.'),
-        findsOneWidget,
-      );
-    },
-  );
-
-  testWidgets(
-    'venta libre permite abrir alta de producto con descripción y precio precargados',
-    (tester) async {
-      final store = CommerceStore.emptyForTest();
-
-      await pumpSaleScreen(tester, store);
-
-      await tester.ensureVisible(find.byKey(const Key('sale-mode-quick')));
-      await tester.tap(find.byKey(const Key('sale-mode-quick')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Descripción'),
-        'Cable USB mostrador',
-      );
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Precio unitario'),
-        '3900',
-      );
-      await tester.pump();
-
-      await tester.ensureVisible(find.text('Crear producto con estos datos'));
-      await tester.tap(find.text('Crear producto con estos datos'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-
-      expect(find.text('Cargar producto'), findsOneWidget);
-      expect(find.text('Cable USB mostrador'), findsWidgets);
-      expect(
-        find.text('Vista previa: Cable USB mostrador / \$3.900'),
-        findsOneWidget,
-      );
-    },
-  );
-
-  testWidgets(
-    'venta libre sugiere usar producto existente ante coincidencia exacta',
-    (tester) async {
-      final store = CommerceStore.seededForTest();
-
-      await pumpSaleScreen(tester, store);
-
-      await tester.ensureVisible(find.byKey(const Key('sale-mode-quick')));
-      await tester.tap(find.byKey(const Key('sale-mode-quick')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Descripción'),
-        '7791234500011',
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-
-      expect(find.text('Ya existe en catálogo'), findsOneWidget);
-      expect(find.text('Yerba premium'), findsOneWidget);
-      expect(find.text('Usar este producto'), findsOneWidget);
-
-      await tester.ensureVisible(find.text('Usar este producto'));
-      await tester.tap(find.text('Usar este producto'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 150));
-
-      expect(find.text('Producto seleccionado'), findsOneWidget);
-      expect(find.text('Stock 8'), findsOneWidget);
-      expect(
-        find.widgetWithText(TextFormField, 'Buscar producto'),
-        findsOneWidget,
-      );
-    },
-  );
-
-  testWidgets(
-    'nueva venta usa efectivo por defecto cuando no hay historial previo',
-    (tester) async {
-      final store = CommerceStore.emptyForTest();
-
-      await pumpSaleScreen(tester, store);
-
-      expect(find.text('Efectivo'), findsOneWidget);
-      expect(find.widgetWithText(TextFormField, 'Cantidad'), findsOneWidget);
-    },
-  );
+    expect(find.text('Efectivo'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Cantidad'), findsOneWidget);
+  });
 }

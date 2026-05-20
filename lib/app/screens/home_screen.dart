@@ -82,9 +82,9 @@ class HomeScreen extends StatelessWidget {
                 _GuideCard(
                   title: 'Empezá por acá',
                   steps: const [
-                    'Tocá Nueva venta y eligí un producto.',
-                    'Confirmá la cantidad y guardá.',
-                    'Vas a ver tu caja y tu stock actualizados al instante.',
+                    'Tocá Nueva venta y escribí qué estás vendiendo.',
+                    'Cargá la cantidad y el precio, y guardá.',
+                    'Vas a ver la caja del día actualizada al instante.',
                   ],
                   actionLabel: 'Registrar primera venta',
                   onAction: onNewSale,
@@ -417,7 +417,7 @@ class _PrimaryActions extends StatelessWidget {
   Widget build(BuildContext context) {
     return ActionCard(
       title: 'Nueva venta',
-      subtitle: 'Vendé en 20 segundos y se actualizan caja + stock.',
+      subtitle: 'Vendé en segundos y se actualiza la caja.',
       icon: Icons.shopping_bag_rounded,
       onTap: onNewSale,
       fillColor: BpcColors.greenDark,
