@@ -125,7 +125,7 @@ const List<StarterTemplateProductSeed> argentinianKioskTemplateProducts =
         category: 'Higiene rapida / impulso',
       ),
       StarterTemplateProductSeed(
-        name: 'Alcohol en gel chico',
+        name: 'Jabón de tocador',
         category: 'Higiene rapida / impulso',
       ),
       StarterTemplateProductSeed(
