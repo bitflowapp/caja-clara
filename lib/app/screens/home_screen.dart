@@ -22,11 +22,13 @@ class HomeScreen extends StatelessWidget {
     required this.exportingExcel,
     required this.onApplyStarterTemplate,
     required this.onLoadCommercialDemo,
+    required this.onResetCommercialDemo,
     required this.onCreateProductFromFreeSale,
     required this.onCreateProductFromSuggestion,
     required this.onDismissFreeSaleSuggestion,
     required this.applyingStarterTemplate,
     required this.loadingCommercialDemo,
+    required this.resettingCommercialDemo,
   });
 
   final VoidCallback onNewSale;
@@ -38,6 +40,7 @@ class HomeScreen extends StatelessWidget {
   final bool exportingExcel;
   final VoidCallback onApplyStarterTemplate;
   final VoidCallback onLoadCommercialDemo;
+  final VoidCallback onResetCommercialDemo;
   final Future<void> Function(Movement movement) onCreateProductFromFreeSale;
   final Future<void> Function(FreeSaleSuggestion suggestion)
   onCreateProductFromSuggestion;
@@ -45,6 +48,7 @@ class HomeScreen extends StatelessWidget {
   onDismissFreeSaleSuggestion;
   final bool applyingStarterTemplate;
   final bool loadingCommercialDemo;
+  final bool resettingCommercialDemo;
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +70,13 @@ class HomeScreen extends StatelessWidget {
                 store: store,
                 onOpenCashRegister: onOpenCashRegister,
               ),
+              if (store.hasProducts || store.hasMovements) ...[
+                const SizedBox(height: 14),
+                _CommercialDemoCard(
+                  onResetCommercialDemo: onResetCommercialDemo,
+                  resettingCommercialDemo: resettingCommercialDemo,
+                ),
+              ],
               if (!store.hasProducts) ...[
                 const SizedBox(height: 14),
                 _StarterTemplateCard(
@@ -483,8 +494,7 @@ class _QuickActionsPanel extends StatelessWidget {
           spacing: spacing,
           runSpacing: spacing,
           children: [
-            for (final action in actions)
-              SizedBox(width: width, child: action),
+            for (final action in actions) SizedBox(width: width, child: action),
           ],
         );
       },
@@ -745,10 +755,7 @@ class _LowStockBanner extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              TextButton(
-                onPressed: onTap,
-                child: const Text('Ver productos'),
-              ),
+              TextButton(onPressed: onTap, child: const Text('Ver productos')),
             ],
           ),
         ),
@@ -878,6 +885,86 @@ class _SuggestionMeta extends StatelessWidget {
             ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CommercialDemoCard extends StatelessWidget {
+  const _CommercialDemoCard({
+    required this.onResetCommercialDemo,
+    required this.resettingCommercialDemo,
+  });
+
+  final VoidCallback onResetCommercialDemo;
+  final bool resettingCommercialDemo;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return BpcPanel(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      color: BpcColors.greenDark.withValues(alpha: 0.06),
+      borderColor: BpcColors.greenDark.withValues(alpha: 0.14),
+      elevated: false,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 620;
+          final copy = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Demo comercial',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: BpcColors.ink,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                'Volvé al ejemplo inicial para grabar ventas, gastos, caja y Excel desde cero.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: BpcColors.subtleInk,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          );
+          final button = FilledButton.tonalIcon(
+            onPressed: resettingCommercialDemo ? null : onResetCommercialDemo,
+            icon: resettingCommercialDemo
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.restart_alt_rounded),
+            label: Text(
+              resettingCommercialDemo ? 'Reiniciando...' : 'Reiniciar demo',
+            ),
+          );
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [copy, const SizedBox(height: 12), button],
+            );
+          }
+
+          return Row(
+            children: [
+              const Icon(
+                Icons.video_settings_rounded,
+                color: BpcColors.greenDark,
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: copy),
+              const SizedBox(width: 12),
+              button,
+            ],
+          );
+        },
       ),
     );
   }

@@ -544,14 +544,22 @@ class CommerceStore extends ChangeNotifier {
       return const CommercialDemoApplyResult(applied: false);
     }
 
+    return _applyCommercialDemo();
+  }
+
+  Future<CommercialDemoApplyResult> resetCommercialDemo() async {
+    return _applyCommercialDemo();
+  }
+
+  Future<CommercialDemoApplyResult> _applyCommercialDemo() async {
     final now = DateTime.now();
     DateTime atToday(int hour, int minute) =>
         DateTime(now.year, now.month, now.day, hour, minute);
 
     final demoProducts = <Product>[
-      Product(
-        id: _buildId('demo-product'),
-        name: 'Coca Cola 2.25 L',
+      const Product(
+        id: 'demo-product-gaseosa-cola',
+        name: 'Gaseosa cola 2.25 L',
         stockUnits: 12,
         minStockUnits: 6,
         costPesos: 1800,
@@ -559,8 +567,8 @@ class CommerceStore extends ChangeNotifier {
         category: 'Bebidas',
         barcode: '7790895000016',
       ),
-      Product(
-        id: _buildId('demo-product'),
+      const Product(
+        id: 'demo-product-agua-mineral',
         name: 'Agua mineral 1.5 L',
         stockUnits: 9,
         minStockUnits: 6,
@@ -569,8 +577,8 @@ class CommerceStore extends ChangeNotifier {
         category: 'Bebidas',
         barcode: '7790895000023',
       ),
-      Product(
-        id: _buildId('demo-product'),
+      const Product(
+        id: 'demo-product-alfajor-triple',
         name: 'Alfajor triple',
         stockUnits: 24,
         minStockUnits: 12,
@@ -579,8 +587,8 @@ class CommerceStore extends ChangeNotifier {
         category: 'Golosinas',
         barcode: '7790895000030',
       ),
-      Product(
-        id: _buildId('demo-product'),
+      const Product(
+        id: 'demo-product-galletitas-dulces',
         name: 'Galletitas dulces',
         stockUnits: 4,
         minStockUnits: 8,
@@ -589,8 +597,8 @@ class CommerceStore extends ChangeNotifier {
         category: 'Almacen',
         barcode: '7790895000047',
       ),
-      Product(
-        id: _buildId('demo-product'),
+      const Product(
+        id: 'demo-product-yerba',
         name: 'Yerba 1 kg',
         stockUnits: 7,
         minStockUnits: 5,
@@ -599,8 +607,8 @@ class CommerceStore extends ChangeNotifier {
         category: 'Almacen',
         barcode: '7790895000054',
       ),
-      Product(
-        id: _buildId('demo-product'),
+      const Product(
+        id: 'demo-product-pan-lactal',
         name: 'Pan lactal',
         stockUnits: 5,
         minStockUnits: 4,
@@ -609,8 +617,8 @@ class CommerceStore extends ChangeNotifier {
         category: 'Almacen',
         barcode: '7790895000061',
       ),
-      Product(
-        id: _buildId('demo-product'),
+      const Product(
+        id: 'demo-product-leche',
         name: 'Leche 1 L',
         stockUnits: 10,
         minStockUnits: 6,
@@ -619,8 +627,8 @@ class CommerceStore extends ChangeNotifier {
         category: 'Almacen',
         barcode: '7790895000078',
       ),
-      Product(
-        id: _buildId('demo-product'),
+      const Product(
+        id: 'demo-product-aceite',
         name: 'Aceite 900 ml',
         stockUnits: 3,
         minStockUnits: 5,
@@ -629,8 +637,8 @@ class CommerceStore extends ChangeNotifier {
         category: 'Almacen',
         barcode: '7790895000085',
       ),
-      Product(
-        id: _buildId('demo-product'),
+      const Product(
+        id: 'demo-product-fideos',
         name: 'Fideos 500 g',
         stockUnits: 18,
         minStockUnits: 8,
@@ -639,8 +647,8 @@ class CommerceStore extends ChangeNotifier {
         category: 'Almacen',
         barcode: '7790895000092',
       ),
-      Product(
-        id: _buildId('demo-product'),
+      const Product(
+        id: 'demo-product-azucar',
         name: 'Azúcar 1 kg',
         stockUnits: 14,
         minStockUnits: 6,
@@ -656,20 +664,20 @@ class CommerceStore extends ChangeNotifier {
 
     final demoMovements = <Movement>[
       Movement(
-        id: _buildId('demo-sale'),
+        id: 'demo-sale-gaseosa-0918',
         kind: MovementKind.sale,
         origin: MovementOrigin.sale,
-        amountPesos: byName('Coca Cola 2.25 L').pricePesos * 2,
-        costOfSalePesos: byName('Coca Cola 2.25 L').costPesos * 2,
+        amountPesos: byName('Gaseosa cola 2.25 L').pricePesos * 2,
+        costOfSalePesos: byName('Gaseosa cola 2.25 L').costPesos * 2,
         createdAt: atToday(9, 18),
         title: 'Venta',
-        subtitle: 'Coca Cola 2.25 L',
-        productId: byName('Coca Cola 2.25 L').id,
+        subtitle: 'Gaseosa cola 2.25 L',
+        productId: byName('Gaseosa cola 2.25 L').id,
         quantityUnits: 2,
         paymentMethod: 'Efectivo',
       ),
       Movement(
-        id: _buildId('demo-sale'),
+        id: 'demo-sale-alfajor-1005',
         kind: MovementKind.sale,
         origin: MovementOrigin.sale,
         amountPesos: byName('Alfajor triple').pricePesos * 3,
@@ -682,7 +690,7 @@ class CommerceStore extends ChangeNotifier {
         paymentMethod: 'Efectivo',
       ),
       Movement(
-        id: _buildId('demo-expense'),
+        id: 'demo-expense-bolsas-1030',
         kind: MovementKind.expense,
         origin: MovementOrigin.expense,
         amountPesos: 3200,
@@ -692,7 +700,7 @@ class CommerceStore extends ChangeNotifier {
         category: 'Insumos',
       ),
       Movement(
-        id: _buildId('demo-sale'),
+        id: 'demo-sale-yerba-1142',
         kind: MovementKind.sale,
         origin: MovementOrigin.sale,
         amountPesos: byName('Yerba 1 kg').pricePesos,
@@ -705,7 +713,7 @@ class CommerceStore extends ChangeNotifier {
         paymentMethod: 'Transferencia',
       ),
       Movement(
-        id: _buildId('demo-sale'),
+        id: 'demo-sale-pan-1250',
         kind: MovementKind.sale,
         origin: MovementOrigin.sale,
         amountPesos: byName('Pan lactal').pricePesos * 2,
@@ -718,7 +726,7 @@ class CommerceStore extends ChangeNotifier {
         paymentMethod: 'Efectivo',
       ),
       Movement(
-        id: _buildId('demo-sale'),
+        id: 'demo-sale-leche-1315',
         kind: MovementKind.sale,
         origin: MovementOrigin.sale,
         amountPesos: byName('Leche 1 L').pricePesos * 2,
@@ -731,7 +739,7 @@ class CommerceStore extends ChangeNotifier {
         paymentMethod: 'Débito',
       ),
       Movement(
-        id: _buildId('demo-sale'),
+        id: 'demo-sale-azucar-1425',
         kind: MovementKind.sale,
         origin: MovementOrigin.sale,
         amountPesos: byName('Azúcar 1 kg').pricePesos,
@@ -744,7 +752,7 @@ class CommerceStore extends ChangeNotifier {
         paymentMethod: 'Efectivo',
       ),
       Movement(
-        id: _buildId('demo-expense'),
+        id: 'demo-expense-proveedor-pan-1500',
         kind: MovementKind.expense,
         origin: MovementOrigin.expense,
         amountPesos: 5800,

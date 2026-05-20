@@ -56,5 +56,41 @@ void main() {
         throwsA(isA<StateError>()),
       );
     });
+
+    test('commercial demo uses neutral data and can be reset', () async {
+      final store = CommerceStore.emptyForTest();
+
+      final firstResult = await store.loadCommercialDemo();
+      await store.recordFreeSale(
+        description: 'Venta de grabación',
+        quantityUnits: 1,
+        unitPricePesos: 2500,
+        paymentMethod: 'Efectivo',
+      );
+      await store.recordExpense(
+        concept: 'Gasto de grabación',
+        amountPesos: 900,
+        category: 'Insumos',
+      );
+      final resetResult = await store.resetCommercialDemo();
+
+      expect(firstResult.applied, isTrue);
+      expect(firstResult.productCount, 10);
+      expect(firstResult.movementCount, 8);
+      expect(resetResult.applied, isTrue);
+      expect(store.products, hasLength(resetResult.productCount));
+      expect(store.movements, hasLength(resetResult.movementCount));
+      expect(
+        store.products.map((product) => product.name.toLowerCase()),
+        everyElement(isNot(contains('coca'))),
+      );
+      expect(
+        store.products.map((product) => product.id),
+        contains('demo-product-gaseosa-cola'),
+      );
+      expect(store.hasMovements, isTrue);
+      expect(store.todaySalesPesos, greaterThan(0));
+      expect(store.todayExpensesPesos, greaterThan(0));
+    });
   });
 }

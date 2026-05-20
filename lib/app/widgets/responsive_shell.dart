@@ -34,6 +34,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
   bool _exportingExcel = false;
   bool _applyingStarterTemplate = false;
   bool _loadingCommercialDemo = false;
+  bool _resettingCommercialDemo = false;
   bool _exportingBackup = false;
   bool _restoringBackup = false;
   bool _retryingSave = false;
@@ -276,6 +277,71 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     } finally {
       if (mounted) {
         setState(() => _loadingCommercialDemo = false);
+      }
+    }
+  }
+
+  Future<void> _resetCommercialDemo() async {
+    if (_resettingCommercialDemo) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reiniciar demo'),
+        content: const Text(
+          'Se reemplazan los datos actuales por un ejemplo neutro listo para mostrar. Esta acción no usa datos personales.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.restart_alt_rounded),
+            label: const Text('Reiniciar demo'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    final store = CommerceScope.of(context);
+    setState(() => _resettingCommercialDemo = true);
+    try {
+      final result = await store.resetCommercialDemo();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _tab = CommerceTab.home);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Demo lista: ${result.productCount} productos y ${result.movementCount} movimientos.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'No se pudo reiniciar la demo: ${userFacingErrorMessage(error)}',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _resettingCommercialDemo = false);
       }
     }
   }
@@ -688,11 +754,13 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         exportingExcel: _exportingExcel,
         onApplyStarterTemplate: _applyStarterTemplate,
         onLoadCommercialDemo: _loadCommercialDemo,
+        onResetCommercialDemo: _resetCommercialDemo,
         onCreateProductFromFreeSale: _createProductFromFreeSale,
         onCreateProductFromSuggestion: _createProductFromSuggestion,
         onDismissFreeSaleSuggestion: _dismissFreeSaleSuggestion,
         applyingStarterTemplate: _applyingStarterTemplate,
         loadingCommercialDemo: _loadingCommercialDemo,
+        resettingCommercialDemo: _resettingCommercialDemo,
       ),
       CommerceTab.products: ProductsScreen(
         onApplyStarterTemplate: _applyStarterTemplate,
