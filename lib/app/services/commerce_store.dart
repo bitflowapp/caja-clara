@@ -5,14 +5,9 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import '../models/movement.dart';
 import '../models/product.dart';
-import '../services/license_service.dart';
-import '../utils/payment_methods.dart';
 import 'commerce_persistence.dart';
 import 'starter_templates.dart';
-
-enum OnboardingTutorialStatus { unseen, dismissed, completed }
-
-enum InitialCatalogSetupStatus { pending, empty, example }
+import 'store_lock.dart';
 
 class CommerceStore extends ChangeNotifier {
   static const int freeSaleSuggestionThreshold = 3;
@@ -23,7 +18,7 @@ class CommerceStore extends ChangeNotifier {
   static Future<CommerceStore> loadOrSeed() async {
     await Hive.initFlutter();
     final store = CommerceStore._(
-      CommercePersistence(),
+      CommercePersistence(hivePath: currentHiveHomePath()),
       persistenceEnabled: true,
     );
     await store._load();
@@ -67,20 +62,25 @@ class CommerceStore extends ChangeNotifier {
     return store;
   }
 
+  @visibleForTesting
+  static Future<CommerceStore> loadWithPersistenceForTest(
+    CommercePersistence persistence,
+  ) async {
+    final store = CommerceStore._(persistence, persistenceEnabled: true);
+    await store._load();
+    return store;
+  }
+
   final CommercePersistence _persistence;
   final bool _persistenceEnabled;
   final List<Product> _products = <Product>[];
   final List<Movement> _movements = <Movement>[];
   final Set<String> _dismissedFreeSaleSuggestions = <String>{};
-  LicenseService? _licenseService;
 
   bool _ready = false;
   bool _saving = false;
   String? _lastError;
-  OnboardingTutorialStatus _onboardingTutorialStatus =
-      OnboardingTutorialStatus.unseen;
-  InitialCatalogSetupStatus _initialCatalogSetupStatus =
-      InitialCatalogSetupStatus.pending;
+  int _idSequence = 0;
   DateTime? _cashOpeningAt;
   int? _cashOpeningBalancePesos;
   DateTime? _cashClosingAt;
@@ -91,18 +91,9 @@ class CommerceStore extends ChangeNotifier {
   String? get lastError => _lastError;
   bool get hasProducts => _products.isNotEmpty;
   bool get hasMovements => _movements.isNotEmpty;
-  bool get isEmptyState => _products.isEmpty && _movements.isEmpty;
-  OnboardingTutorialStatus get onboardingTutorialStatus =>
-      _onboardingTutorialStatus;
-  InitialCatalogSetupStatus get initialCatalogSetupStatus =>
-      _initialCatalogSetupStatus;
-  bool get shouldPromptInitialCatalogSetup =>
-      isEmptyState &&
-      _initialCatalogSetupStatus == InitialCatalogSetupStatus.pending;
-  bool get shouldPromptOnboardingTutorial =>
-      _onboardingTutorialStatus == OnboardingTutorialStatus.unseen &&
-      isEmptyState &&
-      !shouldPromptInitialCatalogSetup;
+  bool get hasCommercialDemoData =>
+      _products.any(_isCommercialDemoProduct) ||
+      _movements.any(_isCommercialDemoMovement);
 
   UnmodifiableListView<Product> get products => UnmodifiableListView(_products);
   UnmodifiableListView<Movement> get movements =>
@@ -192,23 +183,8 @@ class CommerceStore extends ChangeNotifier {
     if (raw == null) {
       return null;
     }
-    final normalized = raw
-        .trim()
-        .replaceAll(RegExp(r'[\s\-_]+'), '')
-        .toUpperCase();
+    final normalized = raw.replaceAll(RegExp(r'\s+'), '').trim();
     return normalized.isEmpty ? null : normalized;
-  }
-
-  static bool barcodeMatchesQuery(String? barcode, String rawQuery) {
-    final normalizedBarcode = normalizeBarcode(barcode);
-    if (normalizedBarcode == null) {
-      return false;
-    }
-    final normalizedQuery = normalizeBarcode(rawQuery);
-    if (normalizedQuery == null) {
-      return false;
-    }
-    return normalizedBarcode.contains(normalizedQuery);
   }
 
   static String? normalizeProductName(String? raw) {
@@ -284,303 +260,6 @@ class CommerceStore extends ChangeNotifier {
   List<Movement> recentMovements([int limit = 8]) =>
       _movements.take(limit).toList(growable: false);
 
-  DailyMovementSummary dailyMovementSummary({
-    DateTime? now,
-    int recentLimit = 5,
-  }) {
-    final reference = now ?? DateTime.now();
-    final todayMovements = _movements
-        .where((movement) => _isSameDay(movement.createdAt, reference))
-        .toList(growable: false);
-    final sales = todayMovements
-        .where((movement) => movement.kind == MovementKind.sale)
-        .toList(growable: false);
-    final expenses = todayMovements
-        .where((movement) => movement.kind == MovementKind.expense)
-        .toList(growable: false);
-
-    return DailyMovementSummary(
-      movementCount: todayMovements.length,
-      salesCount: sales.length,
-      salesPesos: sales.fold<int>(
-        0,
-        (sum, movement) => sum + movement.amountPesos,
-      ),
-      expenseCount: expenses.length,
-      expensesPesos: expenses.fold<int>(
-        0,
-        (sum, movement) => sum + movement.amountPesos,
-      ),
-      recentMovements: todayMovements.take(recentLimit).toList(growable: false),
-    );
-  }
-
-  List<TopSellingProduct> topSellingProductsToday({
-    DateTime? now,
-    int limit = 5,
-  }) {
-    if (limit <= 0) {
-      return const <TopSellingProduct>[];
-    }
-    final reference = now ?? DateTime.now();
-    final aggregates = <String, _TopSellingAggregate>{};
-
-    for (final movement in _movements) {
-      if (movement.kind != MovementKind.sale ||
-          movement.isFreeSale ||
-          !_isSameDay(movement.createdAt, reference)) {
-        continue;
-      }
-      final productId = movement.productId;
-      if (productId == null) {
-        continue;
-      }
-      final product = productById(productId);
-      if (product == null) {
-        continue;
-      }
-
-      final aggregate = aggregates.putIfAbsent(
-        productId,
-        () => _TopSellingAggregate(product: product),
-      );
-      aggregate.unitsSold += movement.quantityUnits ?? 0;
-      aggregate.salesCount += 1;
-      aggregate.revenuePesos += movement.amountPesos;
-      if (aggregate.latestSoldAt == null ||
-          movement.createdAt.isAfter(aggregate.latestSoldAt!)) {
-        aggregate.latestSoldAt = movement.createdAt;
-      }
-    }
-
-    final results =
-        aggregates.values
-            .map(
-              (aggregate) => TopSellingProduct(
-                product: aggregate.product,
-                unitsSold: aggregate.unitsSold,
-                salesCount: aggregate.salesCount,
-                revenuePesos: aggregate.revenuePesos,
-                latestSoldAt: aggregate.latestSoldAt ?? reference,
-              ),
-            )
-            .toList(growable: false)
-          ..sort((a, b) {
-            final byUnits = b.unitsSold.compareTo(a.unitsSold);
-            if (byUnits != 0) {
-              return byUnits;
-            }
-            final byRevenue = b.revenuePesos.compareTo(a.revenuePesos);
-            if (byRevenue != 0) {
-              return byRevenue;
-            }
-            return b.latestSoldAt.compareTo(a.latestSoldAt);
-          });
-
-    return results.take(limit).toList(growable: false);
-  }
-
-  List<UrgentRestockProduct> urgentRestockProducts({
-    DateTime? now,
-    int limit = 5,
-  }) {
-    if (limit <= 0) {
-      return const <UrgentRestockProduct>[];
-    }
-    final reference = now ?? DateTime.now();
-    final recentThreshold = reference.subtract(const Duration(days: 7));
-    final items =
-        _products
-            .where((product) => product.isLowStock)
-            .map((product) {
-              var recentUnitsSold = 0;
-              var totalUnitsSold = 0;
-              DateTime? latestSoldAt;
-
-              for (final movement in _movements) {
-                if (movement.kind != MovementKind.sale ||
-                    movement.isFreeSale ||
-                    movement.productId != product.id ||
-                    movement.createdAt.isAfter(reference)) {
-                  continue;
-                }
-                final units = movement.quantityUnits ?? 0;
-                totalUnitsSold += units;
-                if (latestSoldAt == null ||
-                    movement.createdAt.isAfter(latestSoldAt)) {
-                  latestSoldAt = movement.createdAt;
-                }
-                if (!movement.createdAt.isBefore(recentThreshold)) {
-                  recentUnitsSold += units;
-                }
-              }
-
-              return UrgentRestockProduct(
-                product: product,
-                stockGapUnits: product.minStockUnits > product.stockUnits
-                    ? product.minStockUnits - product.stockUnits
-                    : 0,
-                recentUnitsSold: recentUnitsSold,
-                totalUnitsSold: totalUnitsSold,
-                latestSoldAt: latestSoldAt,
-              );
-            })
-            .toList(growable: false)
-          ..sort((a, b) {
-            final byRecentActivity = b.hasRecentSales == a.hasRecentSales
-                ? 0
-                : (b.hasRecentSales ? 1 : -1);
-            if (byRecentActivity != 0) {
-              return byRecentActivity;
-            }
-            final byGap = b.stockGapUnits.compareTo(a.stockGapUnits);
-            if (byGap != 0) {
-              return byGap;
-            }
-            final byStock = a.product.stockUnits.compareTo(
-              b.product.stockUnits,
-            );
-            if (byStock != 0) {
-              return byStock;
-            }
-            final aLatest = a.latestSoldAt;
-            final bLatest = b.latestSoldAt;
-            if (aLatest != null && bLatest != null) {
-              final byLatest = bLatest.compareTo(aLatest);
-              if (byLatest != 0) {
-                return byLatest;
-              }
-            } else if (aLatest == null && bLatest != null) {
-              return 1;
-            } else if (aLatest != null && bLatest == null) {
-              return -1;
-            }
-            return a.product.name.toLowerCase().compareTo(
-              b.product.name.toLowerCase(),
-            );
-          });
-
-    return items.take(limit).toList(growable: false);
-  }
-
-  LowRotationInsight lowRotationProducts({DateTime? now, int limit = 5}) {
-    final reference = now ?? DateTime.now();
-    final sales = _movements
-        .where(
-          (movement) =>
-              movement.kind == MovementKind.sale &&
-              !movement.isFreeSale &&
-              movement.productId != null &&
-              !movement.createdAt.isAfter(reference),
-        )
-        .toList(growable: false);
-
-    if (sales.length < 6) {
-      return const LowRotationInsight(
-        hasEnoughHistory: false,
-        message:
-            'Todavia no hay suficiente historial para sugerir productos de baja salida.',
-        products: <LowRotationProduct>[],
-      );
-    }
-
-    final oldestSaleAt = sales
-        .map((movement) => movement.createdAt)
-        .reduce((a, b) => a.isBefore(b) ? a : b);
-    if (reference.difference(oldestSaleAt).inDays < 7) {
-      return const LowRotationInsight(
-        hasEnoughHistory: false,
-        message:
-            'Todavia no hay suficiente historial para sugerir productos de baja salida.',
-        products: <LowRotationProduct>[],
-      );
-    }
-
-    final recentThreshold = reference.subtract(const Duration(days: 30));
-    final items =
-        _products
-            .where((product) => product.stockUnits > 0)
-            .map((product) {
-              var unitsSoldLast30Days = 0;
-              DateTime? latestSoldAt;
-
-              for (final movement in sales) {
-                if (movement.productId != product.id) {
-                  continue;
-                }
-                final units = movement.quantityUnits ?? 0;
-                if (!movement.createdAt.isBefore(recentThreshold)) {
-                  unitsSoldLast30Days += units;
-                }
-                if (latestSoldAt == null ||
-                    movement.createdAt.isAfter(latestSoldAt)) {
-                  latestSoldAt = movement.createdAt;
-                }
-              }
-
-              LowRotationTag? tag;
-              if (latestSoldAt == null ||
-                  reference.difference(latestSoldAt).inDays >= 21) {
-                tag = LowRotationTag.noRecentMovement;
-              } else if (unitsSoldLast30Days <= 1) {
-                tag = LowRotationTag.lowRotation;
-              }
-
-              if (tag == null) {
-                return null;
-              }
-
-              return LowRotationProduct(
-                product: product,
-                tag: tag,
-                unitsSoldLast30Days: unitsSoldLast30Days,
-                latestSoldAt: latestSoldAt,
-              );
-            })
-            .whereType<LowRotationProduct>()
-            .toList(growable: false)
-          ..sort((a, b) {
-            final byTag = a.tag.index.compareTo(b.tag.index);
-            if (byTag != 0) {
-              return byTag;
-            }
-            final byStock = b.product.stockUnits.compareTo(
-              a.product.stockUnits,
-            );
-            if (byStock != 0) {
-              return byStock;
-            }
-            final byUnits = a.unitsSoldLast30Days.compareTo(
-              b.unitsSoldLast30Days,
-            );
-            if (byUnits != 0) {
-              return byUnits;
-            }
-            final aLatest = a.latestSoldAt;
-            final bLatest = b.latestSoldAt;
-            if (aLatest != null && bLatest != null) {
-              return aLatest.compareTo(bLatest);
-            }
-            if (aLatest == null && bLatest != null) {
-              return -1;
-            }
-            if (aLatest != null && bLatest == null) {
-              return 1;
-            }
-            return a.product.name.toLowerCase().compareTo(
-              b.product.name.toLowerCase(),
-            );
-          });
-
-    return LowRotationInsight(
-      hasEnoughHistory: true,
-      message: items.isEmpty
-          ? 'Sin alertas claras de baja salida por ahora.'
-          : null,
-      products: items.take(limit).toList(growable: false),
-    );
-  }
-
   int get cashBalancePesos => _movements.fold<int>(
     0,
     (sum, movement) => sum + movement.cashImpactPesos,
@@ -605,34 +284,6 @@ class CommerceStore extends ChangeNotifier {
 
   int get todayMovementCount => _movements.where(_isTodayMovement).length;
 
-  int get totalStockUnits =>
-      _products.fold<int>(0, (sum, product) => sum + product.stockUnits);
-
-  int get sellableProductsCount =>
-      _products.where((product) => product.isSellable).length;
-
-  int get productsWithoutPriceCount =>
-      _products.where((product) => !product.hasPrice).length;
-
-  int get productsWithBarcodeCount =>
-      _products.where((product) => product.hasBarcode).length;
-
-  int get productsWithoutBarcodeCount =>
-      _products.where((product) => !product.hasBarcode).length;
-
-  int get productsNeedingCatalogReviewCount =>
-      _products.where((product) => product.needsCatalogAttention).length;
-
-  bool get isCatalogReadyForSelling =>
-      hasProducts &&
-      productsWithoutPriceCount == 0 &&
-      productsWithoutBarcodeCount == 0;
-
-  int get estimatedInventoryCostPesos => _products.fold<int>(
-    0,
-    (sum, product) => sum + (product.costPesos * product.stockUnits),
-  );
-
   String? get lastSalePaymentMethod {
     for (final movement in _movements) {
       if (movement.kind != MovementKind.sale) {
@@ -651,12 +302,12 @@ class CommerceStore extends ChangeNotifier {
   String? saleReadinessMessage(String productId, {required int quantityUnits}) {
     final product = productById(productId);
     if (product == null) {
-      return 'El producto ya no esta disponible.';
+      return 'El producto ya no está disponible.';
     }
     if (quantityUnits <= 0) {
-      return 'Ingresa una cantidad mayor a 0.';
+      return 'Ingresá una cantidad mayor a 0.';
     }
-    if (!product.hasPrice) {
+    if (product.pricePesos <= 0) {
       return 'Define un precio antes de vender este producto.';
     }
     if (product.stockUnits < quantityUnits) {
@@ -665,23 +316,19 @@ class CommerceStore extends ChangeNotifier {
     return null;
   }
 
-  void attachLicenseService(LicenseService licenseService) {
-    _licenseService = licenseService;
-  }
-
   String? freeSaleReadinessMessage({
     required String description,
     required int quantityUnits,
     required int unitPricePesos,
   }) {
     if (description.trim().isEmpty) {
-      return 'Escribe una descripcion para la venta.';
+      return 'Escribí una descripción para la venta.';
     }
     if (quantityUnits <= 0) {
-      return 'Ingresa una cantidad mayor a 0.';
+      return 'Ingresá una cantidad mayor a 0.';
     }
     if (unitPricePesos <= 0) {
-      return 'Ingresa un precio unitario mayor a 0.';
+      return 'Ingresá un precio unitario mayor a 0.';
     }
     return null;
   }
@@ -705,7 +352,6 @@ class CommerceStore extends ChangeNotifier {
       final snapshot = await _persistence.load();
       if (snapshot == null) {
         _seedEmptyState();
-        await _persist();
       } else {
         _applySnapshot(_parseSnapshot(snapshot));
       }
@@ -718,8 +364,9 @@ class CommerceStore extends ChangeNotifier {
       }
       _seedEmptyState();
       _ready = true;
-      _lastError =
-          'No se pudo abrir el almacenamiento. La app quedo lista para cargar tus datos.';
+      _lastError = error is StoreAccessException
+          ? error.userMessage
+          : 'No se pudo abrir el almacenamiento. La app quedó lista para cargar tus datos.';
       notifyListeners();
     }
   }
@@ -727,8 +374,6 @@ class CommerceStore extends ChangeNotifier {
   void _seedEmptyState() {
     _products.clear();
     _movements.clear();
-    _onboardingTutorialStatus = OnboardingTutorialStatus.unseen;
-    _initialCatalogSetupStatus = InitialCatalogSetupStatus.pending;
     _cashOpeningAt = null;
     _cashOpeningBalancePesos = null;
     _cashClosingAt = null;
@@ -841,7 +486,7 @@ class CommerceStore extends ChangeNotifier {
           title: 'Venta',
           subtitle: 'Cafe molido + galletitas',
           quantityUnits: 2,
-          paymentMethod: 'Debito',
+          paymentMethod: 'Débito',
           productId: 'p-3',
         ),
       ])
@@ -851,12 +496,9 @@ class CommerceStore extends ChangeNotifier {
     _cashOpeningBalancePesos = null;
     _cashClosingAt = null;
     _cashClosingBalancePesos = null;
-    _onboardingTutorialStatus = OnboardingTutorialStatus.completed;
-    _initialCatalogSetupStatus = InitialCatalogSetupStatus.example;
   }
 
   Future<StarterTemplateApplyResult> applyArgentinianKioskTemplate() async {
-    _ensureFeatureAvailable(LockedFeature.templates);
     final existingProducts = List<Product>.of(_products, growable: false);
     final existingKeys = existingProducts
         .map(_starterTemplateKeyForProduct)
@@ -891,12 +533,6 @@ class CommerceStore extends ChangeNotifier {
     if (pendingProducts.isNotEmpty) {
       await _runPersistedMutation(() {
         _products.addAll(pendingProducts);
-        if (_initialCatalogSetupStatus == InitialCatalogSetupStatus.pending) {
-          _initialCatalogSetupStatus = InitialCatalogSetupStatus.empty;
-          if (_onboardingTutorialStatus == OnboardingTutorialStatus.unseen) {
-            _onboardingTutorialStatus = OnboardingTutorialStatus.dismissed;
-          }
-        }
         _sortProducts();
       });
     }
@@ -909,50 +545,309 @@ class CommerceStore extends ChangeNotifier {
     );
   }
 
-  Future<void> loadDemoData({bool overwrite = false}) async {
-    _ensureFeatureAvailable(LockedFeature.demoData);
-    if (!overwrite && !isEmptyState) {
-      throw StateError(
-        'La demo comercial solo se puede cargar sobre una app vacia.',
+  bool get canLoadCommercialDemo =>
+      !hasProducts &&
+      !hasMovements &&
+      _cashOpeningAt == null &&
+      _cashClosingAt == null;
+
+  Future<CommercialDemoApplyResult> loadCommercialDemo() async {
+    if (!canLoadCommercialDemo) {
+      return const CommercialDemoApplyResult(applied: false);
+    }
+
+    return _applyCommercialDemo();
+  }
+
+  Future<CommercialDemoApplyResult> resetCommercialDemo() async {
+    return _applyCommercialDemo();
+  }
+
+  Future<CommercialDemoCleanupResult> cleanCommercialDemoData() async {
+    final demoProductIds = _products
+        .where(_isCommercialDemoProduct)
+        .map((product) => product.id)
+        .toSet();
+    final productsToRemove = demoProductIds.length;
+    final movementsToRemove = _movements
+        .where(
+          (movement) =>
+              _isCommercialDemoMovement(movement) ||
+              (movement.productId != null &&
+                  demoProductIds.contains(movement.productId)),
+        )
+        .length;
+
+    if (productsToRemove == 0 && movementsToRemove == 0) {
+      return const CommercialDemoCleanupResult(
+        applied: false,
+        productCount: 0,
+        movementCount: 0,
       );
     }
 
-    await _runPersistedMutation(_seedDemoData);
+    await _runPersistedMutation(() {
+      _products.removeWhere((product) => demoProductIds.contains(product.id));
+      _movements.removeWhere(
+        (movement) =>
+            _isCommercialDemoMovement(movement) ||
+            (movement.productId != null &&
+                demoProductIds.contains(movement.productId)),
+      );
+      _dismissedFreeSaleSuggestions.clear();
+      _sortProducts();
+    });
+
+    return CommercialDemoCleanupResult(
+      applied: true,
+      productCount: productsToRemove,
+      movementCount: movementsToRemove,
+    );
   }
 
-  Future<void> chooseEmptyCatalogStart() async {
-    if (_initialCatalogSetupStatus == InitialCatalogSetupStatus.empty) {
-      return;
-    }
+  Future<void> resetAllData() async {
     await _runPersistedMutation(() {
-      _initialCatalogSetupStatus = InitialCatalogSetupStatus.empty;
-      if (_onboardingTutorialStatus == OnboardingTutorialStatus.unseen) {
-        _onboardingTutorialStatus = OnboardingTutorialStatus.dismissed;
-      }
+      _seedEmptyState();
+      _dismissedFreeSaleSuggestions.clear();
     });
   }
 
-  Future<void> dismissOnboardingTutorial() {
-    return _setOnboardingTutorialStatus(OnboardingTutorialStatus.dismissed);
-  }
+  Future<CommercialDemoApplyResult> _applyCommercialDemo() async {
+    final now = DateTime.now();
+    DateTime atToday(int hour, int minute) =>
+        DateTime(now.year, now.month, now.day, hour, minute);
 
-  Future<void> completeOnboardingTutorial() {
-    return _setOnboardingTutorialStatus(OnboardingTutorialStatus.completed);
-  }
+    final demoProducts = <Product>[
+      const Product(
+        id: 'demo-product-gaseosa-cola',
+        name: 'Gaseosa cola 2.25 L',
+        stockUnits: 12,
+        minStockUnits: 6,
+        costPesos: 1800,
+        pricePesos: 2900,
+        category: 'Bebidas',
+        barcode: '7790895000016',
+      ),
+      const Product(
+        id: 'demo-product-agua-mineral',
+        name: 'Agua mineral 1.5 L',
+        stockUnits: 9,
+        minStockUnits: 6,
+        costPesos: 700,
+        pricePesos: 1200,
+        category: 'Bebidas',
+        barcode: '7790895000023',
+      ),
+      const Product(
+        id: 'demo-product-alfajor-triple',
+        name: 'Alfajor triple',
+        stockUnits: 24,
+        minStockUnits: 12,
+        costPesos: 650,
+        pricePesos: 1100,
+        category: 'Golosinas',
+        barcode: '7790895000030',
+      ),
+      const Product(
+        id: 'demo-product-galletitas-dulces',
+        name: 'Galletitas dulces',
+        stockUnits: 4,
+        minStockUnits: 8,
+        costPesos: 850,
+        pricePesos: 1400,
+        category: 'Almacen',
+        barcode: '7790895000047',
+      ),
+      const Product(
+        id: 'demo-product-yerba',
+        name: 'Yerba 1 kg',
+        stockUnits: 7,
+        minStockUnits: 5,
+        costPesos: 2600,
+        pricePesos: 4200,
+        category: 'Almacen',
+        barcode: '7790895000054',
+      ),
+      const Product(
+        id: 'demo-product-pan-lactal',
+        name: 'Pan lactal',
+        stockUnits: 5,
+        minStockUnits: 4,
+        costPesos: 1300,
+        pricePesos: 2100,
+        category: 'Almacen',
+        barcode: '7790895000061',
+      ),
+      const Product(
+        id: 'demo-product-leche',
+        name: 'Leche 1 L',
+        stockUnits: 10,
+        minStockUnits: 6,
+        costPesos: 900,
+        pricePesos: 1500,
+        category: 'Almacen',
+        barcode: '7790895000078',
+      ),
+      const Product(
+        id: 'demo-product-aceite',
+        name: 'Aceite 900 ml',
+        stockUnits: 3,
+        minStockUnits: 5,
+        costPesos: 2100,
+        pricePesos: 3300,
+        category: 'Almacen',
+        barcode: '7790895000085',
+      ),
+      const Product(
+        id: 'demo-product-fideos',
+        name: 'Fideos 500 g',
+        stockUnits: 18,
+        minStockUnits: 8,
+        costPesos: 700,
+        pricePesos: 1200,
+        category: 'Almacen',
+        barcode: '7790895000092',
+      ),
+      const Product(
+        id: 'demo-product-azucar',
+        name: 'Azúcar 1 kg',
+        stockUnits: 14,
+        minStockUnits: 6,
+        costPesos: 900,
+        pricePesos: 1600,
+        category: 'Almacen',
+        barcode: '7790895000108',
+      ),
+    ];
 
-  Future<void> _setOnboardingTutorialStatus(
-    OnboardingTutorialStatus status,
-  ) async {
-    if (_onboardingTutorialStatus == status) {
-      return;
-    }
+    Product byName(String name) =>
+        demoProducts.firstWhere((product) => product.name == name);
+
+    final demoMovements = <Movement>[
+      Movement(
+        id: 'demo-sale-gaseosa-0918',
+        kind: MovementKind.sale,
+        origin: MovementOrigin.sale,
+        amountPesos: byName('Gaseosa cola 2.25 L').pricePesos * 2,
+        costOfSalePesos: byName('Gaseosa cola 2.25 L').costPesos * 2,
+        createdAt: atToday(9, 18),
+        title: 'Venta',
+        subtitle: 'Gaseosa cola 2.25 L',
+        productId: byName('Gaseosa cola 2.25 L').id,
+        quantityUnits: 2,
+        paymentMethod: 'Efectivo',
+      ),
+      Movement(
+        id: 'demo-sale-alfajor-1005',
+        kind: MovementKind.sale,
+        origin: MovementOrigin.sale,
+        amountPesos: byName('Alfajor triple').pricePesos * 3,
+        costOfSalePesos: byName('Alfajor triple').costPesos * 3,
+        createdAt: atToday(10, 5),
+        title: 'Venta',
+        subtitle: 'Alfajor triple',
+        productId: byName('Alfajor triple').id,
+        quantityUnits: 3,
+        paymentMethod: 'Efectivo',
+      ),
+      Movement(
+        id: 'demo-expense-bolsas-1030',
+        kind: MovementKind.expense,
+        origin: MovementOrigin.expense,
+        amountPesos: 3200,
+        createdAt: atToday(10, 30),
+        title: 'Compra bolsas',
+        subtitle: 'Insumos',
+        category: 'Insumos',
+      ),
+      Movement(
+        id: 'demo-sale-yerba-1142',
+        kind: MovementKind.sale,
+        origin: MovementOrigin.sale,
+        amountPesos: byName('Yerba 1 kg').pricePesos,
+        costOfSalePesos: byName('Yerba 1 kg').costPesos,
+        createdAt: atToday(11, 42),
+        title: 'Venta',
+        subtitle: 'Yerba 1 kg',
+        productId: byName('Yerba 1 kg').id,
+        quantityUnits: 1,
+        paymentMethod: 'Transferencia',
+      ),
+      Movement(
+        id: 'demo-sale-pan-1250',
+        kind: MovementKind.sale,
+        origin: MovementOrigin.sale,
+        amountPesos: byName('Pan lactal').pricePesos * 2,
+        costOfSalePesos: byName('Pan lactal').costPesos * 2,
+        createdAt: atToday(12, 50),
+        title: 'Venta',
+        subtitle: 'Pan lactal',
+        productId: byName('Pan lactal').id,
+        quantityUnits: 2,
+        paymentMethod: 'Efectivo',
+      ),
+      Movement(
+        id: 'demo-sale-leche-1315',
+        kind: MovementKind.sale,
+        origin: MovementOrigin.sale,
+        amountPesos: byName('Leche 1 L').pricePesos * 2,
+        costOfSalePesos: byName('Leche 1 L').costPesos * 2,
+        createdAt: atToday(13, 15),
+        title: 'Venta',
+        subtitle: 'Leche 1 L',
+        productId: byName('Leche 1 L').id,
+        quantityUnits: 2,
+        paymentMethod: 'Débito',
+      ),
+      Movement(
+        id: 'demo-sale-azucar-1425',
+        kind: MovementKind.sale,
+        origin: MovementOrigin.sale,
+        amountPesos: byName('Azúcar 1 kg').pricePesos,
+        costOfSalePesos: byName('Azúcar 1 kg').costPesos,
+        createdAt: atToday(14, 25),
+        title: 'Venta',
+        subtitle: 'Azúcar 1 kg',
+        productId: byName('Azúcar 1 kg').id,
+        quantityUnits: 1,
+        paymentMethod: 'Efectivo',
+      ),
+      Movement(
+        id: 'demo-expense-proveedor-pan-1500',
+        kind: MovementKind.expense,
+        origin: MovementOrigin.expense,
+        amountPesos: 5800,
+        createdAt: atToday(15, 0),
+        title: 'Pago proveedor pan',
+        subtitle: 'Mercaderia',
+        category: 'Mercaderia',
+      ),
+    ];
+
     await _runPersistedMutation(() {
-      _onboardingTutorialStatus = status;
+      _products
+        ..clear()
+        ..addAll(demoProducts);
+      _movements
+        ..clear()
+        ..addAll(demoMovements)
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _dismissedFreeSaleSuggestions.clear();
+      _cashOpeningAt = null;
+      _cashOpeningBalancePesos = null;
+      _cashClosingAt = null;
+      _cashClosingBalancePesos = null;
+      _sortProducts();
     });
+
+    return CommercialDemoApplyResult(
+      applied: true,
+      productCount: demoProducts.length,
+      movementCount: demoMovements.length,
+    );
   }
 
   Future<void> addProduct(Product product) async {
-    _ensureFeatureAvailable(LockedFeature.catalog);
     final sanitized = _validateProduct(product);
     await _runPersistedMutation(() {
       final index = _products.indexWhere((item) => item.id == sanitized.id);
@@ -971,13 +866,12 @@ class CommerceStore extends ChangeNotifier {
     String? note,
     DateTime? createdAt,
   }) async {
-    _ensureFeatureAvailable(LockedFeature.stock);
     final index = _products.indexWhere((product) => product.id == productId);
     if (index == -1) {
-      throw StateError('No se encontro el producto.');
+      throw StateError('No se encontró el producto.');
     }
     if (quantityUnits <= 0) {
-      throw StateError('Ingresa una cantidad mayor a 0.');
+      throw StateError('Ingresá una cantidad mayor a 0.');
     }
 
     final product = _products[index];
@@ -1008,10 +902,9 @@ class CommerceStore extends ChangeNotifier {
   }
 
   Future<void> removeProduct(String productId) async {
-    _ensureFeatureAvailable(LockedFeature.catalog);
     final productExists = _products.any((product) => product.id == productId);
     if (!productExists) {
-      throw StateError('No se encontro el producto.');
+      throw StateError('No se encontró el producto.');
     }
     if (_movements.any((movement) => movement.productId == productId)) {
       throw StateError(
@@ -1021,6 +914,10 @@ class CommerceStore extends ChangeNotifier {
     await _runPersistedMutation(() {
       _products.removeWhere((product) => product.id == productId);
     });
+  }
+
+  bool productHasMovements(String productId) {
+    return _movements.any((movement) => movement.productId == productId);
   }
 
   Future<void> dismissFreeSaleSuggestion(String normalizedDescription) async {
@@ -1040,13 +937,12 @@ class CommerceStore extends ChangeNotifier {
     required String paymentMethod,
     DateTime? createdAt,
   }) async {
-    _ensureFeatureAvailable(LockedFeature.sales);
     final index = _products.indexWhere((product) => product.id == productId);
     if (index == -1) {
-      throw StateError('No se encontro el producto.');
+      throw StateError('No se encontró el producto.');
     }
     if (quantityUnits <= 0) {
-      throw StateError('Ingresa una cantidad mayor a 0.');
+      throw StateError('Ingresá una cantidad mayor a 0.');
     }
 
     final product = _products[index];
@@ -1061,7 +957,6 @@ class CommerceStore extends ChangeNotifier {
     final revenue = product.pricePesos * quantityUnits;
     final cost = product.costPesos * quantityUnits;
     final timestamp = createdAt ?? DateTime.now();
-    final normalizedPaymentMethod = normalizeStoredPaymentMethod(paymentMethod);
     await _runPersistedMutation(() {
       _products[index] = product.copyWith(
         stockUnits: product.stockUnits - quantityUnits,
@@ -1079,7 +974,9 @@ class CommerceStore extends ChangeNotifier {
           subtitle: product.name,
           productId: product.id,
           quantityUnits: quantityUnits,
-          paymentMethod: normalizedPaymentMethod,
+          paymentMethod: paymentMethod.trim().isEmpty
+              ? 'Sin dato'
+              : paymentMethod,
         ),
       );
       _sortProducts();
@@ -1093,7 +990,6 @@ class CommerceStore extends ChangeNotifier {
     required String paymentMethod,
     DateTime? createdAt,
   }) async {
-    _ensureFeatureAvailable(LockedFeature.sales);
     final cleanDescription = description.trim();
     final readinessMessage = freeSaleReadinessMessage(
       description: cleanDescription,
@@ -1105,7 +1001,6 @@ class CommerceStore extends ChangeNotifier {
     }
 
     final revenue = unitPricePesos * quantityUnits;
-    final normalizedPaymentMethod = normalizeStoredPaymentMethod(paymentMethod);
     await _runPersistedMutation(() {
       _movements.insert(
         0,
@@ -1120,7 +1015,9 @@ class CommerceStore extends ChangeNotifier {
           title: 'Venta libre',
           subtitle: cleanDescription,
           quantityUnits: quantityUnits,
-          paymentMethod: normalizedPaymentMethod,
+          paymentMethod: paymentMethod.trim().isEmpty
+              ? 'Sin dato'
+              : paymentMethod,
         ),
       );
     });
@@ -1132,15 +1029,14 @@ class CommerceStore extends ChangeNotifier {
     required String category,
     DateTime? createdAt,
   }) async {
-    _ensureFeatureAvailable(LockedFeature.expenses);
     final cleanConcept = concept.trim();
     final cleanCategory = category.trim().isEmpty ? 'General' : category.trim();
 
     if (cleanConcept.isEmpty) {
-      throw StateError('Escribe un concepto.');
+      throw StateError('Escribí un concepto.');
     }
     if (amountPesos <= 0) {
-      throw StateError('Ingresa un monto mayor a 0.');
+      throw StateError('Ingresá un monto mayor a 0.');
     }
 
     await _runPersistedMutation(() {
@@ -1165,7 +1061,6 @@ class CommerceStore extends ChangeNotifier {
     DateTime? createdAt,
     bool overwrite = false,
   }) async {
-    _ensureFeatureAvailable(LockedFeature.cash);
     final timestamp = createdAt ?? DateTime.now();
     if (openingBalancePesos < 0) {
       throw StateError('La apertura no puede ser negativa.');
@@ -1205,10 +1100,9 @@ class CommerceStore extends ChangeNotifier {
     DateTime? createdAt,
     bool overwrite = false,
   }) async {
-    _ensureFeatureAvailable(LockedFeature.cash);
     final timestamp = createdAt ?? DateTime.now();
     if (!hasCashOpeningToday) {
-      throw StateError('Registra primero una apertura de caja.');
+      throw StateError('Registrá primero una apertura de caja.');
     }
     if (closingBalancePesos < 0) {
       throw StateError('El cierre no puede ser negativo.');
@@ -1241,14 +1135,13 @@ class CommerceStore extends ChangeNotifier {
   }
 
   Future<void> undoLastMovement() async {
-    _ensureFeatureAvailable(LockedFeature.cash);
     if (_movements.isEmpty) {
       throw StateError('No hay movimientos para deshacer.');
     }
 
     final movement = _movements.first;
     if (movement.resolvedOrigin == MovementOrigin.restore) {
-      throw StateError('No se puede deshacer una restauracion de backup.');
+      throw StateError('No se puede deshacer una restauración de backup.');
     }
 
     await _runPersistedMutation(() {
@@ -1307,13 +1200,11 @@ class CommerceStore extends ChangeNotifier {
 
   Map<String, dynamic> buildSnapshot({DateTime? generatedAt}) {
     return <String, dynamic>{
-      'version': 4,
+      'version': 2,
       'savedAt': (generatedAt ?? DateTime.now()).toIso8601String(),
       'products': _products.map((product) => product.toJson()).toList(),
       'movements': _movements.map((movement) => movement.toJson()).toList(),
       'dismissedFreeSaleSuggestions': _dismissedFreeSaleSuggestions.toList(),
-      'onboardingTutorialStatus': _onboardingTutorialStatus.name,
-      'initialCatalogSetupStatus': _initialCatalogSetupStatus.name,
       'cashOpeningAt': _cashOpeningAt?.toIso8601String(),
       'cashOpeningBalancePesos': _cashOpeningBalancePesos,
       'cashClosingAt': _cashClosingAt?.toIso8601String(),
@@ -1322,7 +1213,6 @@ class CommerceStore extends ChangeNotifier {
   }
 
   Future<void> restoreSnapshot(Map<String, dynamic> snapshot) async {
-    _ensureFeatureAvailable(LockedFeature.restore);
     final parsed = _parseSnapshot(snapshot);
     await _runPersistedMutation(() {
       _applySnapshot(parsed);
@@ -1336,7 +1226,7 @@ class CommerceStore extends ChangeNotifier {
           cashImpactOverridePesos: 0,
           estimatedProfitImpactOverridePesos: 0,
           createdAt: DateTime.now(),
-          title: 'Restauracion de backup',
+          title: 'Restauración de backup',
           subtitle: 'Estado restaurado correctamente',
         ),
       );
@@ -1361,18 +1251,20 @@ class CommerceStore extends ChangeNotifier {
     final productBarcodes = <String>{};
     final validatedProducts = <Product>[];
     for (final product in products) {
-      final valid = _validateProduct(
+      var valid = _validateProduct(
         product,
         allowZeroPrice: true,
         allowZeroCost: true,
         againstProducts: validatedProducts,
       );
       if (!productIds.add(valid.id)) {
-        throw StateError('Hay productos duplicados en el backup.');
+        do {
+          valid = valid.copyWith(id: _buildId('product'));
+        } while (!productIds.add(valid.id));
       }
       final barcode = valid.barcode;
       if (barcode != null && !productBarcodes.add(barcode)) {
-        throw StateError('Hay codigos de barras duplicados en el backup.');
+        throw StateError('Hay códigos de barras duplicados en el backup.');
       }
       validatedProducts.add(valid);
     }
@@ -1388,14 +1280,6 @@ class CommerceStore extends ChangeNotifier {
       movements: movements,
       dismissedFreeSaleSuggestions: _readStringSet(
         snapshot['dismissedFreeSaleSuggestions'],
-      ),
-      onboardingTutorialStatus: _readOnboardingTutorialStatus(
-        snapshot['onboardingTutorialStatus'],
-        hasExistingData: validatedProducts.isNotEmpty || movements.isNotEmpty,
-      ),
-      initialCatalogSetupStatus: _readInitialCatalogSetupStatus(
-        snapshot['initialCatalogSetupStatus'],
-        hasExistingData: validatedProducts.isNotEmpty || movements.isNotEmpty,
       ),
       cashOpeningAt: _readDate(snapshot['cashOpeningAt']),
       cashOpeningBalancePesos: (snapshot['cashOpeningBalancePesos'] as num?)
@@ -1437,38 +1321,6 @@ class CommerceStore extends ChangeNotifier {
         .toSet();
   }
 
-  OnboardingTutorialStatus _readOnboardingTutorialStatus(
-    dynamic raw, {
-    required bool hasExistingData,
-  }) {
-    if (raw is String) {
-      for (final status in OnboardingTutorialStatus.values) {
-        if (status.name == raw) {
-          return status;
-        }
-      }
-    }
-    return hasExistingData
-        ? OnboardingTutorialStatus.completed
-        : OnboardingTutorialStatus.unseen;
-  }
-
-  InitialCatalogSetupStatus _readInitialCatalogSetupStatus(
-    dynamic raw, {
-    required bool hasExistingData,
-  }) {
-    if (raw is String) {
-      for (final status in InitialCatalogSetupStatus.values) {
-        if (status.name == raw) {
-          return status;
-        }
-      }
-    }
-    return hasExistingData
-        ? InitialCatalogSetupStatus.empty
-        : InitialCatalogSetupStatus.pending;
-  }
-
   Product _validateProduct(
     Product product, {
     bool allowZeroPrice = true,
@@ -1477,7 +1329,7 @@ class CommerceStore extends ChangeNotifier {
   }) {
     final normalizedBarcode = normalizeBarcode(product.barcode);
     if (product.id.trim().isEmpty) {
-      throw StateError('El producto necesita un id valido.');
+      throw StateError('El producto necesita un id válido.');
     }
     if (product.name.trim().isEmpty) {
       throw StateError('El producto necesita un nombre.');
@@ -1486,7 +1338,7 @@ class CommerceStore extends ChangeNotifier {
       throw StateError('El stock no puede ser negativo.');
     }
     if (product.minStockUnits < 0) {
-      throw StateError('El stock minimo no puede ser negativo.');
+      throw StateError('El stock mínimo no puede ser negativo.');
     }
     if (product.costPesos < 0 || (!allowZeroCost && product.costPesos == 0)) {
       throw StateError('El costo debe ser mayor a 0.');
@@ -1500,7 +1352,7 @@ class CommerceStore extends ChangeNotifier {
           existing.id != product.id &&
           existing.barcode == normalizedBarcode) {
         throw StateError(
-          'Ese codigo de barras ya esta asignado a otro producto.',
+          'Ese código de barras ya está asignado a otro producto.',
         );
       }
     }
@@ -1515,7 +1367,7 @@ class CommerceStore extends ChangeNotifier {
 
   void _validateMovement(Movement movement, Set<String> productIds) {
     if (movement.amountPesos < 0) {
-      throw StateError('Hay un movimiento con importe invalido.');
+      throw StateError('Hay un movimiento con importe inválido.');
     }
     if (movement.title.trim().isEmpty) {
       throw StateError('Hay un movimiento sin titulo.');
@@ -1530,7 +1382,7 @@ class CommerceStore extends ChangeNotifier {
           throw StateError('Hay una venta asociada a un producto inexistente.');
         }
       } else if ((movement.subtitle ?? '').trim().isEmpty) {
-        throw StateError('Hay una venta libre sin descripcion.');
+        throw StateError('Hay una venta libre sin descripción.');
       }
     }
     if (movement.kind == MovementKind.expense &&
@@ -1556,8 +1408,6 @@ class CommerceStore extends ChangeNotifier {
     _dismissedFreeSaleSuggestions
       ..clear()
       ..addAll(snapshot.dismissedFreeSaleSuggestions);
-    _onboardingTutorialStatus = snapshot.onboardingTutorialStatus;
-    _initialCatalogSetupStatus = snapshot.initialCatalogSetupStatus;
     _cashOpeningAt = snapshot.cashOpeningAt;
     _cashOpeningBalancePesos = snapshot.cashOpeningBalancePesos;
     _cashClosingAt = snapshot.cashClosingAt;
@@ -1600,9 +1450,11 @@ class CommerceStore extends ChangeNotifier {
     try {
       await _persistence.save(buildSnapshot());
     } catch (error) {
-      _lastError = 'No se pudo guardar el cambio.';
+      _lastError = error is StoreAccessException
+          ? error.userMessage
+          : 'No se pudo guardar el cambio.';
       if (kDebugMode) {
-        debugPrint('CommerceStore save failed: $error');
+        debugPrint('CommerceStore save failed: ${classifyStorageError(error)}');
       }
       rethrow;
     } finally {
@@ -1630,8 +1482,6 @@ class CommerceStore extends ChangeNotifier {
       dismissedFreeSaleSuggestions: Set<String>.of(
         _dismissedFreeSaleSuggestions,
       ),
-      onboardingTutorialStatus: _onboardingTutorialStatus,
-      initialCatalogSetupStatus: _initialCatalogSetupStatus,
       cashOpeningAt: _cashOpeningAt,
       cashOpeningBalancePesos: _cashOpeningBalancePesos,
       cashClosingAt: _cashClosingAt,
@@ -1649,8 +1499,6 @@ class CommerceStore extends ChangeNotifier {
     _dismissedFreeSaleSuggestions
       ..clear()
       ..addAll(state.dismissedFreeSaleSuggestions);
-    _onboardingTutorialStatus = state.onboardingTutorialStatus;
-    _initialCatalogSetupStatus = state.initialCatalogSetupStatus;
     _cashOpeningAt = state.cashOpeningAt;
     _cashOpeningBalancePesos = state.cashOpeningBalancePesos;
     _cashClosingAt = state.cashClosingAt;
@@ -1664,13 +1512,11 @@ class CommerceStore extends ChangeNotifier {
     );
   }
 
-  void _ensureFeatureAvailable(LockedFeature feature) {
-    final licenseService = _licenseService;
-    if (licenseService == null || licenseService.canUse(feature)) {
-      return;
-    }
-    throw LicenseRestrictionException(licenseService.blockingMessage(feature));
-  }
+  bool _isCommercialDemoProduct(Product product) =>
+      product.id.startsWith('demo-product-');
+
+  bool _isCommercialDemoMovement(Movement movement) =>
+      movement.id.startsWith('demo-');
 
   String _starterTemplateKeyForProduct(Product product) {
     return _starterTemplateKey(product.name, product.category ?? '');
@@ -1684,7 +1530,8 @@ class CommerceStore extends ChangeNotifier {
 
   String _buildId(String prefix) {
     final now = DateTime.now().microsecondsSinceEpoch;
-    return '$prefix-$now';
+    _idSequence += 1;
+    return '$prefix-$now-$_idSequence';
   }
 }
 
@@ -1705,98 +1552,28 @@ class StarterTemplateApplyResult {
   bool get fullySkipped => addedCount == 0 && skippedCount == totalCount;
 }
 
-class DailyMovementSummary {
-  const DailyMovementSummary({
-    required this.movementCount,
-    required this.salesCount,
-    required this.salesPesos,
-    required this.expenseCount,
-    required this.expensesPesos,
-    required this.recentMovements,
+class CommercialDemoApplyResult {
+  const CommercialDemoApplyResult({
+    required this.applied,
+    this.productCount = 0,
+    this.movementCount = 0,
   });
 
+  final bool applied;
+  final int productCount;
   final int movementCount;
-  final int salesCount;
-  final int salesPesos;
-  final int expenseCount;
-  final int expensesPesos;
-  final List<Movement> recentMovements;
 }
 
-class TopSellingProduct {
-  const TopSellingProduct({
-    required this.product,
-    required this.unitsSold,
-    required this.salesCount,
-    required this.revenuePesos,
-    required this.latestSoldAt,
+class CommercialDemoCleanupResult {
+  const CommercialDemoCleanupResult({
+    required this.applied,
+    required this.productCount,
+    required this.movementCount,
   });
 
-  final Product product;
-  final int unitsSold;
-  final int salesCount;
-  final int revenuePesos;
-  final DateTime latestSoldAt;
-}
-
-class UrgentRestockProduct {
-  const UrgentRestockProduct({
-    required this.product,
-    required this.stockGapUnits,
-    required this.recentUnitsSold,
-    required this.totalUnitsSold,
-    required this.latestSoldAt,
-  });
-
-  final Product product;
-  final int stockGapUnits;
-  final int recentUnitsSold;
-  final int totalUnitsSold;
-  final DateTime? latestSoldAt;
-
-  bool get hasRecentSales => recentUnitsSold > 0;
-}
-
-enum LowRotationTag { noRecentMovement, lowRotation }
-
-class LowRotationProduct {
-  const LowRotationProduct({
-    required this.product,
-    required this.tag,
-    required this.unitsSoldLast30Days,
-    required this.latestSoldAt,
-  });
-
-  final Product product;
-  final LowRotationTag tag;
-  final int unitsSoldLast30Days;
-  final DateTime? latestSoldAt;
-
-  String get statusLabel => tag == LowRotationTag.noRecentMovement
-      ? 'Sin movimiento reciente'
-      : 'Poca salida';
-}
-
-class LowRotationInsight {
-  const LowRotationInsight({
-    required this.hasEnoughHistory,
-    required this.message,
-    required this.products,
-  });
-
-  final bool hasEnoughHistory;
-  final String? message;
-  final List<LowRotationProduct> products;
-}
-
-class _TopSellingAggregate {
-  _TopSellingAggregate({required this.product});
-
-  final Product product;
-  int unitsSold = 0;
-  int salesCount = 0;
-  int revenuePesos = 0;
-  DateTime? latestSoldAt;
+  final bool applied;
+  final int productCount;
+  final int movementCount;
 }
 
 class _MutableStoreState {
@@ -1804,8 +1581,6 @@ class _MutableStoreState {
     required this.products,
     required this.movements,
     required this.dismissedFreeSaleSuggestions,
-    required this.onboardingTutorialStatus,
-    required this.initialCatalogSetupStatus,
     required this.cashOpeningAt,
     required this.cashOpeningBalancePesos,
     required this.cashClosingAt,
@@ -1815,8 +1590,6 @@ class _MutableStoreState {
   final List<Product> products;
   final List<Movement> movements;
   final Set<String> dismissedFreeSaleSuggestions;
-  final OnboardingTutorialStatus onboardingTutorialStatus;
-  final InitialCatalogSetupStatus initialCatalogSetupStatus;
   final DateTime? cashOpeningAt;
   final int? cashOpeningBalancePesos;
   final DateTime? cashClosingAt;
@@ -1828,8 +1601,6 @@ class _SnapshotData {
     required this.products,
     required this.movements,
     required this.dismissedFreeSaleSuggestions,
-    required this.onboardingTutorialStatus,
-    required this.initialCatalogSetupStatus,
     required this.cashOpeningAt,
     required this.cashOpeningBalancePesos,
     required this.cashClosingAt,
@@ -1839,8 +1610,6 @@ class _SnapshotData {
   final List<Product> products;
   final List<Movement> movements;
   final Set<String> dismissedFreeSaleSuggestions;
-  final OnboardingTutorialStatus onboardingTutorialStatus;
-  final InitialCatalogSetupStatus initialCatalogSetupStatus;
   final DateTime? cashOpeningAt;
   final int? cashOpeningBalancePesos;
   final DateTime? cashClosingAt;
@@ -1851,7 +1620,7 @@ class _SnapshotData {
       throw StateError('La apertura del backup es invalida.');
     }
     if (cashClosingBalancePesos != null && cashClosingBalancePesos! < 0) {
-      throw StateError('El cierre del backup es invalido.');
+      throw StateError('El cierre del backup es inválido.');
     }
   }
 }

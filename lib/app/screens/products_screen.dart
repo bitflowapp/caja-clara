@@ -363,11 +363,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
       return;
     }
     final messenger = ScaffoldMessenger.of(context);
+    final hasMovements = store.productHasMovements(product.id);
     final confirmed = await showDangerConfirmationDialog(
       context,
-      title: 'Eliminar producto',
-      message:
-          'Se va a eliminar "${product.name}". Si ya tiene movimientos, la app lo bloqueara para cuidar tu historial.',
+      title: '¿Eliminar producto?',
+      message: hasMovements
+          ? 'Esta acción no se puede deshacer.\n\n"${product.name}" tiene ventas o ajustes registrados. La app no lo eliminará si eso rompe el historial.'
+          : 'Esta acción no se puede deshacer.\n\nSe va a eliminar "${product.name}" del catálogo.',
       confirmLabel: 'Eliminar',
     );
     if (!confirmed || !mounted) {
@@ -1031,6 +1033,17 @@ class _ProductTile extends StatelessWidget {
                         label: const Text('Ajustar stock'),
                       ),
                     ],
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: onDelete,
+                    icon: const Icon(Icons.delete_outline_rounded),
+                    label: const Text('Eliminar'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: scheme.error,
+                      side: BorderSide(
+                        color: scheme.error.withValues(alpha: 0.38),
+                      ),
+                    ),
                   ),
                 ],
               );

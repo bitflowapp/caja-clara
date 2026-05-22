@@ -1,28 +1,22 @@
-import 'dart:async';
-
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 
 import '../screens/expense_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/products_screen.dart';
-import '../screens/barcode_scan_screen.dart';
 import '../screens/sale_screen.dart';
 import '../screens/summary_screen.dart';
 import '../models/movement.dart';
-import '../models/product.dart';
 import '../services/commerce_store.dart';
 import '../services/backup_service.dart';
 import '../services/build_info.dart';
 import '../services/excel_export_service.dart';
-import '../services/license_service.dart';
 import '../theme/bpc_colors.dart';
 import '../utils/user_facing_errors.dart';
 import 'caja_clara_brand.dart';
 import 'commerce_components.dart';
 import 'commerce_scope.dart';
-import 'license_dialogs.dart';
-import 'license_scope.dart';
+import 'input_shortcuts.dart';
 import 'operation_dialogs.dart';
 import 'product_form_dialog.dart';
 import 'quick_help_dialog.dart';
@@ -37,47 +31,20 @@ class ResponsiveShell extends StatefulWidget {
 }
 
 class _ResponsiveShellState extends State<ResponsiveShell> {
-  static const Duration _recoverableSaveBannerDuration = Duration(seconds: 8);
-
   CommerceTab _tab = CommerceTab.home;
   bool _exportingExcel = false;
   bool _applyingStarterTemplate = false;
-  bool _loadingDemoData = false;
+  bool _loadingCommercialDemo = false;
+  bool _cleaningCommercialDemo = false;
+  bool _resettingCommercialDemo = false;
+  bool _resettingAllData = false;
   bool _exportingBackup = false;
   bool _restoringBackup = false;
   bool _retryingSave = false;
   bool _undoingMovement = false;
   bool _savingCashEvent = false;
-  String? _trackedSaveIssueMessage;
-  bool _recoverableSaveBannerDismissed = false;
-  Timer? _recoverableSaveBannerTimer;
-  bool _recoverableSaveBannerTimerQueued = false;
-  bool _onboardingTutorialQueued = false;
-  bool _autoOnboardingHandled = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final saveIssueMessage = _saveIssueMessageFor(
-      CommerceScope.of(context).lastError,
-    );
-    if (saveIssueMessage != _trackedSaveIssueMessage) {
-      _trackedSaveIssueMessage = saveIssueMessage;
-      _cancelRecoverableSaveBannerTimer();
-      _recoverableSaveBannerDismissed = false;
-    }
-  }
-
-  @override
-  void dispose() {
-    _cancelRecoverableSaveBannerTimer();
-    super.dispose();
-  }
 
   Future<void> _openSale() async {
-    if (!await _ensureFeatureAccess(LockedFeature.sales) || !mounted) {
-      return;
-    }
     final message = await Navigator.of(context).push<String>(
       MaterialPageRoute<String>(builder: (_) => const SaleScreen()),
     );
@@ -87,25 +54,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     _showMovementSavedFeedback(message);
   }
 
-  Future<void> _openSaleForProduct(Product product) async {
-    if (!await _ensureFeatureAccess(LockedFeature.sales) || !mounted) {
-      return;
-    }
-    final message = await Navigator.of(context).push<String>(
-      MaterialPageRoute<String>(
-        builder: (_) => SaleScreen(initialProduct: product),
-      ),
-    );
-    if (!mounted || message == null) {
-      return;
-    }
-    _showMovementSavedFeedback(message);
-  }
-
   Future<void> _openExpense() async {
-    if (!await _ensureFeatureAccess(LockedFeature.expenses) || !mounted) {
-      return;
-    }
     final message = await Navigator.of(context).push<String>(
       MaterialPageRoute<String>(builder: (_) => const ExpenseScreen()),
     );
@@ -115,66 +64,16 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     _showMovementSavedFeedback(message);
   }
 
-  void _openBarcodeScan() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const BarcodeScanScreen()));
-  }
-
   void _openProducts() {
     setState(() => _tab = CommerceTab.products);
   }
 
+  void _openCash() {
+    setState(() => _tab = CommerceTab.summary);
+  }
+
   Future<void> _openQuickHelp() async {
-    final result = await showQuickHelpDialog(context);
-    await _handleQuickHelpResult(result);
-  }
-
-  Future<void> _handleQuickHelpResult(QuickHelpDialogResult? result) async {
-    if (!mounted || result == null) {
-      return;
-    }
-    final store = CommerceScope.of(context);
-    if (result == QuickHelpDialogResult.completed) {
-      if (store.onboardingTutorialStatus !=
-          OnboardingTutorialStatus.completed) {
-        await store.completeOnboardingTutorial();
-      }
-      return;
-    }
-    if (store.onboardingTutorialStatus == OnboardingTutorialStatus.unseen) {
-      await store.dismissOnboardingTutorial();
-    }
-  }
-
-  void _queueOnboardingTutorialIfNeeded(CommerceStore store) {
-    if (!store.shouldPromptOnboardingTutorial ||
-        _autoOnboardingHandled ||
-        _onboardingTutorialQueued) {
-      return;
-    }
-    _onboardingTutorialQueued = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      _onboardingTutorialQueued = false;
-      if (!mounted || _autoOnboardingHandled) {
-        return;
-      }
-      final currentStore = CommerceScope.of(context);
-      if (!currentStore.shouldPromptOnboardingTutorial) {
-        return;
-      }
-      _autoOnboardingHandled = true;
-      final result = await showQuickHelpDialog(context);
-      await _handleQuickHelpResult(result);
-    });
-  }
-
-  Future<bool> _ensureFeatureAccess(LockedFeature feature) {
-    return ensureLicenseAccess(context, feature);
-  }
-
-  Future<void> _openLicenseManagement() {
-    return showLicenseManagementDialog(context);
+    await showQuickHelpDialog(context);
   }
 
   void _showMovementSavedFeedback(String message) {
@@ -222,8 +121,8 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       SnackBar(
         content: Text(
           result.kind == ProductEditorResultKind.created
-              ? '"${result.product.name}" ya quedo en el catalogo.'
-              : 'Usaras "${result.product.name}", que ya estaba en el catalogo.',
+              ? '"${result.product.name}" ya se sumó al catálogo.'
+              : 'Vas a usar "${result.product.name}" que ya existía en el catálogo.',
         ),
         behavior: SnackBarBehavior.floating,
       ),
@@ -325,81 +224,289 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     }
   }
 
-  bool _isRecoverableSaveIssue(String? lastError) {
-    return lastError == 'No se pudo guardar el cambio.';
-  }
-
-  String? _saveIssueTitleFor(String? lastError) {
-    if (lastError == null) {
-      return null;
-    }
-    return _isRecoverableSaveIssue(lastError)
-        ? 'Guardado pendiente'
-        : 'Revisa el guardado';
-  }
-
-  String? _saveIssueMessageFor(String? lastError) {
-    if (lastError == null) {
-      return null;
-    }
-    return _isRecoverableSaveIssue(lastError)
-        ? 'El ultimo cambio no pudo guardarse. Puedes reintentarlo desde aqui.'
-        : lastError;
-  }
-
-  void _cancelRecoverableSaveBannerTimer() {
-    _recoverableSaveBannerTimer?.cancel();
-    _recoverableSaveBannerTimer = null;
-    _recoverableSaveBannerTimerQueued = false;
-  }
-
-  void _dismissRecoverableSaveBanner() {
-    _cancelRecoverableSaveBannerTimer();
-    if (!mounted) {
-      return;
-    }
-    setState(() => _recoverableSaveBannerDismissed = true);
-  }
-
-  void _syncRecoverableSaveBanner({
-    required bool wide,
-    required bool hasIssue,
-    required bool isRecoverable,
-  }) {
-    final shouldAutoDismiss = wide && hasIssue && isRecoverable;
-    if (!shouldAutoDismiss) {
-      _cancelRecoverableSaveBannerTimer();
-      return;
-    }
-    if (_recoverableSaveBannerDismissed ||
-        _recoverableSaveBannerTimer != null ||
-        _recoverableSaveBannerTimerQueued) {
+  Future<void> _loadCommercialDemo() async {
+    if (_loadingCommercialDemo) {
       return;
     }
 
-    _recoverableSaveBannerTimerQueued = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _recoverableSaveBannerTimerQueued = false;
-      if (!mounted ||
-          _recoverableSaveBannerDismissed ||
-          _recoverableSaveBannerTimer != null) {
+    final messenger = ScaffoldMessenger.of(context);
+    final store = CommerceScope.of(context);
+
+    if (!store.canLoadCommercialDemo) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Los datos de demo solo se cargan cuando la app está vacía.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _loadingCommercialDemo = true);
+    try {
+      final result = await store.loadCommercialDemo();
+      if (!mounted) {
         return;
       }
-      _recoverableSaveBannerTimer = Timer(_recoverableSaveBannerDuration, () {
-        if (!mounted) {
-          return;
-        }
-        setState(() => _recoverableSaveBannerDismissed = true);
-        _recoverableSaveBannerTimer = null;
-      });
-    });
+      if (!result.applied) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Los datos de demo no se cargaron.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Listo. Ahora probá registrar una venta.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'No se pudo cargar la demo: ${userFacingErrorMessage(error)}',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loadingCommercialDemo = false);
+      }
+    }
+  }
+
+  Future<void> _resetCommercialDemo() async {
+    if (_resettingCommercialDemo) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reiniciar demo'),
+        content: const Text(
+          'Se reemplazan los datos actuales por un ejemplo neutro listo para mostrar. Esta acción no usa datos personales.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.restart_alt_rounded),
+            label: const Text('Reiniciar demo'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    final store = CommerceScope.of(context);
+    setState(() => _resettingCommercialDemo = true);
+    try {
+      final result = await store.resetCommercialDemo();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _tab = CommerceTab.home);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Demo lista: ${result.productCount} productos y ${result.movementCount} movimientos.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'No se pudo reiniciar la demo: ${userFacingErrorMessage(error)}',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _resettingCommercialDemo = false);
+      }
+    }
+  }
+
+  Future<void> _cleanCommercialDemoData() async {
+    if (_cleaningCommercialDemo) {
+      return;
+    }
+
+    final confirmed = await showDangerConfirmationDialog(
+      context,
+      title: 'Limpiar datos de demo',
+      message:
+          'Se eliminarán los datos de ejemplo cargados para probar Caja Clara. Tus datos reales no deberían verse afectados.',
+      confirmLabel: 'Limpiar demo',
+    );
+    if (!confirmed || !mounted) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    final store = CommerceScope.of(context);
+    setState(() => _cleaningCommercialDemo = true);
+    try {
+      final result = await store.cleanCommercialDemoData();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _tab = CommerceTab.home);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            result.applied
+                ? 'Datos de demo limpiados: ${result.productCount} productos y ${result.movementCount} movimientos.'
+                : 'No había datos de demo identificables para limpiar.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'No se pudo limpiar la demo: ${userFacingErrorMessage(error)}',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _cleaningCommercialDemo = false);
+      }
+    }
+  }
+
+  Future<void> _resetAllData() async {
+    if (_resettingAllData) {
+      return;
+    }
+
+    final confirmed = await _showTypedResetConfirmation();
+    if (!confirmed || !mounted) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    final store = CommerceScope.of(context);
+    setState(() => _resettingAllData = true);
+    try {
+      await store.resetAllData();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _tab = CommerceTab.home);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Caja Clara quedó lista para empezar.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'No se pudo restablecer Caja Clara: ${userFacingErrorMessage(error)}',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _resettingAllData = false);
+      }
+    }
+  }
+
+  Future<bool> _showTypedResetConfirmation() async {
+    final controller = TextEditingController();
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        var canReset = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Restablecer Caja Clara'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Esto eliminará productos, ventas, gastos y movimientos guardados en este dispositivo.',
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: controller,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Escribí RESTABLECER',
+                    ),
+                    textInputAction: TextInputAction.done,
+                    onChanged: (value) {
+                      setDialogState(() => canReset = value == 'RESTABLECER');
+                    },
+                    onSubmitted: (_) {
+                      if (canReset) {
+                        Navigator.of(context).pop(true);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton.icon(
+                  onPressed: canReset
+                      ? () => Navigator.of(context).pop(true)
+                      : null,
+                  icon: const Icon(Icons.delete_forever_rounded),
+                  label: const Text('Restablecer'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    controller.dispose();
+    return result ?? false;
   }
 
   Future<void> _applyStarterTemplate() async {
     if (_applyingStarterTemplate) {
-      return;
-    }
-    if (!await _ensureFeatureAccess(LockedFeature.templates) || !mounted) {
       return;
     }
 
@@ -418,10 +525,10 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         SnackBar(
           content: Text(
             result.fullySkipped
-                ? 'La base simple ya estaba cargada.'
+                ? 'La plantilla kiosco ya estaba cargada.'
                 : result.skippedCount == 0
-                ? 'Base simple cargada: ${result.addedCount} productos nuevos.'
-                : 'Base simple cargada: ${result.addedCount} nuevos y ${result.skippedCount} repetidos salteados.',
+                ? 'Plantilla kiosco cargada: ${result.addedCount} productos nuevos.'
+                : 'Plantilla kiosco cargada: ${result.addedCount} nuevos y ${result.skippedCount} repetidos salteados.',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -441,77 +548,6 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     } finally {
       if (mounted) {
         setState(() => _applyingStarterTemplate = false);
-      }
-    }
-  }
-
-  Future<void> _chooseEmptyCatalogStart() async {
-    final store = CommerceScope.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      await store.chooseEmptyCatalogStart();
-      if (!mounted) {
-        return;
-      }
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Listo. Ya puedes cargar tu primer producto.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(userFacingErrorMessage(error)),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
-
-  Future<void> _loadDemoData() async {
-    if (_loadingDemoData) {
-      return;
-    }
-    if (!await _ensureFeatureAccess(LockedFeature.demoData) || !mounted) {
-      return;
-    }
-
-    final messenger = ScaffoldMessenger.of(context);
-    final store = CommerceScope.of(context);
-
-    setState(() => _loadingDemoData = true);
-    try {
-      await store.loadDemoData();
-      if (!mounted) {
-        return;
-      }
-
-      setState(() => _tab = CommerceTab.home);
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Ejemplo cargado. Ya puedes probar ventas, productos y caja.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(userFacingErrorMessage(error)),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _loadingDemoData = false);
       }
     }
   }
@@ -582,14 +618,14 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       if (result.saved) {
         messenger.showSnackBar(
           SnackBar(
-            content: Text('Respaldo guardado en ${result.path}'),
+            content: Text('Backup guardado en ${result.path}'),
             behavior: SnackBarBehavior.floating,
           ),
         );
       } else if (result.downloaded) {
         messenger.showSnackBar(
           const SnackBar(
-            content: Text('Descarga del respaldo iniciada'),
+            content: Text('Descarga de backup iniciada'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -601,7 +637,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            'No se pudo guardar el respaldo: ${userFacingErrorMessage(error)}',
+            'No se pudo exportar el backup: ${userFacingErrorMessage(error)}',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -615,9 +651,6 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
 
   Future<void> _restoreBackup() async {
     if (_restoringBackup) {
-      return;
-    }
-    if (!await _ensureFeatureAccess(LockedFeature.restore) || !mounted) {
       return;
     }
 
@@ -634,9 +667,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
 
       final confirmed = await showDangerConfirmationDialog(
         context,
-        title: 'Restaurar respaldo',
+        title: 'Restaurar backup',
         message:
-            'Se reemplazara el estado actual por el contenido de ${importData.fileName}. Esta accion no se puede revertir.',
+            'Se reemplazará el estado actual por el contenido de ${importData.fileName}. Esta acción no se puede revertir.',
         confirmLabel: 'Restaurar',
       );
       if (!confirmed || !mounted) {
@@ -649,7 +682,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       }
       messenger.showSnackBar(
         SnackBar(
-          content: Text('Respaldo restaurado desde ${importData.fileName}'),
+          content: Text('Backup restaurado desde ${importData.fileName}'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -660,7 +693,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            'No se pudo restaurar el respaldo: ${userFacingErrorMessage(error)}',
+            'No se pudo restaurar el backup: ${userFacingErrorMessage(error)}',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -676,9 +709,6 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     if (_undoingMovement) {
       return;
     }
-    if (!await _ensureFeatureAccess(LockedFeature.cash) || !mounted) {
-      return;
-    }
 
     final messenger = ScaffoldMessenger.of(context);
     final store = CommerceScope.of(context);
@@ -690,9 +720,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     if (!skipConfirmation) {
       final confirmed = await showDangerConfirmationDialog(
         context,
-        title: 'Deshacer ultimo movimiento',
+        title: 'Deshacer último movimiento',
         message:
-            'Se va a deshacer "${movement.title}". Si fue una venta, tambien se repone el stock.',
+            'Se va a deshacer "${movement.title}". Si fue una venta, también se repone el stock.',
         confirmLabel: 'Deshacer',
       );
       if (!confirmed) {
@@ -708,7 +738,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       }
       messenger.showSnackBar(
         const SnackBar(
-          content: Text('Ultimo movimiento deshecho'),
+          content: Text('Último movimiento deshecho'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -735,9 +765,6 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     if (_savingCashEvent) {
       return;
     }
-    if (!await _ensureFeatureAccess(LockedFeature.cash) || !mounted) {
-      return;
-    }
 
     final messenger = ScaffoldMessenger.of(context);
     final store = CommerceScope.of(context);
@@ -748,9 +775,8 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
           : 'Apertura de caja',
       label: 'Caja inicial',
       confirmLabel: store.hasCashOpeningToday ? 'Actualizar' : 'Guardar',
-      helper: 'Efectivo con el que arrancas. Puede ser 0.',
+      helper: 'Ingresá el efectivo inicial del día.',
       initialValue: store.todayOpeningCashPesos,
-      allowZero: true,
     );
     if (amount == null) {
       return;
@@ -765,7 +791,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         context,
         title: 'Reemplazar apertura',
         message:
-            'Ya existe una apertura registrada hoy. Se reemplazara la apertura y se limpiara el cierre del dia.',
+            'Ya existe una apertura registrada hoy. Se reemplazará la apertura y se limpiará el cierre del día.',
         confirmLabel: 'Reemplazar',
       );
       if (!overwrite) {
@@ -809,9 +835,6 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     if (_savingCashEvent) {
       return;
     }
-    if (!await _ensureFeatureAccess(LockedFeature.cash) || !mounted) {
-      return;
-    }
 
     final messenger = ScaffoldMessenger.of(context);
     final store = CommerceScope.of(context);
@@ -820,9 +843,8 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       title: store.hasCashClosingToday ? 'Actualizar cierre' : 'Cierre de caja',
       label: 'Caja contada',
       confirmLabel: store.hasCashClosingToday ? 'Actualizar' : 'Guardar',
-      helper: 'Monto contado al cierre. Puede ser 0.',
+      helper: 'Ingresá el monto contado al cierre.',
       initialValue: store.todayClosingCashPesos,
-      allowZero: true,
     );
     if (amount == null) {
       return;
@@ -837,7 +859,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         context,
         title: 'Reemplazar cierre',
         message:
-            'Ya existe un cierre registrado hoy. Se reemplazara por el nuevo valor.',
+            'Ya existe un cierre registrado hoy. Se reemplazará por el nuevo valor.',
         confirmLabel: 'Reemplazar',
       );
       if (!overwrite) {
@@ -880,35 +902,32 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
   @override
   Widget build(BuildContext context) {
     final store = CommerceScope.of(context);
-    final license = LicenseScope.of(context);
-    _queueOnboardingTutorialIfNeeded(store);
     final pages = <CommerceTab, Widget>{
       CommerceTab.home: HomeScreen(
-        onRegisterCashOpening: _registerCashOpening,
         onNewSale: _openSale,
         onNewExpense: _openExpense,
-        onScanProduct: _openBarcodeScan,
         onOpenProducts: _openProducts,
+        onOpenCash: _openCash,
+        onOpenCashRegister: _registerCashOpening,
         onExportExcel: _exportExcel,
+        exportingExcel: _exportingExcel,
         onApplyStarterTemplate: _applyStarterTemplate,
-        onLoadDemoData: _loadDemoData,
-        onChooseEmptyCatalogStart: _chooseEmptyCatalogStart,
+        onLoadCommercialDemo: _loadCommercialDemo,
+        onCleanCommercialDemo: _cleanCommercialDemoData,
+        onResetCommercialDemo: _resetCommercialDemo,
+        onResetAllData: _resetAllData,
         onCreateProductFromFreeSale: _createProductFromFreeSale,
         onCreateProductFromSuggestion: _createProductFromSuggestion,
         onDismissFreeSaleSuggestion: _dismissFreeSaleSuggestion,
-        exportingExcel: _exportingExcel,
         applyingStarterTemplate: _applyingStarterTemplate,
-        loadingDemoData: _loadingDemoData,
-        hasCashOpeningToday: store.hasCashOpeningToday,
-        savingCashEvent: _savingCashEvent,
+        loadingCommercialDemo: _loadingCommercialDemo,
+        cleaningCommercialDemo: _cleaningCommercialDemo,
+        resettingCommercialDemo: _resettingCommercialDemo,
+        resettingAllData: _resettingAllData,
       ),
       CommerceTab.products: ProductsScreen(
         onApplyStarterTemplate: _applyStarterTemplate,
         applyingStarterTemplate: _applyingStarterTemplate,
-        onLoadDemoData: _loadDemoData,
-        loadingDemoData: _loadingDemoData,
-        onChooseEmptyCatalogStart: _chooseEmptyCatalogStart,
-        onSellProduct: _openSaleForProduct,
       ),
       CommerceTab.summary: SummaryScreen(
         onExportExcel: _exportExcel,
@@ -933,165 +952,108 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         final wide = constraints.maxWidth >= 980;
         final page = pages[_tab]!;
         final lowStockCount = store.lowStockCount;
-        final hasSaveIssue = store.lastError != null;
-        final isRecoverableSaveIssue = _isRecoverableSaveIssue(store.lastError);
-        final saveIssueTitle = _saveIssueTitleFor(store.lastError);
-        final saveIssueMessage = _saveIssueMessageFor(store.lastError);
-        final canCollapseSaveBanner = wide && isRecoverableSaveIssue;
-        _syncRecoverableSaveBanner(
-          wide: wide,
-          hasIssue: saveIssueMessage != null,
-          isRecoverable: isRecoverableSaveIssue,
-        );
-        final showSaveIssueBanner =
-            saveIssueMessage != null &&
-            (!canCollapseSaveBanner || !_recoverableSaveBannerDismissed);
-        final saveStatusLabel = hasSaveIssue
-            ? isRecoverableSaveIssue
-                  ? 'Pendiente de guardado'
-                  : 'Revisa el guardado'
-            : store.isSaving
-            ? 'Guardando'
-            : 'Todo guardado';
-        final saveStatusColor = hasSaveIssue
-            ? BpcColors.expenseSoft
-            : store.isSaving
-            ? BpcColors.sandMuted
-            : BpcColors.income;
-        final saveStatusIcon = hasSaveIssue
-            ? Icons.sync_problem_rounded
-            : store.isSaving
-            ? Icons.sync_rounded
-            : Icons.check_circle_outline_rounded;
-        final helpActionLabel = store.isEmptyState ? 'Primeros pasos' : 'Ayuda';
-        final helpActionIcon = store.isEmptyState
-            ? Icons.auto_stories_rounded
-            : Icons.help_outline_rounded;
 
         if (wide) {
           return Scaffold(
             body: SafeArea(
               child: Row(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 0, 16),
-                    child: SizedBox(
-                      width: 230,
-                      child: Column(
-                        children: [
-                          const Padding(
-                            padding: EdgeInsets.fromLTRB(6, 6, 6, 14),
+                  Container(
+                    width: 238,
+                    margin: const EdgeInsets.fromLTRB(16, 16, 0, 16),
+                    decoration: BoxDecoration(
+                      color: BpcColors.surface.withValues(alpha: 0.88),
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(color: BpcColors.line),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: BpcColors.shadow,
+                          blurRadius: 14,
+                          offset: Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
+                          child: const Padding(
+                            padding: EdgeInsets.fromLTRB(2, 4, 2, 6),
                             child: _RailBrand(),
                           ),
-                          Expanded(
-                            child: NavigationRail(
-                              selectedIndex: _tab.index,
-                              onDestinationSelected: (index) {
-                                setState(
-                                  () => _tab = CommerceTab.values[index],
-                                );
-                              },
-                              labelType: NavigationRailLabelType.all,
-                              leading: const SizedBox(height: 2),
-                              groupAlignment: -0.88,
-                              backgroundColor: Colors.transparent,
-                              destinations: [
-                                const NavigationRailDestination(
-                                  icon: Icon(Icons.home_outlined),
-                                  selectedIcon: Icon(Icons.home_rounded),
-                                  label: Text('Inicio'),
+                        ),
+                        Expanded(
+                          child: NavigationRail(
+                            selectedIndex: _tab.index,
+                            onDestinationSelected: (index) {
+                              setState(() => _tab = CommerceTab.values[index]);
+                            },
+                            labelType: NavigationRailLabelType.all,
+                            leading: const SizedBox(height: 2),
+                            groupAlignment: -0.88,
+                            backgroundColor: Colors.transparent,
+                            destinations: [
+                              const NavigationRailDestination(
+                                icon: Icon(Icons.home_outlined),
+                                selectedIcon: Icon(Icons.home_rounded),
+                                label: Text('Inicio'),
+                              ),
+                              NavigationRailDestination(
+                                icon: _ProductsIconBadge(count: lowStockCount),
+                                selectedIcon: _ProductsIconBadge(
+                                  count: lowStockCount,
+                                  selected: true,
                                 ),
-                                NavigationRailDestination(
-                                  icon: _ProductsIconBadge(
-                                    count: lowStockCount,
-                                  ),
-                                  selectedIcon: _ProductsIconBadge(
-                                    count: lowStockCount,
-                                    selected: true,
-                                  ),
-                                  label: const Text('Productos'),
+                                label: const Text('Productos'),
+                              ),
+                              const NavigationRailDestination(
+                                icon: Icon(
+                                  Icons.account_balance_wallet_outlined,
                                 ),
-                                const NavigationRailDestination(
-                                  icon: Icon(
-                                    Icons.account_balance_wallet_outlined,
-                                  ),
-                                  selectedIcon: Icon(
-                                    Icons.account_balance_wallet_rounded,
-                                  ),
-                                  label: Text('Caja'),
+                                selectedIcon: Icon(
+                                  Icons.account_balance_wallet_rounded,
                                 ),
-                              ],
-                            ),
+                                label: Text('Caja'),
+                              ),
+                            ],
                           ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(6, 0, 6, 0),
-                            child: _RailSystemFooter(
-                              saveStatusLabel: saveStatusLabel,
-                              saveStatusColor: saveStatusColor,
-                              saveStatusIcon: saveStatusIcon,
-                            ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                          child: _SaveStatusChip(store: store),
+                        ),
+                        if (InputShortcutScope.demoControlsEnabled) ...[
+                          const SizedBox(height: 10),
+                          const Padding(
+                            padding: EdgeInsets.fromLTRB(14, 0, 14, 14),
+                            child: _BuildInfoStrip(),
                           ),
                         ],
-                      ),
+                      ],
                     ),
-                  ),
-                  Container(
-                    width: 1,
-                    margin: const EdgeInsets.fromLTRB(18, 20, 0, 20),
-                    color: BpcColors.line,
                   ),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(22, 16, 18, 16),
+                      padding: const EdgeInsets.fromLTRB(20, 16, 18, 16),
                       child: Column(
                         children: [
+                          if (store.lastError != null) ...[
+                            _SaveErrorBanner(
+                              message: store.lastError!,
+                              retrying: _retryingSave || store.isSaving,
+                              onRetry: _retrySave,
+                            ),
+                            const SizedBox(height: 10),
+                          ],
                           Align(
                             alignment: Alignment.centerRight,
-                            child: _ShellUtilityActions(
-                              showLicenseAction: license.shouldShowLicenseUi,
-                              licenseActionLabel: license.isActivated
-                                  ? 'Licencia'
-                                  : 'Activar Caja Clara',
-                              onLicenseAction: _openLicenseManagement,
-                              helpActionLabel: helpActionLabel,
-                              helpActionIcon: helpActionIcon,
-                              onHelp: _openQuickHelp,
+                            child: TextButton.icon(
+                              onPressed: _openQuickHelp,
+                              icon: const Icon(Icons.help_outline_rounded),
+                              label: const Text('Ayuda'),
                             ),
                           ),
-                          if (showSaveIssueBanner) ...[
-                            const SizedBox(height: 10),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 620,
-                                ),
-                                child: _SaveErrorBanner(
-                                  title: saveIssueTitle!,
-                                  message: saveIssueMessage,
-                                  retrying: _retryingSave || store.isSaving,
-                                  onRetry: _retrySave,
-                                  onDismiss: canCollapseSaveBanner
-                                      ? _dismissRecoverableSaveBanner
-                                      : null,
-                                ),
-                              ),
-                            ),
-                          ],
                           const SizedBox(height: 6),
-                          if (license.shouldShowLicenseUi &&
-                              license.status != LicenseStatus.active) ...[
-                            _LicenseStatusBanner(
-                              licenseService: license,
-                              onManage: _openLicenseManagement,
-                            ),
-                            SizedBox(
-                              height:
-                                  license.status == LicenseStatus.trialActive
-                                  ? 6
-                                  : 10,
-                            ),
-                          ],
                           Expanded(child: page),
                         ],
                       ),
@@ -1109,44 +1071,23 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
               child: Column(
                 children: [
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: _ShellUtilityActions(
-                      showLicenseAction: license.shouldShowLicenseUi,
-                      licenseActionLabel: license.isActivated
-                          ? 'Licencia'
-                          : 'Activar Caja Clara',
-                      onLicenseAction: _openLicenseManagement,
-                      helpActionLabel: helpActionLabel,
-                      helpActionIcon: helpActionIcon,
-                      onHelp: _openQuickHelp,
-                    ),
-                  ),
-                  if (showSaveIssueBanner) ...[
-                    const SizedBox(height: 10),
+                  if (store.lastError != null) ...[
                     _SaveErrorBanner(
-                      title: saveIssueTitle!,
-                      message: saveIssueMessage,
+                      message: store.lastError!,
                       retrying: _retryingSave || store.isSaving,
                       onRetry: _retrySave,
                     ),
                     const SizedBox(height: 10),
                   ],
-                  const SizedBox(height: 6),
-                  if (license.shouldShowLicenseUi &&
-                      license.status != LicenseStatus.active) ...[
-                    _LicenseStatusBanner(
-                      licenseService: license,
-                      onManage: _openLicenseManagement,
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: _openQuickHelp,
+                      icon: const Icon(Icons.help_outline_rounded),
+                      label: const Text('Ayuda'),
                     ),
-                    SizedBox(
-                      height: license.status == LicenseStatus.trialActive
-                          ? 6
-                          : 10,
-                    ),
-                  ],
-                  const _BuildInfoStrip(),
-                  const SizedBox(height: 8),
+                  ),
+                  const SizedBox(height: 4),
                   Expanded(child: page),
                 ],
               ),
@@ -1180,300 +1121,6 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
           ),
         );
       },
-    );
-  }
-}
-
-class _ShellUtilityActions extends StatelessWidget {
-  const _ShellUtilityActions({
-    required this.showLicenseAction,
-    required this.licenseActionLabel,
-    required this.onLicenseAction,
-    required this.helpActionLabel,
-    required this.helpActionIcon,
-    required this.onHelp,
-  });
-
-  final bool showLicenseAction;
-  final String licenseActionLabel;
-  final Future<void> Function() onLicenseAction;
-  final String helpActionLabel;
-  final IconData helpActionIcon;
-  final Future<void> Function() onHelp;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      alignment: WrapAlignment.end,
-      children: [
-        if (showLicenseAction)
-          TextButton.icon(
-            onPressed: () => onLicenseAction(),
-            icon: const Icon(Icons.verified_user_rounded),
-            label: Text(licenseActionLabel),
-          ),
-        TextButton.icon(
-          onPressed: () => onHelp(),
-          icon: Icon(helpActionIcon),
-          label: Text(helpActionLabel),
-        ),
-      ],
-    );
-  }
-}
-
-class _RailSystemFooter extends StatelessWidget {
-  const _RailSystemFooter({
-    required this.saveStatusLabel,
-    required this.saveStatusColor,
-    required this.saveStatusIcon,
-  });
-
-  final String saveStatusLabel;
-  final Color saveStatusColor;
-  final IconData saveStatusIcon;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final text = BuildInfo.footerText;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(0, 10, 0, 6),
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.34)),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(saveStatusIcon, size: 14, color: saveStatusColor),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  saveStatusLabel,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: BpcColors.ink,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          _BuildInfoStrip(
-            dense: true,
-            leadingIcon: false,
-            text: text,
-            copySnackLabel: 'Datos de soporte copiados',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LicenseStatusBanner extends StatelessWidget {
-  const _LicenseStatusBanner({
-    required this.licenseService,
-    required this.onManage,
-  });
-
-  final LicenseService licenseService;
-  final Future<void> Function() onManage;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final expired = licenseService.isTrialExpired;
-    final accent = expired ? scheme.error : scheme.primary;
-    final chipLabel = expired
-        ? 'Solo lectura'
-        : '${licenseService.trialDaysRemaining} ${licenseService.trialDaysRemaining == 1 ? 'dia' : 'dias'} restantes';
-
-    if (!expired) {
-      final summary =
-          'Puedes activar cuando quieras. Tus datos siguen guardados en esta PC.';
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(4, 2, 4, 10),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: scheme.outlineVariant.withValues(alpha: 0.3),
-            ),
-          ),
-        ),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final compact = constraints.maxWidth < 760;
-            final manageButton = TextButton.icon(
-              onPressed: () => onManage(),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-              ),
-              icon: const Icon(Icons.key_rounded, size: 18),
-              label: const Text('Ver activacion'),
-            );
-            final body = Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      licenseService.statusHeadline,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: BpcColors.ink,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.09),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        chipLabel,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: accent,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  summary,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: scheme.outline,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            );
-
-            if (compact) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [body, const SizedBox(height: 4), manageButton],
-              );
-            }
-
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: body),
-                const SizedBox(width: 12),
-                manageButton,
-              ],
-            );
-          },
-        ),
-      );
-    }
-
-    return BpcPanel(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      color: expired
-          ? scheme.errorContainer.withValues(alpha: 0.54)
-          : scheme.surfaceContainerLow,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 760;
-          final manageButton = FilledButton.icon(
-            onPressed: () => onManage(),
-            style: compact
-                ? FilledButton.styleFrom(minimumSize: const Size.fromHeight(48))
-                : null,
-            icon: const Icon(Icons.key_rounded),
-            label: Text(expired ? 'Activar Caja Clara' : 'Ver activacion'),
-          );
-          final body = Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(
-                    licenseService.statusHeadline,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: accent.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      chipLabel,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: accent,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                licenseService.statusDescription,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: scheme.outline,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                licenseService.positioningMessage,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: scheme.outline,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          );
-
-          if (compact) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [body, const SizedBox(height: 14), manageButton],
-            );
-          }
-
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: body),
-              const SizedBox(width: 16),
-              manageButton,
-            ],
-          );
-        },
-      ),
     );
   }
 }
@@ -1529,28 +1176,27 @@ class _RailBrand extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Container(
-              width: 46,
-              height: 46,
-              padding: const EdgeInsets.all(5),
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
-                color: Color.alphaBlend(
-                  scheme.primary.withValues(alpha: 0.07),
-                  BpcColors.surface,
-                ),
+                color: BpcColors.accentStrong,
                 borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: BpcColors.accentStrong.withValues(alpha: 0.24),
+                    blurRadius: 18,
+                    offset: const Offset(0, 9),
+                  ),
+                ],
               ),
               alignment: Alignment.center,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: const CajaClaraSmallMark(size: 36),
-              ),
+              child: const CajaClaraSymbol(size: 29),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -1559,17 +1205,22 @@ class _RailBrand extends StatelessWidget {
                 children: [
                   Text(
                     'Caja Clara',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleMedium?.copyWith(
                       color: BpcColors.ink,
                       fontWeight: FontWeight.w900,
+                      letterSpacing: -0.35,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Caja, ventas, stock y codigos',
+                    'Luna Systems',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: BpcColors.subtleInk,
-                      fontWeight: FontWeight.w700,
+                      color: BpcColors.accentStrong,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ],
@@ -1577,12 +1228,13 @@ class _RailBrand extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 14),
         Text(
-          'Listo para mostrador',
-          style: theme.textTheme.labelMedium?.copyWith(
+          'Ventas, gastos y caja en un solo lugar.',
+          style: theme.textTheme.bodySmall?.copyWith(
             color: BpcColors.mutedInk,
             fontWeight: FontWeight.w800,
+            height: 1.25,
           ),
         ),
       ],
@@ -1590,132 +1242,98 @@ class _RailBrand extends StatelessWidget {
   }
 }
 
-class _SaveErrorBanner extends StatelessWidget {
-  const _SaveErrorBanner({
-    required this.title,
-    required this.message,
-    required this.retrying,
-    required this.onRetry,
-    this.onDismiss,
-  });
+/// Indicador discreto de guardado: refleja el estado real del store.
+class _SaveStatusChip extends StatelessWidget {
+  const _SaveStatusChip({required this.store});
 
-  final String title;
-  final String message;
-  final bool retrying;
-  final VoidCallback onRetry;
-  final VoidCallback? onDismiss;
+  final CommerceStore store;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final panelColor = Color.alphaBlend(
-      BpcColors.sandSoft.withValues(alpha: 0.44),
-      BpcColors.surface,
+    final Color color;
+    final String label;
+    final IconData icon;
+    if (store.lastError != null) {
+      color = BpcColors.expense;
+      label = 'Guardado con problema';
+      icon = Icons.error_outline_rounded;
+    } else if (store.isSaving) {
+      color = BpcColors.warning;
+      label = 'Guardando...';
+      icon = Icons.sync_rounded;
+    } else {
+      color = BpcColors.accentStrong;
+      label = 'Todo guardado';
+      icon = Icons.cloud_done_rounded;
+    }
+
+    final saved = store.lastError == null && !store.isSaving;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+      decoration: BoxDecoration(
+        color: saved ? BpcColors.surface : color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: saved ? BpcColors.line : color.withValues(alpha: 0.22),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: saved ? BpcColors.mutedInk : color,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
+  }
+}
+
+class _SaveErrorBanner extends StatelessWidget {
+  const _SaveErrorBanner({
+    required this.message,
+    required this.retrying,
+    required this.onRetry,
+  });
+
+  final String message;
+  final bool retrying;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return BpcPanel(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-      color: panelColor,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 560;
-          final action = OutlinedButton.icon(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      color: scheme.errorContainer.withValues(alpha: 0.72),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline_rounded, color: scheme.error),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: BpcColors.ink,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          FilledButton.tonal(
             onPressed: retrying ? null : onRetry,
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              foregroundColor: BpcColors.ink,
-              backgroundColor: Colors.white.withValues(alpha: 0.42),
-              side: BorderSide(
-                color: BpcColors.lineStrong.withValues(alpha: 0.8),
-              ),
-            ),
-            icon: retrying
-                ? const SizedBox.square(
-                    dimension: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2.2),
-                  )
-                : const Icon(Icons.refresh_rounded, size: 16),
-            label: Text(retrying ? 'Reintentando' : 'Reintentar'),
-          );
-
-          final messageBlock = Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: BpcColors.ink,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                message,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: BpcColors.mutedInk,
-                  fontWeight: FontWeight.w600,
-                  height: 1.25,
-                ),
-              ),
-            ],
-          );
-
-          final leading = DecoratedBox(
-            decoration: BoxDecoration(
-              color: BpcColors.sand.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Padding(
-              padding: EdgeInsets.all(7),
-              child: Icon(
-                Icons.sync_problem_rounded,
-                color: BpcColors.expense,
-                size: 16,
-              ),
-            ),
-          );
-
-          final dismissButton = onDismiss == null
-              ? null
-              : IconButton(
-                  onPressed: onDismiss,
-                  icon: const Icon(Icons.close_rounded, size: 18),
-                  splashRadius: 18,
-                  tooltip: 'Ocultar aviso',
-                );
-
-          if (compact) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    leading,
-                    const SizedBox(width: 10),
-                    Expanded(child: messageBlock),
-                    if (dismissButton != null) dismissButton,
-                  ],
-                ),
-                const SizedBox(height: 10),
-                action,
-              ],
-            );
-          }
-
-          return Row(
-            children: [
-              leading,
-              const SizedBox(width: 10),
-              Expanded(child: messageBlock),
-              const SizedBox(width: 12),
-              action,
-              if (dismissButton != null) ...[
-                const SizedBox(width: 2),
-                dismissButton,
-              ],
-            ],
-          );
-        },
+            child: Text(retrying ? 'Reintentando' : 'Reintentar'),
+          ),
+        ],
       ),
     );
   }
@@ -1769,79 +1387,54 @@ class _ActionSnackContent extends StatelessWidget {
 }
 
 class _BuildInfoStrip extends StatelessWidget {
-  const _BuildInfoStrip({
-    this.dense = false,
-    this.leadingIcon = true,
-    this.text,
-    this.copySnackLabel = 'Datos de soporte copiados',
-  });
-
-  final bool dense;
-  final bool leadingIcon;
-  final String? text;
-  final String copySnackLabel;
+  const _BuildInfoStrip();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final footerText = text ?? BuildInfo.footerText;
+    final text = BuildInfo.footerText;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: () async {
-          await Clipboard.setData(ClipboardData(text: footerText));
+          await Clipboard.setData(ClipboardData(text: text));
           if (!context.mounted) {
             return;
           }
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('$copySnackLabel: $footerText'),
+              content: Text('Build copiado: $text'),
               behavior: SnackBarBehavior.floating,
             ),
           );
         },
         child: Container(
           width: double.infinity,
-          padding: EdgeInsets.fromLTRB(dense ? 22 : 0, dense ? 2 : 10, 0, 2),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            border: dense
-                ? null
-                : Border(
-                    top: BorderSide(
-                      color: scheme.outlineVariant.withValues(alpha: 0.4),
-                    ),
-                  ),
+            color: scheme.surfaceContainerHighest.withValues(alpha: 0.58),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: scheme.outlineVariant.withValues(alpha: 0.34),
+            ),
           ),
           child: Row(
             children: [
-              if (leadingIcon) ...[
-                Icon(
-                  Icons.fingerprint_rounded,
-                  size: dense ? 14 : 16,
-                  color: scheme.outline,
-                ),
-                SizedBox(width: dense ? 6 : 8),
-              ],
+              Icon(Icons.fingerprint_rounded, size: 16, color: scheme.outline),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  footerText,
-                  maxLines: dense ? 2 : 1,
-                  overflow: TextOverflow.ellipsis,
+                  text,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: scheme.outline.withValues(alpha: dense ? 0.88 : 1),
-                    fontWeight: dense ? FontWeight.w600 : FontWeight.w700,
-                    height: dense ? 1.15 : null,
+                    color: scheme.outline,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
-              SizedBox(width: dense ? 6 : 8),
-              Icon(
-                Icons.copy_rounded,
-                size: dense ? 13 : 16,
-                color: scheme.outline.withValues(alpha: dense ? 0.72 : 1),
-              ),
+              const SizedBox(width: 8),
+              Icon(Icons.copy_rounded, size: 16, color: scheme.outline),
             ],
           ),
         ),
