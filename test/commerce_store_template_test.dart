@@ -1,4 +1,5 @@
 import 'package:b_plus_commerce/app/services/commerce_store.dart';
+import 'package:b_plus_commerce/app/models/product.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -92,5 +93,65 @@ void main() {
       expect(store.todaySalesPesos, greaterThan(0));
       expect(store.todayExpensesPesos, greaterThan(0));
     });
+
+    test(
+      'cleans identifiable commercial demo data without full reset',
+      () async {
+        final store = CommerceStore.emptyForTest();
+
+        await store.loadCommercialDemo();
+        await store.addProduct(
+          const Product(
+            id: 'real-product-1',
+            name: 'Producto real',
+            stockUnits: 4,
+            minStockUnits: 1,
+            costPesos: 100,
+            pricePesos: 200,
+          ),
+        );
+
+        final result = await store.cleanCommercialDemoData();
+
+        expect(result.applied, isTrue);
+        expect(result.productCount, 10);
+        expect(result.movementCount, 8);
+        expect(store.hasCommercialDemoData, isFalse);
+        expect(store.products.map((product) => product.id), ['real-product-1']);
+        expect(store.movements, isEmpty);
+      },
+    );
+
+    test('reset all data returns the store to a clean state', () async {
+      final store = CommerceStore.emptyForTest();
+
+      await store.loadCommercialDemo();
+      await store.resetAllData();
+
+      expect(store.products, isEmpty);
+      expect(store.movements, isEmpty);
+      expect(store.hasProducts, isFalse);
+      expect(store.hasMovements, isFalse);
+      expect(store.hasCommercialDemoData, isFalse);
+    });
+
+    test(
+      'product deletion is blocked when history references the product',
+      () async {
+        final store = CommerceStore.emptyForTest();
+
+        await store.loadCommercialDemo();
+        final product = store.products.firstWhere(
+          (item) => item.id == 'demo-product-gaseosa-cola',
+        );
+
+        expect(store.productHasMovements(product.id), isTrue);
+        await expectLater(
+          store.removeProduct(product.id),
+          throwsA(isA<StateError>()),
+        );
+        expect(store.productById(product.id), isNotNull);
+      },
+    );
   });
 }

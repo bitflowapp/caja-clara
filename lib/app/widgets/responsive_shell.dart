@@ -34,7 +34,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
   bool _exportingExcel = false;
   bool _applyingStarterTemplate = false;
   bool _loadingCommercialDemo = false;
+  bool _cleaningCommercialDemo = false;
   bool _resettingCommercialDemo = false;
+  bool _resettingAllData = false;
   bool _exportingBackup = false;
   bool _restoringBackup = false;
   bool _retryingSave = false;
@@ -344,6 +346,162 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         setState(() => _resettingCommercialDemo = false);
       }
     }
+  }
+
+  Future<void> _cleanCommercialDemoData() async {
+    if (_cleaningCommercialDemo) {
+      return;
+    }
+
+    final confirmed = await showDangerConfirmationDialog(
+      context,
+      title: 'Limpiar datos de demo',
+      message:
+          'Se eliminarán los datos de ejemplo cargados para probar Caja Clara. Tus datos reales no deberían verse afectados.',
+      confirmLabel: 'Limpiar demo',
+    );
+    if (!confirmed || !mounted) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    final store = CommerceScope.of(context);
+    setState(() => _cleaningCommercialDemo = true);
+    try {
+      final result = await store.cleanCommercialDemoData();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _tab = CommerceTab.home);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            result.applied
+                ? 'Datos de demo limpiados: ${result.productCount} productos y ${result.movementCount} movimientos.'
+                : 'No había datos de demo identificables para limpiar.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'No se pudo limpiar la demo: ${userFacingErrorMessage(error)}',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _cleaningCommercialDemo = false);
+      }
+    }
+  }
+
+  Future<void> _resetAllData() async {
+    if (_resettingAllData) {
+      return;
+    }
+
+    final confirmed = await _showTypedResetConfirmation();
+    if (!confirmed || !mounted) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    final store = CommerceScope.of(context);
+    setState(() => _resettingAllData = true);
+    try {
+      await store.resetAllData();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _tab = CommerceTab.home);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Caja Clara quedó lista para empezar.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'No se pudo restablecer Caja Clara: ${userFacingErrorMessage(error)}',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _resettingAllData = false);
+      }
+    }
+  }
+
+  Future<bool> _showTypedResetConfirmation() async {
+    final controller = TextEditingController();
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        var canReset = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Restablecer Caja Clara'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Esto eliminará productos, ventas, gastos y movimientos guardados en este dispositivo.',
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: controller,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Escribí RESTABLECER',
+                    ),
+                    textInputAction: TextInputAction.done,
+                    onChanged: (value) {
+                      setDialogState(() => canReset = value == 'RESTABLECER');
+                    },
+                    onSubmitted: (_) {
+                      if (canReset) {
+                        Navigator.of(context).pop(true);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton.icon(
+                  onPressed: canReset
+                      ? () => Navigator.of(context).pop(true)
+                      : null,
+                  icon: const Icon(Icons.delete_forever_rounded),
+                  label: const Text('Restablecer'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    controller.dispose();
+    return result ?? false;
   }
 
   Future<void> _applyStarterTemplate() async {
@@ -754,13 +912,17 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         exportingExcel: _exportingExcel,
         onApplyStarterTemplate: _applyStarterTemplate,
         onLoadCommercialDemo: _loadCommercialDemo,
+        onCleanCommercialDemo: _cleanCommercialDemoData,
         onResetCommercialDemo: _resetCommercialDemo,
+        onResetAllData: _resetAllData,
         onCreateProductFromFreeSale: _createProductFromFreeSale,
         onCreateProductFromSuggestion: _createProductFromSuggestion,
         onDismissFreeSaleSuggestion: _dismissFreeSaleSuggestion,
         applyingStarterTemplate: _applyingStarterTemplate,
         loadingCommercialDemo: _loadingCommercialDemo,
+        cleaningCommercialDemo: _cleaningCommercialDemo,
         resettingCommercialDemo: _resettingCommercialDemo,
+        resettingAllData: _resettingAllData,
       ),
       CommerceTab.products: ProductsScreen(
         onApplyStarterTemplate: _applyStarterTemplate,
@@ -1014,13 +1176,62 @@ class _RailBrand extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const CajaClaraLogo(height: 52),
-        const SizedBox(height: 10),
+        Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: BpcColors.accentStrong,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: BpcColors.accentStrong.withValues(alpha: 0.24),
+                    blurRadius: 18,
+                    offset: const Offset(0, 9),
+                  ),
+                ],
+              ),
+              alignment: Alignment.center,
+              child: const CajaClaraSymbol(size: 29),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Caja Clara',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: BpcColors.ink,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.35,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Luna Systems',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: BpcColors.accentStrong,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
         Text(
-          'Ordena tu negocio sin Excel',
+          'Ventas, gastos y caja en un solo lugar.',
           style: theme.textTheme.bodySmall?.copyWith(
-            color: BpcColors.subtleInk,
-            fontWeight: FontWeight.w700,
+            color: BpcColors.mutedInk,
+            fontWeight: FontWeight.w800,
+            height: 1.25,
           ),
         ),
       ],
@@ -1048,18 +1259,21 @@ class _SaveStatusChip extends StatelessWidget {
       label = 'Guardando...';
       icon = Icons.sync_rounded;
     } else {
-      color = BpcColors.income;
+      color = BpcColors.accentStrong;
       label = 'Todo guardado';
       icon = Icons.cloud_done_rounded;
     }
 
+    final saved = store.lastError == null && !store.isSaving;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
+        color: saved ? BpcColors.surface : color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.22)),
+        border: Border.all(
+          color: saved ? BpcColors.line : color.withValues(alpha: 0.22),
+        ),
       ),
       child: Row(
         children: [
@@ -1069,7 +1283,7 @@ class _SaveStatusChip extends StatelessWidget {
             child: Text(
               label,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: color,
+                color: saved ? BpcColors.mutedInk : color,
                 fontWeight: FontWeight.w800,
               ),
             ),

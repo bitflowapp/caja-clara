@@ -81,6 +81,9 @@ class CommerceStore extends ChangeNotifier {
   String? get lastError => _lastError;
   bool get hasProducts => _products.isNotEmpty;
   bool get hasMovements => _movements.isNotEmpty;
+  bool get hasCommercialDemoData =>
+      _products.any(_isCommercialDemoProduct) ||
+      _movements.any(_isCommercialDemoMovement);
 
   UnmodifiableListView<Product> get products => UnmodifiableListView(_products);
   UnmodifiableListView<Movement> get movements =>
@@ -551,6 +554,55 @@ class CommerceStore extends ChangeNotifier {
     return _applyCommercialDemo();
   }
 
+  Future<CommercialDemoCleanupResult> cleanCommercialDemoData() async {
+    final demoProductIds = _products
+        .where(_isCommercialDemoProduct)
+        .map((product) => product.id)
+        .toSet();
+    final productsToRemove = demoProductIds.length;
+    final movementsToRemove = _movements
+        .where(
+          (movement) =>
+              _isCommercialDemoMovement(movement) ||
+              (movement.productId != null &&
+                  demoProductIds.contains(movement.productId)),
+        )
+        .length;
+
+    if (productsToRemove == 0 && movementsToRemove == 0) {
+      return const CommercialDemoCleanupResult(
+        applied: false,
+        productCount: 0,
+        movementCount: 0,
+      );
+    }
+
+    await _runPersistedMutation(() {
+      _products.removeWhere((product) => demoProductIds.contains(product.id));
+      _movements.removeWhere(
+        (movement) =>
+            _isCommercialDemoMovement(movement) ||
+            (movement.productId != null &&
+                demoProductIds.contains(movement.productId)),
+      );
+      _dismissedFreeSaleSuggestions.clear();
+      _sortProducts();
+    });
+
+    return CommercialDemoCleanupResult(
+      applied: true,
+      productCount: productsToRemove,
+      movementCount: movementsToRemove,
+    );
+  }
+
+  Future<void> resetAllData() async {
+    await _runPersistedMutation(() {
+      _seedEmptyState();
+      _dismissedFreeSaleSuggestions.clear();
+    });
+  }
+
   Future<CommercialDemoApplyResult> _applyCommercialDemo() async {
     final now = DateTime.now();
     DateTime atToday(int hour, int minute) =>
@@ -853,6 +905,10 @@ class CommerceStore extends ChangeNotifier {
     await _runPersistedMutation(() {
       _products.removeWhere((product) => product.id == productId);
     });
+  }
+
+  bool productHasMovements(String productId) {
+    return _movements.any((movement) => movement.productId == productId);
   }
 
   Future<void> dismissFreeSaleSuggestion(String normalizedDescription) async {
@@ -1445,6 +1501,12 @@ class CommerceStore extends ChangeNotifier {
     );
   }
 
+  bool _isCommercialDemoProduct(Product product) =>
+      product.id.startsWith('demo-product-');
+
+  bool _isCommercialDemoMovement(Movement movement) =>
+      movement.id.startsWith('demo-');
+
   String _starterTemplateKeyForProduct(Product product) {
     return _starterTemplateKey(product.name, product.category ?? '');
   }
@@ -1483,6 +1545,18 @@ class CommercialDemoApplyResult {
     required this.applied,
     this.productCount = 0,
     this.movementCount = 0,
+  });
+
+  final bool applied;
+  final int productCount;
+  final int movementCount;
+}
+
+class CommercialDemoCleanupResult {
+  const CommercialDemoCleanupResult({
+    required this.applied,
+    required this.productCount,
+    required this.movementCount,
   });
 
   final bool applied;

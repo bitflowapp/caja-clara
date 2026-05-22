@@ -22,13 +22,17 @@ class HomeScreen extends StatelessWidget {
     required this.exportingExcel,
     required this.onApplyStarterTemplate,
     required this.onLoadCommercialDemo,
+    required this.onCleanCommercialDemo,
     required this.onResetCommercialDemo,
+    required this.onResetAllData,
     required this.onCreateProductFromFreeSale,
     required this.onCreateProductFromSuggestion,
     required this.onDismissFreeSaleSuggestion,
     required this.applyingStarterTemplate,
     required this.loadingCommercialDemo,
+    required this.cleaningCommercialDemo,
     required this.resettingCommercialDemo,
+    required this.resettingAllData,
   });
 
   final VoidCallback onNewSale;
@@ -40,7 +44,9 @@ class HomeScreen extends StatelessWidget {
   final bool exportingExcel;
   final VoidCallback onApplyStarterTemplate;
   final VoidCallback onLoadCommercialDemo;
+  final VoidCallback onCleanCommercialDemo;
   final VoidCallback onResetCommercialDemo;
+  final VoidCallback onResetAllData;
   final Future<void> Function(Movement movement) onCreateProductFromFreeSale;
   final Future<void> Function(FreeSaleSuggestion suggestion)
   onCreateProductFromSuggestion;
@@ -48,7 +54,9 @@ class HomeScreen extends StatelessWidget {
   onDismissFreeSaleSuggestion;
   final bool applyingStarterTemplate;
   final bool loadingCommercialDemo;
+  final bool cleaningCommercialDemo;
   final bool resettingCommercialDemo;
+  final bool resettingAllData;
 
   @override
   Widget build(BuildContext context) {
@@ -73,8 +81,13 @@ class HomeScreen extends StatelessWidget {
               if (store.hasProducts || store.hasMovements) ...[
                 const SizedBox(height: 14),
                 _CommercialDemoCard(
+                  hasDemoData: store.hasCommercialDemoData,
+                  onCleanCommercialDemo: onCleanCommercialDemo,
                   onResetCommercialDemo: onResetCommercialDemo,
+                  onResetAllData: onResetAllData,
+                  cleaningCommercialDemo: cleaningCommercialDemo,
                   resettingCommercialDemo: resettingCommercialDemo,
+                  resettingAllData: resettingAllData,
                 ),
               ],
               if (!store.hasProducts) ...[
@@ -107,7 +120,11 @@ class HomeScreen extends StatelessWidget {
                 subtitle: 'Lo que está pasando en tu negocio ahora mismo.',
               ),
               const SizedBox(height: 12),
-              _HomeKpiGrid(store: store, onOpenCash: onOpenCash),
+              _HomeKpiGrid(
+                store: store,
+                onOpenCash: onOpenCash,
+                onOpenProducts: onOpenProducts,
+              ),
               const SizedBox(height: 18),
               _PrimaryActions(onNewSale: onNewSale),
               const SizedBox(height: 12),
@@ -146,10 +163,10 @@ class HomeScreen extends StatelessWidget {
                   icon: Icons.receipt_long_rounded,
                   title: store.hasProducts
                       ? 'Todavía no registraste ventas hoy'
-                      : 'Todavía no cargaste productos',
+                      : 'Caja Clara está lista para empezar.',
                   message: store.hasProducts
                       ? 'Cuando registres una venta o un gasto, lo ves acá al instante.'
-                      : 'Cargá uno para empezar a vender.',
+                      : 'Cargá productos, registrá ventas o probá una demo cuando quieras.',
                   action: Wrap(
                     spacing: 10,
                     runSpacing: 10,
@@ -169,12 +186,19 @@ class HomeScreen extends StatelessWidget {
                       ),
                       TextButton(
                         onPressed: () => showProductEditor(context, store),
-                        child: Text(
-                          store.hasProducts
-                              ? 'Cargar producto'
-                              : 'Cargar primer producto',
-                        ),
+                        child: const Text('Cargar producto'),
                       ),
+                      if (!store.hasProducts && store.canLoadCommercialDemo)
+                        TextButton(
+                          onPressed: loadingCommercialDemo
+                              ? null
+                              : onLoadCommercialDemo,
+                          child: Text(
+                            loadingCommercialDemo
+                                ? 'Cargando demo...'
+                                : 'Cargar datos de demo',
+                          ),
+                        ),
                     ],
                   ),
                 )
@@ -209,7 +233,7 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-/// Saludo del día con la marca, compacto y cálido.
+/// Saludo del día con la marca, compacto y claro.
 class _HomeGreeting extends StatelessWidget {
   const _HomeGreeting({required this.now});
 
@@ -229,40 +253,71 @@ class _HomeGreeting extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
-      children: [
-        Container(
-          width: 50,
-          height: 50,
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: BpcColors.greenDeep,
-            borderRadius: BorderRadius.circular(15),
+    return BpcPanel(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      elevated: false,
+      child: Row(
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            padding: const EdgeInsets.all(9),
+            decoration: BoxDecoration(
+              color: BpcColors.accentStrong,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: BpcColors.accentStrong.withValues(alpha: 0.24),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: const CajaClaraSymbol(size: 36),
           ),
-          child: const CajaClaraSymbol(size: 34),
-        ),
-        const SizedBox(width: 13),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '$_greeting · ${formatShortDate(now)}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: BpcColors.subtleInk,
-                  fontWeight: FontWeight.w800,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$_greeting · ${formatShortDate(now)}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: BpcColors.subtleInk,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Caja Clara',
+                  style: theme.textTheme.titleLarge?.copyWith(fontSize: 24),
+                ),
+              ],
+            ),
+          ),
+          if (MediaQuery.sizeOf(context).width >= 420) ...[
+            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: BpcColors.accentSoft,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: BpcColors.accent.withValues(alpha: 0.18),
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                'Caja Clara',
-                style: theme.textTheme.titleLarge?.copyWith(fontSize: 22),
+              child: Text(
+                'Luna Systems',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: BpcColors.accentStrong,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -281,7 +336,7 @@ class _CashStatusBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final open = store.hasCashOpeningToday;
-    final color = open ? BpcColors.income : BpcColors.warning;
+    final color = open ? BpcColors.income : BpcColors.accentStrong;
     final opening = store.todayOpeningCashPesos;
 
     return Container(
@@ -350,50 +405,56 @@ class _CashStatusBanner extends StatelessWidget {
 
 /// Grilla de 4 KPIs principales del Home.
 class _HomeKpiGrid extends StatelessWidget {
-  const _HomeKpiGrid({required this.store, required this.onOpenCash});
+  const _HomeKpiGrid({
+    required this.store,
+    required this.onOpenCash,
+    required this.onOpenProducts,
+  });
 
   final CommerceStore store;
   final VoidCallback onOpenCash;
+  final VoidCallback onOpenProducts;
 
   @override
   Widget build(BuildContext context) {
     final lowStock = store.lowStockCount;
     final cards = <Widget>[
       KpiCard(
-        label: 'Ventas de hoy',
+        label: 'Ventas',
         value: formatMoney(store.todaySalesPesos),
         icon: Icons.trending_up_rounded,
-        accent: BpcColors.income,
+        accent: BpcColors.accent,
         helper:
             '${store.todaySalesCount} ${store.todaySalesCount == 1 ? 'venta' : 'ventas'} registradas',
       ),
       KpiCard(
-        label: 'Caja actual',
-        value: formatMoney(store.cashBalancePesos),
-        icon: Icons.account_balance_wallet_rounded,
-        accent: BpcColors.greenDark,
-        helper: 'Lo que tenés ahora',
-        onTap: onOpenCash,
-      ),
-      KpiCard(
-        label: 'Stock bajo',
-        value: '$lowStock',
-        icon: Icons.inventory_2_rounded,
-        accent: lowStock == 0 ? BpcColors.mutedInk : BpcColors.warning,
-        helper: lowStock == 0
-            ? 'Sin productos a reponer'
-            : lowStock == 1
-            ? '1 producto a reponer'
-            : '$lowStock productos a reponer',
-      ),
-      KpiCard(
-        label: 'Gastos del día',
+        label: 'Gastos',
         value: formatMoney(store.todayExpensesPesos),
         icon: Icons.south_east_rounded,
         accent: BpcColors.expense,
         helper: store.todayExpensesPesos == 0
             ? 'Sin gastos registrados'
             : 'Salidas de caja de hoy',
+      ),
+      KpiCard(
+        label: 'Caja actual',
+        value: formatMoney(store.cashBalancePesos),
+        icon: Icons.account_balance_wallet_rounded,
+        accent: BpcColors.accentStrong,
+        helper: 'Lo que tenés ahora',
+        onTap: onOpenCash,
+      ),
+      KpiCard(
+        label: 'Productos',
+        value: '${store.products.length}',
+        icon: Icons.inventory_2_rounded,
+        accent: lowStock == 0 ? BpcColors.accent : BpcColors.warning,
+        helper: lowStock == 0
+            ? 'Catálogo activo'
+            : lowStock == 1
+            ? '1 producto a reponer'
+            : '$lowStock productos a reponer',
+        onTap: onOpenProducts,
       ),
     ];
 
@@ -431,7 +492,7 @@ class _PrimaryActions extends StatelessWidget {
       subtitle: 'Vendé en segundos y se actualiza la caja.',
       icon: Icons.shopping_bag_rounded,
       onTap: onNewSale,
-      fillColor: BpcColors.greenDark,
+      fillColor: BpcColors.accentStrong,
       contentColor: Colors.white,
       emphasized: true,
     );
@@ -521,7 +582,7 @@ class _QuickAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Material(
-      color: BpcColors.surface,
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
@@ -529,8 +590,16 @@ class _QuickAction extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
+            color: BpcColors.surface,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: BpcColors.line),
+            boxShadow: const [
+              BoxShadow(
+                color: BpcColors.shadow,
+                blurRadius: 16,
+                offset: Offset(0, 6),
+              ),
+            ],
           ),
           child: Row(
             children: [
@@ -708,11 +777,9 @@ class _LowStockBanner extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
           decoration: BoxDecoration(
-            color: BpcColors.warningSoft,
+            color: BpcColors.surface,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: BpcColors.warning.withValues(alpha: 0.30),
-            ),
+            border: Border.all(color: BpcColors.accent.withValues(alpha: 0.18)),
           ),
           child: Row(
             children: [
@@ -720,12 +787,12 @@ class _LowStockBanner extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.75),
+                  color: BpcColors.accentSoft,
                   borderRadius: BorderRadius.circular(13),
                 ),
                 child: const Icon(
                   Icons.inventory_2_rounded,
-                  color: BpcColors.warning,
+                  color: BpcColors.accentStrong,
                 ),
               ),
               const SizedBox(width: 12),
@@ -892,12 +959,22 @@ class _SuggestionMeta extends StatelessWidget {
 
 class _CommercialDemoCard extends StatelessWidget {
   const _CommercialDemoCard({
+    required this.hasDemoData,
+    required this.onCleanCommercialDemo,
     required this.onResetCommercialDemo,
+    required this.onResetAllData,
+    required this.cleaningCommercialDemo,
     required this.resettingCommercialDemo,
+    required this.resettingAllData,
   });
 
+  final bool hasDemoData;
+  final VoidCallback onCleanCommercialDemo;
   final VoidCallback onResetCommercialDemo;
+  final VoidCallback onResetAllData;
+  final bool cleaningCommercialDemo;
   final bool resettingCommercialDemo;
+  final bool resettingAllData;
 
   @override
   Widget build(BuildContext context) {
@@ -909,7 +986,7 @@ class _CommercialDemoCard extends StatelessWidget {
       elevated: false,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final compact = constraints.maxWidth < 620;
+          final compact = constraints.maxWidth < 760;
           final copy = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -931,24 +1008,68 @@ class _CommercialDemoCard extends StatelessWidget {
               ),
             ],
           );
-          final button = FilledButton.tonalIcon(
-            onPressed: resettingCommercialDemo ? null : onResetCommercialDemo,
-            icon: resettingCommercialDemo
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.restart_alt_rounded),
-            label: Text(
-              resettingCommercialDemo ? 'Reiniciando...' : 'Reiniciar demo',
-            ),
+          final actions = Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              if (hasDemoData)
+                FilledButton.tonalIcon(
+                  onPressed: cleaningCommercialDemo
+                      ? null
+                      : onCleanCommercialDemo,
+                  icon: cleaningCommercialDemo
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.cleaning_services_rounded),
+                  label: Text(
+                    cleaningCommercialDemo
+                        ? 'Limpiando...'
+                        : 'Limpiar datos de demo',
+                  ),
+                )
+              else
+                FilledButton.tonalIcon(
+                  onPressed: resettingCommercialDemo
+                      ? null
+                      : onResetCommercialDemo,
+                  icon: resettingCommercialDemo
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.restart_alt_rounded),
+                  label: Text(
+                    resettingCommercialDemo
+                        ? 'Reiniciando...'
+                        : 'Restablecer demo',
+                  ),
+                ),
+              TextButton.icon(
+                onPressed: resettingAllData ? null : onResetAllData,
+                icon: resettingAllData
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.delete_forever_rounded),
+                label: Text(
+                  resettingAllData
+                      ? 'Restableciendo...'
+                      : 'Restablecer Caja Clara',
+                ),
+              ),
+            ],
           );
 
           if (compact) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [copy, const SizedBox(height: 12), button],
+              children: [copy, const SizedBox(height: 12), actions],
             );
           }
 
@@ -961,7 +1082,7 @@ class _CommercialDemoCard extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(child: copy),
               const SizedBox(width: 12),
-              button,
+              actions,
             ],
           );
         },
