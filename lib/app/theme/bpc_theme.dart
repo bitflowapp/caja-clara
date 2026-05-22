@@ -14,11 +14,11 @@ class BpcTheme {
     final base = ThemeData(
       useMaterial3: true,
       colorScheme: cs.copyWith(
-        primary: BpcColors.greenDark,
-        secondary: BpcColors.sand,
-        tertiary: BpcColors.sandSoft,
-        outline: BpcColors.line,
-        outlineVariant: BpcColors.lineStrong,
+        primary: BpcColors.accent,
+        secondary: BpcColors.accentStrong,
+        tertiary: BpcColors.accentSoft,
+        outline: BpcColors.mutedInk,
+        outlineVariant: BpcColors.line,
         surfaceContainerLow: BpcColors.surfaceStrong,
         surfaceContainerHighest: BpcColors.paperShade,
         onSurface: BpcColors.ink,
@@ -39,34 +39,38 @@ class BpcTheme {
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: BpcColors.paper,
         selectedIconTheme: const IconThemeData(
-          color: BpcColors.greenDark,
-          size: 23,
+          color: BpcColors.accent,
+          size: 22,
         ),
         unselectedIconTheme: const IconThemeData(
           color: BpcColors.mutedInk,
           size: 22,
         ),
         selectedLabelTextStyle: const TextStyle(
-          color: BpcColors.ink,
+          color: BpcColors.accent,
           fontWeight: FontWeight.w800,
           fontSize: 13,
         ),
         unselectedLabelTextStyle: const TextStyle(
           color: BpcColors.mutedInk,
           fontWeight: FontWeight.w700,
-          fontSize: 13,
+          fontSize: 12.5,
+          letterSpacing: -0.1,
         ),
-        indicatorColor: BpcColors.sandSoft,
+        indicatorColor: BpcColors.accentSoft,
+        indicatorShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
         minWidth: 108,
         minExtendedWidth: 220,
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: BpcColors.surface,
-        indicatorColor: BpcColors.sandSoft,
+        indicatorColor: BpcColors.accentSoft,
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return IconThemeData(
-            color: selected ? BpcColors.greenDark : BpcColors.mutedInk,
+            color: selected ? BpcColors.accent : BpcColors.mutedInk,
           );
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
@@ -82,6 +86,20 @@ class BpcTheme {
         style: FilledButton.styleFrom(
           backgroundColor: BpcColors.greenDark,
           foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.1,
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: BpcColors.accentStrong,
+          side: const BorderSide(color: BpcColors.lineStrong),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -125,6 +143,22 @@ class BpcTheme {
           borderRadius: BorderRadius.circular(22),
           side: const BorderSide(color: BpcColors.line),
         ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: BpcColors.surface,
+        selectedColor: BpcColors.accentSoft,
+        disabledColor: BpcColors.surfaceStrong,
+        side: const BorderSide(color: BpcColors.line),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        labelStyle: const TextStyle(
+          color: BpcColors.mutedInk,
+          fontWeight: FontWeight.w800,
+        ),
+        secondaryLabelStyle: const TextStyle(
+          color: BpcColors.accentStrong,
+          fontWeight: FontWeight.w900,
+        ),
+        checkmarkColor: BpcColors.accentStrong,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
