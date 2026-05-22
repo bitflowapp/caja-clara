@@ -35,7 +35,7 @@ class BPlusCommerceApp extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFFF7F4EC), Color(0xFFF1ECE0)],
+                colors: [Color(0xFFF8FAFD), Color(0xFFEEF2F7)],
               ),
             ),
             child: child ?? const SizedBox.shrink(),

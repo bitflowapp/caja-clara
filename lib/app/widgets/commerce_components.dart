@@ -27,14 +27,14 @@ class BpcPanel extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: color ?? BpcColors.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: borderColor ?? BpcColors.line),
         boxShadow: elevated
             ? const [
                 BoxShadow(
                   color: BpcColors.shadow,
-                  blurRadius: 18,
-                  offset: Offset(0, 6),
+                  blurRadius: 22,
+                  offset: Offset(0, 8),
                 ),
               ]
             : null,
@@ -108,72 +108,83 @@ class KpiCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final content = Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: Icon(icon, color: accent, size: 19),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  label,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: BpcColors.mutedInk,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 12,
+    final content = ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 136),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(13),
                   ),
+                  child: Icon(icon, color: accent, size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: BpcColors.mutedInk,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Text(
+              value,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                color: BpcColors.ink,
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.4,
+              ),
+            ),
+            if (helper != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                helper!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: BpcColors.subtleInk,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: theme.textTheme.headlineMedium?.copyWith(
-              color: BpcColors.ink,
-              fontSize: 26,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.6,
-            ),
-          ),
-          if (helper != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              helper!,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: BpcColors.subtleInk,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
           ],
-        ],
+        ),
       ),
     );
 
     return Material(
-      color: BpcColors.surface,
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
+            color: BpcColors.surface,
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(color: BpcColors.line),
+            boxShadow: const [
+              BoxShadow(
+                color: BpcColors.shadow,
+                blurRadius: 20,
+                offset: Offset(0, 8),
+              ),
+            ],
           ),
           child: content,
         ),
@@ -293,9 +304,9 @@ class ActionCard extends StatelessWidget {
             boxShadow: emphasized
                 ? const [
                     BoxShadow(
-                      color: Color(0x33123A30),
-                      blurRadius: 22,
-                      offset: Offset(0, 10),
+                      color: Color(0x333B82F6),
+                      blurRadius: 24,
+                      offset: Offset(0, 12),
                     ),
                   ]
                 : null,
@@ -562,9 +573,7 @@ class StockBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            low
-                ? Icons.warning_amber_rounded
-                : Icons.check_circle_rounded,
+            low ? Icons.warning_amber_rounded : Icons.check_circle_rounded,
             color: color,
             size: 14,
           ),
