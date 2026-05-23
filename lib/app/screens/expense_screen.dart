@@ -38,10 +38,17 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
   @override
   void initState() {
     super.initState();
+    if (InputShortcutScope.demoAutofillEnabled) {
+      _conceptController.text = 'Bolsas';
+      _amountController.text = '900';
+      _categoryController.text = 'Insumos';
+    }
     selectAllTextOnFocus(_conceptFocusNode, _conceptController);
     selectAllTextOnFocus(_amountFocusNode, _amountController);
-    _conceptDictation.initialize();
-    _categoryDictation.initialize();
+    if (!InputShortcutScope.demoAutofillEnabled) {
+      _conceptDictation.initialize();
+      _categoryDictation.initialize();
+    }
     selectAllTextOnFocus(_categoryFocusNode, _categoryController);
   }
 
@@ -62,12 +69,14 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
   Widget build(BuildContext context) {
     final store = CommerceScope.of(context);
     final useMobileSensitiveFieldEditor = useMobileFieldEditor(context);
+    final demoMode = InputShortcutScope.demoAutofillEnabled;
     return Scaffold(
       appBar: AppBar(title: const Text('Registrar gasto')),
       body: KeyboardAwarePageBody(
         child: InputShortcutScope(
           onSave: _saving ? null : () => _save(store),
           onCancel: _saving ? null : () => Navigator.of(context).maybePop(),
+          onDemoAutofill: _fillPremiumDemoExpense,
           child: BpcPanel(
             child: FocusTraversalGroup(
               child: Form(
@@ -104,14 +113,18 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                           }
                           return null;
                         },
-                        suffixBuilder: (controller) =>
-                            SpeechDictationActionButton(
-                              controller: _conceptDictation,
-                              textController: controller,
-                              tooltip: 'Dictar concepto',
-                            ),
-                        supportingBuilder: () =>
-                            SpeechDictationHint(controller: _conceptDictation),
+                        suffixBuilder: demoMode
+                            ? null
+                            : (controller) => SpeechDictationActionButton(
+                                controller: _conceptDictation,
+                                textController: controller,
+                                tooltip: 'Dictar concepto',
+                              ),
+                        supportingBuilder: demoMode
+                            ? null
+                            : () => SpeechDictationHint(
+                                controller: _conceptDictation,
+                              ),
                       )
                     else ...[
                       EnsureVisibleWhenFocused(
@@ -125,11 +138,13 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                           textCapitalization: TextCapitalization.sentences,
                           decoration: InputDecoration(
                             labelText: 'Concepto',
-                            suffixIcon: SpeechDictationActionButton(
-                              controller: _conceptDictation,
-                              textController: _conceptController,
-                              tooltip: 'Dictar concepto',
-                            ),
+                            suffixIcon: demoMode
+                                ? null
+                                : SpeechDictationActionButton(
+                                    controller: _conceptDictation,
+                                    textController: _conceptController,
+                                    tooltip: 'Dictar concepto',
+                                  ),
                           ),
                           onTapOutside: (_) => _conceptFocusNode.unfocus(),
                           onFieldSubmitted: (_) => _moveFocusTo(
@@ -144,7 +159,8 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                           },
                         ),
                       ),
-                      SpeechDictationHint(controller: _conceptDictation),
+                      if (!demoMode)
+                        SpeechDictationHint(controller: _conceptDictation),
                     ],
                     const SizedBox(height: 12),
                     LayoutBuilder(
@@ -463,5 +479,14 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
       }
       focusNode.requestFocus();
     });
+  }
+
+  void _fillPremiumDemoExpense() {
+    setState(() {
+      _conceptController.text = 'Bolsas';
+      _amountController.text = '900';
+      _categoryController.text = 'Insumos';
+    });
+    _dismissKeyboard();
   }
 }

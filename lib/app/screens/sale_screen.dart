@@ -54,6 +54,10 @@ class _SaleScreenState extends State<SaleScreen> {
       if (initial.pricePesos > 0) {
         _unitPriceController.text = initial.pricePesos.toString();
       }
+    } else if (InputShortcutScope.demoAutofillEnabled) {
+      _descriptionController.text = 'Café frío';
+      _quantityController.text = '2';
+      _unitPriceController.text = '1800';
     }
     _descriptionController.addListener(_handleDraftChanged);
     _quantityController.addListener(_handleDraftChanged);
@@ -119,6 +123,7 @@ class _SaleScreenState extends State<SaleScreen> {
                 _descriptionFocusNode,
                 controller: _descriptionController,
               ),
+              onDemoAutofill: _fillPremiumDemoSale,
               child: BpcPanel(
                 child: FocusTraversalGroup(
                   child: Form(
@@ -429,6 +434,17 @@ class _SaleScreenState extends State<SaleScreen> {
     messenger.showSnackBar(
       SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
+  }
+
+  void _fillPremiumDemoSale() {
+    setState(() {
+      _descriptionController.text = 'Café frío';
+      _quantityController.text = '2';
+      _unitPriceController.text = '1800';
+      _paymentMethod = 'Efectivo';
+      _autoValidateMode = AutovalidateMode.disabled;
+    });
+    _dismissKeyboard();
   }
 
   Future<void> _submitSale(CommerceStore store) async {
