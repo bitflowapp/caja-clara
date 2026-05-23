@@ -13,6 +13,10 @@ class SearchShortcutIntent extends Intent {
   const SearchShortcutIntent();
 }
 
+class DemoAutofillShortcutIntent extends Intent {
+  const DemoAutofillShortcutIntent();
+}
+
 class InputShortcutScope extends StatelessWidget {
   const InputShortcutScope({
     super.key,
@@ -20,12 +24,18 @@ class InputShortcutScope extends StatelessWidget {
     this.onSave,
     this.onCancel,
     this.onFocusSearch,
+    this.onDemoAutofill,
   });
+
+  static const demoAutofillEnabled = bool.fromEnvironment(
+    'CAJA_CLARA_DEMO_CONTROLS',
+  );
 
   final Widget child;
   final VoidCallback? onSave;
   final VoidCallback? onCancel;
   final VoidCallback? onFocusSearch;
+  final VoidCallback? onDemoAutofill;
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +55,9 @@ class InputShortcutScope extends StatelessWidget {
         const SingleActivator(LogicalKeyboardKey.keyF, meta: true):
             const SearchShortcutIntent(),
       },
+      if (demoAutofillEnabled && onDemoAutofill != null)
+        const SingleActivator(LogicalKeyboardKey.keyD, alt: true):
+            const DemoAutofillShortcutIntent(),
     };
 
     if (shortcuts.isEmpty) {
@@ -76,6 +89,14 @@ class InputShortcutScope extends StatelessWidget {
                 return null;
               },
             ),
+          if (demoAutofillEnabled && onDemoAutofill != null)
+            DemoAutofillShortcutIntent:
+                CallbackAction<DemoAutofillShortcutIntent>(
+                  onInvoke: (_) {
+                    onDemoAutofill!.call();
+                    return null;
+                  },
+                ),
         },
         child: child,
       ),
