@@ -4,8 +4,6 @@ import 'package:intl/intl.dart';
 
 import '../models/movement.dart';
 import '../models/product.dart';
-import '../utils/formatters.dart';
-import '../utils/payment_methods.dart';
 import 'commerce_store.dart';
 import 'excel_file_saver.dart';
 
@@ -27,14 +25,11 @@ class ExcelExportResult {
 
 class ExcelExportService {
   ExcelExportService({ExcelFileSaver? fileSaver})
-      : _fileSaver = fileSaver ?? createExcelFileSaver();
+    : _fileSaver = fileSaver ?? createExcelFileSaver();
 
   final ExcelFileSaver _fileSaver;
 
-  Future<ExcelExportResult> export(
-    CommerceStore store, {
-    DateTime? now,
-  }) async {
+  Future<ExcelExportResult> export(CommerceStore store, {DateTime? now}) async {
     final exportAt = now ?? DateTime.now();
     final fileName = buildSuggestedFileName(exportAt);
     final workbook = buildWorkbookBytes(store, exportAt: exportAt);
@@ -81,7 +76,7 @@ class ExcelExportService {
 
   @visibleForTesting
   String buildSuggestedFileName(DateTime exportAt) {
-    final suffix = DateFormat('dd-MM-yyyy_HH-mm').format(exportAt);
+    final suffix = DateFormat('yyyy-MM-dd_HH-mm').format(exportAt);
     return 'caja_clara_$suffix.xlsx';
   }
 
@@ -92,16 +87,16 @@ class ExcelExportService {
       TextCellValue(_formatDateTime(exportAt)),
     ]);
     _writeRow(sheet, 2, <CellValue>[
-      TextCellValue('Ventas del dia'),
+      TextCellValue('Ventas del día'),
       IntCellValue(store.todaySalesPesos),
     ]);
     _writeRow(sheet, 3, <CellValue>[
-      TextCellValue('Gastos del dia'),
+      TextCellValue('Gastos del día'),
       IntCellValue(store.todayExpensesPesos),
     ]);
     _writeRow(sheet, 4, <CellValue>[
-      TextCellValue('Caja actual'),
-      IntCellValue(store.cashBalancePesos),
+      TextCellValue('Caja del día'),
+      IntCellValue(store.todayExpectedCashPesos ?? store.cashBalancePesos),
     ]);
     _writeRow(sheet, 5, <CellValue>[
       TextCellValue('Ganancia estimada simple'),
@@ -115,10 +110,10 @@ class ExcelExportService {
       'Nombre',
       'Barcode',
       'Stock',
-      'Stock minimo',
+      'Stock mínimo',
       'Costo',
       'Precio',
-      'Categoria',
+      'Categoría',
     ]);
 
     for (var i = 0; i < products.length; i++) {
@@ -156,7 +151,7 @@ class ExcelExportService {
         TextCellValue(_formatDateTime(sale.createdAt)),
         TextCellValue(productName),
         IntCellValue(sale.quantityUnits ?? 0),
-        TextCellValue(displayPaymentMethodLabel(sale.paymentMethod, fallback: '')),
+        TextCellValue(sale.paymentMethod ?? ''),
         IntCellValue(sale.amountPesos),
       ]);
     }
@@ -170,7 +165,7 @@ class ExcelExportService {
     _writeHeaderRow(sheet, 0, const <String>[
       'Fecha/hora',
       'Concepto',
-      'Categoria',
+      'Categoría',
       'Monto',
     ]);
 
@@ -223,20 +218,21 @@ class ExcelExportService {
   void _writeRow(Sheet sheet, int rowIndex, List<CellValue> values) {
     for (var columnIndex = 0; columnIndex < values.length; columnIndex++) {
       sheet
-          .cell(
-            CellIndex.indexByColumnRow(
-              rowIndex: rowIndex,
-              columnIndex: columnIndex,
-            ),
-          )
-          .value = values[columnIndex];
+              .cell(
+                CellIndex.indexByColumnRow(
+                  rowIndex: rowIndex,
+                  columnIndex: columnIndex,
+                ),
+              )
+              .value =
+          values[columnIndex];
     }
   }
 
   String _movementDetail(CommerceStore store, Movement movement) {
     if (movement.kind == MovementKind.sale) {
       final productName = _saleLabel(store, movement);
-      final paymentMethod = displayPaymentMethodLabel(movement.paymentMethod);
+      final paymentMethod = movement.paymentMethod ?? 'Sin dato';
       return '$productName / $paymentMethod';
     }
 
@@ -255,6 +251,6 @@ class ExcelExportService {
   }
 
   String _formatDateTime(DateTime value) {
-    return formatDateTimeShort(value);
+    return DateFormat('yyyy-MM-dd HH:mm').format(value);
   }
 }

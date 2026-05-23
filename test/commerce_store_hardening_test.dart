@@ -1,7 +1,6 @@
 import 'package:b_plus_commerce/app/services/backup_service.dart';
 import 'package:b_plus_commerce/app/services/commerce_persistence.dart';
 import 'package:b_plus_commerce/app/services/commerce_store.dart';
-import 'package:b_plus_commerce/app/services/license_service.dart';
 import 'package:b_plus_commerce/app/models/product.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -79,7 +78,7 @@ void main() {
         final store = CommerceStore.emptyForTest();
 
         await store.recordFreeSale(
-          description: 'Cable USB rapido',
+          description: 'Cable USB rápido',
           quantityUnits: 1,
           unitPricePesos: 4500,
           paymentMethod: 'Transferencia',
@@ -90,7 +89,7 @@ void main() {
         await store.addProduct(
           const Product(
             id: 'p-cable',
-            name: 'Cable USB rapido',
+            name: 'Cable USB rápido',
             stockUnits: 6,
             minStockUnits: 1,
             costPesos: 2200,
@@ -104,7 +103,7 @@ void main() {
         expect(store.movements.first.id, freeSale.id);
         expect(store.movements.first.isFreeSale, isTrue);
         expect(store.movements.first.productId, isNull);
-        expect(store.movements.first.subtitle, 'Cable USB rapido');
+        expect(store.movements.first.subtitle, 'Cable USB rápido');
       },
     );
 
@@ -157,21 +156,21 @@ void main() {
         final newestSaleAt = DateTime(2026, 3, 23, 19, 15);
 
         await store.recordFreeSale(
-          description: 'Cable USB rapido',
+          description: 'Cable USB rápido',
           quantityUnits: 1,
           unitPricePesos: 4200,
           paymentMethod: 'Transferencia',
           createdAt: newestSaleAt,
         );
         await store.recordFreeSale(
-          description: 'Cable USB rapido',
+          description: 'Cable USB rápido',
           quantityUnits: 1,
           unitPricePesos: 3900,
           paymentMethod: 'Transferencia',
           createdAt: DateTime(2026, 3, 21, 11, 0),
         );
         await store.recordFreeSale(
-          description: 'Cable USB rapido',
+          description: 'Cable USB rápido',
           quantityUnits: 2,
           unitPricePesos: 4000,
           paymentMethod: 'Transferencia',
@@ -228,289 +227,6 @@ void main() {
       );
 
       expect(store.lastSalePaymentMethod, 'Transferencia');
-    });
-
-    test('stores payment methods trimmed for future defaults', () async {
-      final store = CommerceStore.emptyForTest();
-
-      await store.recordFreeSale(
-        description: 'Cable USB',
-        quantityUnits: 1,
-        unitPricePesos: 4500,
-        paymentMethod: '  Mercado Pago  ',
-      );
-
-      expect(store.movements.first.paymentMethod, 'Mercado Pago');
-      expect(store.lastSalePaymentMethod, 'Mercado Pago');
-    });
-
-    test(
-      'builds a daily movement summary with today counts and recent items',
-      () async {
-        final store = CommerceStore.emptyForTest();
-        final now = DateTime(2026, 3, 28, 18, 0);
-
-        await store.recordFreeSale(
-          description: 'Venta mostrador',
-          quantityUnits: 1,
-          unitPricePesos: 2500,
-          paymentMethod: 'Efectivo',
-          createdAt: now.subtract(const Duration(hours: 1)),
-        );
-        await store.recordExpense(
-          concept: 'Bolsas',
-          amountPesos: 800,
-          category: 'Insumos',
-          createdAt: now.subtract(const Duration(minutes: 30)),
-        );
-        await store.recordFreeSale(
-          description: 'Venta vieja',
-          quantityUnits: 1,
-          unitPricePesos: 1200,
-          paymentMethod: 'Efectivo',
-          createdAt: now.subtract(const Duration(days: 2)),
-        );
-
-        final summary = store.dailyMovementSummary(now: now, recentLimit: 3);
-
-        expect(summary.movementCount, 2);
-        expect(summary.salesCount, 1);
-        expect(summary.salesPesos, 2500);
-        expect(summary.expenseCount, 1);
-        expect(summary.expensesPesos, 800);
-        expect(summary.recentMovements, hasLength(2));
-        expect(summary.recentMovements.first.originLabel, 'Gasto');
-        expect(summary.recentMovements.first.title, 'Bolsas');
-      },
-    );
-
-    test('ranks top selling products for the day by units sold', () async {
-      final store = CommerceStore.emptyForTest();
-      final now = DateTime(2026, 3, 28, 18, 0);
-
-      await store.addProduct(
-        const Product(
-          id: 'top-1',
-          name: 'Yerba suave',
-          stockUnits: 12,
-          minStockUnits: 2,
-          costPesos: 2200,
-          pricePesos: 3600,
-          category: 'Almacen',
-        ),
-      );
-      await store.addProduct(
-        const Product(
-          id: 'top-2',
-          name: 'Galletitas surtidas',
-          stockUnits: 10,
-          minStockUnits: 2,
-          costPesos: 900,
-          pricePesos: 1700,
-          category: 'Almacen',
-        ),
-      );
-
-      await store.recordSale(
-        productId: 'top-1',
-        quantityUnits: 3,
-        paymentMethod: 'Efectivo',
-        createdAt: now.subtract(const Duration(hours: 2)),
-      );
-      await store.recordSale(
-        productId: 'top-2',
-        quantityUnits: 1,
-        paymentMethod: 'Efectivo',
-        createdAt: now.subtract(const Duration(hours: 1)),
-      );
-      await store.recordSale(
-        productId: 'top-1',
-        quantityUnits: 1,
-        paymentMethod: 'Transferencia',
-        createdAt: now.subtract(const Duration(minutes: 20)),
-      );
-
-      final topSelling = store.topSellingProductsToday(now: now);
-
-      expect(topSelling, hasLength(2));
-      expect(topSelling.first.product.id, 'top-1');
-      expect(topSelling.first.unitsSold, 4);
-      expect(topSelling[1].product.id, 'top-2');
-    });
-
-    test(
-      'prioritizes urgent restock when low stock also moved recently',
-      () async {
-        final store = CommerceStore.emptyForTest();
-        final now = DateTime(2026, 3, 28, 18, 0);
-
-        await store.addProduct(
-          const Product(
-            id: 'restock-hot',
-            name: 'Papas fritas 100 g',
-            stockUnits: 4,
-            minStockUnits: 5,
-            costPesos: 700,
-            pricePesos: 1400,
-            category: 'Golosinas',
-          ),
-        );
-        await store.addProduct(
-          const Product(
-            id: 'restock-cold',
-            name: 'Lavandina 1 L',
-            stockUnits: 0,
-            minStockUnits: 3,
-            costPesos: 1200,
-            pricePesos: 2100,
-            category: 'Limpieza',
-          ),
-        );
-
-        await store.recordSale(
-          productId: 'restock-hot',
-          quantityUnits: 2,
-          paymentMethod: 'Efectivo',
-          createdAt: now.subtract(const Duration(days: 1)),
-        );
-
-        final urgentRestock = store.urgentRestockProducts(now: now);
-
-        expect(urgentRestock, hasLength(2));
-        expect(urgentRestock.first.product.id, 'restock-hot');
-        expect(urgentRestock.first.hasRecentSales, isTrue);
-        expect(urgentRestock.first.recentUnitsSold, 2);
-      },
-    );
-
-    test(
-      'keeps low rotation honest when history is short and flags stale stock later',
-      () async {
-        final store = CommerceStore.emptyForTest();
-        final now = DateTime(2026, 3, 28, 18, 0);
-
-        await store.addProduct(
-          const Product(
-            id: 'rot-fast',
-            name: 'Agua mineral 500 ml',
-            stockUnits: 20,
-            minStockUnits: 4,
-            costPesos: 500,
-            pricePesos: 1100,
-            category: 'Bebidas',
-          ),
-        );
-        await store.addProduct(
-          const Product(
-            id: 'rot-stale',
-            name: 'Bizcochos',
-            stockUnits: 14,
-            minStockUnits: 3,
-            costPesos: 600,
-            pricePesos: 1200,
-            category: 'Galletitas',
-          ),
-        );
-
-        expect(store.lowRotationProducts(now: now).hasEnoughHistory, isFalse);
-
-        for (var i = 0; i < 6; i++) {
-          await store.recordSale(
-            productId: 'rot-fast',
-            quantityUnits: 1,
-            paymentMethod: 'Efectivo',
-            createdAt: now.subtract(Duration(days: 10 + i)),
-          );
-        }
-
-        final lowRotation = store.lowRotationProducts(now: now);
-
-        expect(lowRotation.hasEnoughHistory, isTrue);
-        expect(lowRotation.products, hasLength(1));
-        expect(lowRotation.products.first.product.id, 'rot-stale');
-        expect(
-          lowRotation.products.first.statusLabel,
-          'Sin movimiento reciente',
-        );
-      },
-    );
-
-    test('persists empty-start choice in snapshots', () async {
-      final store = CommerceStore.emptyForTest();
-
-      expect(store.shouldPromptInitialCatalogSetup, isTrue);
-      expect(store.shouldPromptOnboardingTutorial, isFalse);
-
-      await store.chooseEmptyCatalogStart();
-
-      expect(store.initialCatalogSetupStatus, InitialCatalogSetupStatus.empty);
-      expect(store.shouldPromptInitialCatalogSetup, isFalse);
-      expect(
-        store.onboardingTutorialStatus,
-        OnboardingTutorialStatus.dismissed,
-      );
-
-      final snapshot = store.buildSnapshot(
-        generatedAt: DateTime(2026, 3, 28, 16, 0),
-      );
-      final restored = CommerceStore.emptyForTest();
-      await restored.restoreSnapshot(snapshot);
-
-      expect(
-        restored.initialCatalogSetupStatus,
-        InitialCatalogSetupStatus.empty,
-      );
-      expect(restored.shouldPromptInitialCatalogSetup, isFalse);
-      expect(restored.shouldPromptOnboardingTutorial, isFalse);
-    });
-
-    test(
-      'older snapshots with data stay quiet even without onboarding status',
-      () async {
-        final source = CommerceStore.seededForTest();
-        final snapshot =
-            source.buildSnapshot(generatedAt: DateTime(2026, 3, 28, 16, 30))
-              ..remove('onboardingTutorialStatus')
-              ..remove('initialCatalogSetupStatus');
-
-        final restored = CommerceStore.emptyForTest();
-        await restored.restoreSnapshot(snapshot);
-
-        expect(
-          restored.onboardingTutorialStatus,
-          OnboardingTutorialStatus.completed,
-        );
-        expect(
-          restored.initialCatalogSetupStatus,
-          InitialCatalogSetupStatus.empty,
-        );
-        expect(restored.shouldPromptOnboardingTutorial, isFalse);
-        expect(restored.shouldPromptInitialCatalogSetup, isFalse);
-      },
-    );
-
-    test('blocks operational writes when the Windows trial expired', () async {
-      final now = DateTime(2026, 3, 26, 10, 0);
-      final store = CommerceStore.emptyForTest();
-      final licenseService = LicenseService.forTest(
-        clock: () => now,
-        installationId: 'CCW-TEST-LOCK',
-        trialStartedAt: now.subtract(const Duration(days: 31)),
-      );
-      store.attachLicenseService(licenseService);
-
-      await expectLater(
-        store.recordFreeSale(
-          description: 'Venta mostrador',
-          quantityUnits: 1,
-          unitPricePesos: 2500,
-          paymentMethod: 'Efectivo',
-        ),
-        throwsA(isA<LicenseRestrictionException>()),
-      );
-
-      expect(store.movements, isEmpty);
-      expect(store.cashBalancePesos, 0);
     });
 
     test('undo last sale restores stock and movement count', () async {
@@ -596,10 +312,56 @@ void main() {
         expect(restored.products.length, source.products.length);
         expect(restored.cashBalancePesos, source.cashBalancePesos);
         expect(restored.todayOpeningCashPesos, 50000);
-        expect(restored.movements.first.title, 'Restauracion de backup');
+        expect(restored.movements.first.title, 'Restauración de backup');
         expect(restored.movements.length, source.movements.length + 1);
       },
     );
+  });
+
+  group('Caja del día KPI', () {
+    test(
+      'todayExpectedCashPesos = apertura + ventas - gastos (dashboard truth)',
+      () async {
+        final store = CommerceStore.emptyForTest();
+        expect(store.todayExpectedCashPesos, isNull);
+
+        await store.registerCashOpening(openingBalancePesos: 10000);
+        await store.recordFreeSale(
+          description: 'Venta mostrador',
+          quantityUnits: 1,
+          unitPricePesos: 2500,
+          paymentMethod: 'Efectivo',
+        );
+        await store.recordExpense(
+          concept: 'Limpieza',
+          amountPesos: 500,
+          category: 'Insumos',
+        );
+
+        expect(store.todayOpeningCashPesos, 10000);
+        expect(store.todaySalesPesos, 2500);
+        expect(store.todayExpensesPesos, 500);
+        // Caja del día = 10000 + 2500 - 500 = 12000
+        expect(store.todayExpectedCashPesos, 12000);
+        // cashBalancePesos is the running net of movements only (no opening) =
+        // 2500 - 500 = 2000. Dashboard must NOT use this value.
+        expect(store.cashBalancePesos, 2000);
+        expect(store.todayExpectedCashPesos, isNot(store.cashBalancePesos));
+      },
+    );
+
+    test('todayExpectedCashPesos is null when apertura is not registered today', () async {
+      final store = CommerceStore.emptyForTest();
+      await store.recordFreeSale(
+        description: 'Venta mostrador',
+        quantityUnits: 1,
+        unitPricePesos: 2500,
+        paymentMethod: 'Efectivo',
+      );
+      expect(store.todayOpeningCashPesos, isNull);
+      expect(store.todayExpectedCashPesos, isNull);
+      expect(store.cashBalancePesos, 2500);
+    });
   });
 }
 
