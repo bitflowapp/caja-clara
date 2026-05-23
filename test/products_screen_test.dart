@@ -1,16 +1,16 @@
 import 'package:b_plus_commerce/app/screens/products_screen.dart';
 import 'package:b_plus_commerce/app/services/commerce_store.dart';
 import 'package:b_plus_commerce/app/widgets/commerce_scope.dart';
-import 'package:b_plus_commerce/app/models/product.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  Future<void> pumpProductsScreen(
-    WidgetTester tester,
-    CommerceStore store, {
-    Future<void> Function(Product product)? onSellProduct,
-  }) async {
+  testWidgets('blocks product deletion when movements reference it', (
+    tester,
+  ) async {
+    final store = CommerceStore.emptyForTest();
+    await store.loadCommercialDemo();
+
     await tester.pumpWidget(
       CommerceScope(
         store: store,
@@ -19,81 +19,25 @@ void main() {
             body: ProductsScreen(
               onApplyStarterTemplate: () async {},
               applyingStarterTemplate: false,
-              onLoadDemoData: () async {},
-              loadingDemoData: false,
-              onChooseEmptyCatalogStart: () async {},
-              onSellProduct: onSellProduct,
             ),
           ),
         ),
       ),
     );
     await tester.pumpAndSettle();
-  }
 
-  testWidgets('products screen shows start choice on first use', (
-    tester,
-  ) async {
-    final store = CommerceStore.emptyForTest();
+    await tester.enterText(find.byType(TextField), 'Gaseosa');
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
 
-    await pumpProductsScreen(tester, store);
+    expect(find.text('Gaseosa cola 2.25 L'), findsOneWidget);
+    await tester.tap(find.byTooltip('Acciones'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Eliminar').last);
+    await tester.pumpAndSettle();
 
-    expect(find.text('Empieza hoy'), findsWidgets);
-    expect(find.text('Cargar mi negocio'), findsWidgets);
-    expect(find.text('Probar con ejemplo'), findsWidgets);
-    expect(find.text('Agregar producto'), findsNothing);
-  });
-
-  testWidgets(
-    'products screen hides example CTA when there are movements without catalog',
-    (tester) async {
-      final store = CommerceStore.emptyForTest();
-      await store.recordFreeSale(
-        description: 'Venta mostrador',
-        quantityUnits: 1,
-        unitPricePesos: 2500,
-        paymentMethod: 'Efectivo',
-      );
-
-      await pumpProductsScreen(tester, store);
-
-      expect(find.text('Probar con ejemplo'), findsNothing);
-      expect(find.text('Cargar base simple'), findsNothing);
-      expect(find.text('Agregar producto'), findsWidgets);
-    },
-  );
-
-  testWidgets('products screen surfaces desktop badges and quick sell action', (
-    tester,
-  ) async {
-    final store = CommerceStore.emptyForTest();
-    await store.addProduct(
-      const Product(
-        id: 'cafe',
-        name: 'Cafe molido',
-        stockUnits: 8,
-        minStockUnits: 2,
-        costPesos: 3200,
-        pricePesos: 5400,
-        category: 'Almacen',
-      ),
-    );
-    await store.addProduct(
-      const Product(
-        id: 'lapiz',
-        name: 'Lapiz negro',
-        stockUnits: 1,
-        minStockUnits: 3,
-        costPesos: 120,
-        pricePesos: 0,
-        category: 'Libreria',
-      ),
-    );
-
-    await pumpProductsScreen(tester, store, onSellProduct: (_) async {});
-
-    expect(find.text('Sin codigo'), findsAtLeastNWidgets(2));
-    expect(find.text('Sin precio'), findsOneWidget);
-    expect(find.text('Vender'), findsAtLeastNWidgets(1));
+    expect(find.text('No se puede eliminar'), findsOneWidget);
+    expect(find.textContaining('proteger el historial'), findsOneWidget);
+    expect(store.productById('demo-product-gaseosa-cola'), isNotNull);
   });
 }

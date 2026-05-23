@@ -30,6 +30,7 @@ class InputShortcutScope extends StatelessWidget {
   static const demoAutofillEnabled = bool.fromEnvironment(
     'CAJA_CLARA_DEMO_CONTROLS',
   );
+  static const demoControlsEnabled = demoAutofillEnabled;
 
   final Widget child;
   final VoidCallback? onSave;
