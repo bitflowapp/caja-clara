@@ -16,6 +16,7 @@ import '../utils/user_facing_errors.dart';
 import 'caja_clara_brand.dart';
 import 'commerce_components.dart';
 import 'commerce_scope.dart';
+import 'input_shortcuts.dart';
 import 'operation_dialogs.dart';
 import 'product_form_dialog.dart';
 import 'quick_help_dialog.dart';
@@ -1021,11 +1022,13 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                           padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
                           child: _SaveStatusChip(store: store),
                         ),
-                        const SizedBox(height: 10),
-                        const Padding(
-                          padding: EdgeInsets.fromLTRB(14, 0, 14, 14),
-                          child: _BuildInfoStrip(),
-                        ),
+                        if (InputShortcutScope.demoControlsEnabled) ...[
+                          const SizedBox(height: 10),
+                          const Padding(
+                            padding: EdgeInsets.fromLTRB(14, 0, 14, 14),
+                            child: _BuildInfoStrip(),
+                          ),
+                        ],
                       ],
                     ),
                   ),

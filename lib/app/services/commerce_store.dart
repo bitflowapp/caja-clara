@@ -62,6 +62,15 @@ class CommerceStore extends ChangeNotifier {
     return store;
   }
 
+  @visibleForTesting
+  static Future<CommerceStore> loadWithPersistenceForTest(
+    CommercePersistence persistence,
+  ) async {
+    final store = CommerceStore._(persistence, persistenceEnabled: true);
+    await store._load();
+    return store;
+  }
+
   final CommercePersistence _persistence;
   final bool _persistenceEnabled;
   final List<Product> _products = <Product>[];
@@ -71,6 +80,7 @@ class CommerceStore extends ChangeNotifier {
   bool _ready = false;
   bool _saving = false;
   String? _lastError;
+  int _idSequence = 0;
   DateTime? _cashOpeningAt;
   int? _cashOpeningBalancePesos;
   DateTime? _cashClosingAt;
@@ -342,7 +352,6 @@ class CommerceStore extends ChangeNotifier {
       final snapshot = await _persistence.load();
       if (snapshot == null) {
         _seedEmptyState();
-        await _persist();
       } else {
         _applySnapshot(_parseSnapshot(snapshot));
       }
@@ -1242,14 +1251,16 @@ class CommerceStore extends ChangeNotifier {
     final productBarcodes = <String>{};
     final validatedProducts = <Product>[];
     for (final product in products) {
-      final valid = _validateProduct(
+      var valid = _validateProduct(
         product,
         allowZeroPrice: true,
         allowZeroCost: true,
         againstProducts: validatedProducts,
       );
       if (!productIds.add(valid.id)) {
-        throw StateError('Hay productos duplicados en el backup.');
+        do {
+          valid = valid.copyWith(id: _buildId('product'));
+        } while (!productIds.add(valid.id));
       }
       final barcode = valid.barcode;
       if (barcode != null && !productBarcodes.add(barcode)) {
@@ -1519,7 +1530,8 @@ class CommerceStore extends ChangeNotifier {
 
   String _buildId(String prefix) {
     final now = DateTime.now().microsecondsSinceEpoch;
-    return '$prefix-$now';
+    _idSequence += 1;
+    return '$prefix-$now-$_idSequence';
   }
 }
 

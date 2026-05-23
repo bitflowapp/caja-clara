@@ -314,12 +314,29 @@ class _ProductsScreenState extends State<ProductsScreen> {
   Future<void> _deleteProduct(CommerceStore store, Product product) async {
     final messenger = ScaffoldMessenger.of(context);
     final hasMovements = store.productHasMovements(product.id);
+    if (hasMovements) {
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('No se puede eliminar'),
+          content: Text(
+            '"${product.name}" tiene ventas o ajustes registrados. Para proteger el historial, Caja Clara conserva el producto en el catálogo.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Entendido'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     final confirmed = await showDangerConfirmationDialog(
       context,
       title: '¿Eliminar producto?',
-      message: hasMovements
-          ? 'Esta acción no se puede deshacer.\n\n"${product.name}" tiene ventas o ajustes registrados. La app no lo eliminará si eso rompe el historial.'
-          : 'Esta acción no se puede deshacer.\n\nSe va a eliminar "${product.name}" del catálogo.',
+      message:
+          'Esta acción no se puede deshacer.\n\nSe va a eliminar "${product.name}" del catálogo.',
       confirmLabel: 'Eliminar',
     );
     if (!confirmed || !mounted) {

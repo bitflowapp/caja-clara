@@ -8,6 +8,7 @@ import '../utils/formatters.dart';
 import '../widgets/caja_clara_brand.dart';
 import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
+import '../widgets/input_shortcuts.dart';
 import '../widgets/product_form_dialog.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -67,6 +68,7 @@ class HomeScreen extends StatelessWidget {
         final now = DateTime.now();
         final recent = store.recentMovements();
         final suggestions = store.freeSaleSuggestions;
+        const demoControlsEnabled = InputShortcutScope.demoControlsEnabled;
 
         return SingleChildScrollView(
           child: Column(
@@ -78,7 +80,8 @@ class HomeScreen extends StatelessWidget {
                 store: store,
                 onOpenCashRegister: onOpenCashRegister,
               ),
-              if (store.hasProducts || store.hasMovements) ...[
+              if (demoControlsEnabled &&
+                  (store.hasProducts || store.hasMovements)) ...[
                 const SizedBox(height: 14),
                 _CommercialDemoCard(
                   hasDemoData: store.hasCommercialDemoData,
@@ -95,7 +98,8 @@ class HomeScreen extends StatelessWidget {
                 _StarterTemplateCard(
                   onApplyStarterTemplate: onApplyStarterTemplate,
                   onAddProduct: () => showProductEditor(context, store),
-                  onLoadCommercialDemo: store.canLoadCommercialDemo
+                  onLoadCommercialDemo:
+                      demoControlsEnabled && store.canLoadCommercialDemo
                       ? onLoadCommercialDemo
                       : null,
                   applyingStarterTemplate: applyingStarterTemplate,
@@ -166,7 +170,9 @@ class HomeScreen extends StatelessWidget {
                       : 'Caja Clara está lista para empezar.',
                   message: store.hasProducts
                       ? 'Cuando registres una venta o un gasto, lo ves acá al instante.'
-                      : 'Cargá productos, registrá ventas o probá una demo cuando quieras.',
+                      : demoControlsEnabled
+                      ? 'Cargá productos, registrá ventas o probá una demo cuando quieras.'
+                      : 'Cargá productos o usá una plantilla para empezar a vender.',
                   action: Wrap(
                     spacing: 10,
                     runSpacing: 10,
@@ -188,7 +194,9 @@ class HomeScreen extends StatelessWidget {
                         onPressed: () => showProductEditor(context, store),
                         child: const Text('Cargar producto'),
                       ),
-                      if (!store.hasProducts && store.canLoadCommercialDemo)
+                      if (!store.hasProducts &&
+                          demoControlsEnabled &&
+                          store.canLoadCommercialDemo)
                         TextButton(
                           onPressed: loadingCommercialDemo
                               ? null
@@ -1131,7 +1139,9 @@ class _StarterTemplateCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Probá con datos de demo: carga productos, ventas, gastos y stock de ejemplo para ver la app funcionando.',
+            onLoadCommercialDemo == null
+                ? 'Cargá productos a mano o usá una base editable para empezar más rápido.'
+                : 'Probá con datos de demo: carga productos, ventas, gastos y stock de ejemplo para ver la app funcionando.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: BpcColors.subtleInk,
             ),

@@ -16,6 +16,8 @@ void main() {
     expect(find.text('Ver caja del día'), findsOneWidget);
     expect(find.text('Registrar gasto'), findsOneWidget);
     expect(find.text('Últimos movimientos'), findsOneWidget);
+    expect(find.text('Demo comercial'), findsNothing);
+    expect(find.textContaining('Build '), findsNothing);
     // Stock bajo banner shows because seeded test data has 3 low-stock products.
     expect(find.textContaining('productos con poco stock'), findsOneWidget);
   });
@@ -28,6 +30,7 @@ void main() {
     expect(find.text('Arrancá con una base de kiosco'), findsOneWidget);
     expect(find.text('Cargar Kiosco argentino'), findsOneWidget);
     expect(find.text('Cargar producto manualmente'), findsOneWidget);
-    expect(find.text('Probá con datos de demo'), findsOneWidget);
+    expect(find.text('Probá con datos de demo'), findsNothing);
+    expect(find.text('Cargar datos de demo'), findsNothing);
   });
 }

@@ -1,4 +1,5 @@
 import 'package:b_plus_commerce/app/services/commerce_store.dart';
+import 'package:b_plus_commerce/app/services/commerce_persistence.dart';
 import 'package:b_plus_commerce/app/models/product.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -25,6 +26,10 @@ void main() {
         expect(firstResult.skippedCount, 0);
         expect(store.products.length, firstResult.totalCount);
         expect(
+          store.products.map((product) => product.id).toSet(),
+          hasLength(store.products.length),
+        );
+        expect(
           store.products.where((product) => product.name == 'Coca-Cola 500 ml'),
           hasLength(1),
         );
@@ -33,6 +38,85 @@ void main() {
         expect(store.products.length, firstResult.totalCount);
       },
     );
+
+    test('starter template snapshot reloads with stable product ids', () async {
+      final source = CommerceStore.emptyForTest();
+
+      await source.applyArgentinianKioskTemplate();
+      final product = source.products.first;
+      await source.addStockToProduct(
+        productId: product.id,
+        quantityUnits: 2,
+        note: 'Alta inicial',
+      );
+
+      final restored = await CommerceStore.loadWithPersistenceForTest(
+        _SnapshotPersistence(source.buildSnapshot()),
+      );
+
+      expect(restored.lastError, isNull);
+      expect(restored.products, hasLength(source.products.length));
+      expect(restored.movements, hasLength(source.movements.length));
+      expect(
+        restored.products.map((product) => product.id).toSet(),
+        hasLength(restored.products.length),
+      );
+      expect(restored.productHasMovements(product.id), isTrue);
+    });
+
+    test('repairs duplicate product ids from older local snapshots', () async {
+      final duplicateSnapshot = <String, dynamic>{
+        'version': 2,
+        'products': [
+          {
+            'id': 'product-duplicate',
+            'name': 'Aceite',
+            'stockUnits': 2,
+            'minStockUnits': 1,
+            'costPesos': 0,
+            'pricePesos': 0,
+            'category': 'Almacen',
+          },
+          {
+            'id': 'product-duplicate',
+            'name': 'Agua',
+            'stockUnits': 0,
+            'minStockUnits': 1,
+            'costPesos': 0,
+            'pricePesos': 0,
+            'category': 'Bebidas',
+          },
+        ],
+        'movements': [
+          {
+            'id': 'stock-1',
+            'kind': 'adjustment',
+            'origin': 'adjustment',
+            'amountPesos': 0,
+            'createdAt': DateTime.now().toIso8601String(),
+            'title': 'Ingreso de stock',
+            'subtitle': 'Aceite / +2 u.',
+            'productId': 'product-duplicate',
+            'quantityUnits': 2,
+            'cashImpactOverridePesos': 0,
+            'estimatedProfitImpactOverridePesos': 0,
+          },
+        ],
+        'dismissedFreeSaleSuggestions': <String>[],
+      };
+
+      final restored = await CommerceStore.loadWithPersistenceForTest(
+        _SnapshotPersistence(duplicateSnapshot),
+      );
+
+      expect(restored.lastError, isNull);
+      expect(restored.products, hasLength(2));
+      expect(
+        restored.products.map((product) => product.id).toSet(),
+        hasLength(2),
+      );
+      expect(restored.productHasMovements('product-duplicate'), isTrue);
+    });
 
     test('allows zero price but blocks sale until price is defined', () async {
       final store = CommerceStore.emptyForTest();
@@ -154,4 +238,16 @@ void main() {
       },
     );
   });
+}
+
+class _SnapshotPersistence extends CommercePersistence {
+  _SnapshotPersistence(this.snapshot);
+
+  final Map<String, dynamic> snapshot;
+
+  @override
+  Future<Map<String, dynamic>?> load() async => snapshot;
+
+  @override
+  Future<void> save(Map<String, dynamic> json) async {}
 }

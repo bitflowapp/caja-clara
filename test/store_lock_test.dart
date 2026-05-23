@@ -41,16 +41,13 @@ void main() {
   group('runWithStorageRetry', () {
     test('reintenta y termina funcionando si el lock se libera', () async {
       var attempts = 0;
-      final result = await runWithStorageRetry<String>(
-        () async {
-          attempts++;
-          if (attempts < 3) {
-            throw Exception(_rawWindowsLockError);
-          }
-          return 'ok';
-        },
-        backoff: _zeroBackoff,
-      );
+      final result = await runWithStorageRetry<String>(() async {
+        attempts++;
+        if (attempts < 3) {
+          throw Exception(_rawWindowsLockError);
+        }
+        return 'ok';
+      }, backoff: _zeroBackoff);
 
       expect(result, 'ok');
       expect(attempts, 3);
@@ -59,13 +56,10 @@ void main() {
     test('un lock que sigue tomado termina como otra instancia', () async {
       var attempts = 0;
       await expectLater(
-        runWithStorageRetry<void>(
-          () async {
-            attempts++;
-            throw Exception(_rawWindowsLockError);
-          },
-          backoff: _zeroBackoff,
-        ),
+        runWithStorageRetry<void>(() async {
+          attempts++;
+          throw Exception(_rawWindowsLockError);
+        }, backoff: _zeroBackoff),
         throwsA(
           isA<StoreAccessException>().having(
             (e) => e.issue,
@@ -80,13 +74,10 @@ void main() {
     test('un error de permisos no se reintenta', () async {
       var attempts = 0;
       await expectLater(
-        runWithStorageRetry<void>(
-          () async {
-            attempts++;
-            throw Exception('Access is denied');
-          },
-          backoff: _zeroBackoff,
-        ),
+        runWithStorageRetry<void>(() async {
+          attempts++;
+          throw Exception('Access is denied');
+        }, backoff: _zeroBackoff),
         throwsA(
           isA<StoreAccessException>().having(
             (e) => e.issue,
@@ -112,24 +103,24 @@ void main() {
       expect(message.toLowerCase(), isNot(contains('errno')));
     });
 
-    test('userFacingErrorMessage nunca filtra el PathAccessException crudo', () {
-      final message = userFacingErrorMessage(Exception(_rawWindowsLockError));
+    test(
+      'userFacingErrorMessage nunca filtra el PathAccessException crudo',
+      () {
+        final message = userFacingErrorMessage(Exception(_rawWindowsLockError));
 
-      expect(message.toLowerCase(), isNot(contains('pathaccessexception')));
-      expect(message.toLowerCase(), isNot(contains('errno')));
-      expect(message, isNot(contains(r'.lock')));
-      expect(message, contains('otra ventana'));
-    });
+        expect(message.toLowerCase(), isNot(contains('pathaccessexception')));
+        expect(message.toLowerCase(), isNot(contains('errno')));
+        expect(message, isNot(contains(r'.lock')));
+        expect(message, contains('otra ventana'));
+      },
+    );
 
     test('userFacingErrorMessage usa el mensaje de StoreAccessException', () {
       final exception = StoreAccessException(
         StoreAccessIssue.temporary,
         Exception('algo'),
       );
-      expect(
-        userFacingErrorMessage(exception),
-        exception.userMessage,
-      );
+      expect(userFacingErrorMessage(exception), exception.userMessage);
       expect(userFacingErrorMessage(exception), contains('Reintentar'));
     });
   });
@@ -192,6 +183,22 @@ void main() {
       expect(store.lastError, isNull);
       expect(persistence.successfulSaves, 1);
     });
+
+    test(
+      'un estado inicial vacío no muestra error si el primer guardado falla',
+      () async {
+        final persistence = _EmptyLoadFailingSavePersistence();
+        final store = await CommerceStore.loadWithPersistenceForTest(
+          persistence,
+        );
+
+        expect(store.isReady, isTrue);
+        expect(store.lastError, isNull);
+        expect(store.products, isEmpty);
+        expect(store.movements, isEmpty);
+        expect(persistence.saveCalls, 0);
+      },
+    );
   });
 }
 
@@ -213,5 +220,21 @@ class _FlakyLockPersistence extends CommercePersistence {
       );
     }
     successfulSaves++;
+  }
+}
+
+class _EmptyLoadFailingSavePersistence extends CommercePersistence {
+  int saveCalls = 0;
+
+  @override
+  Future<Map<String, dynamic>?> load() async => null;
+
+  @override
+  Future<void> save(Map<String, dynamic> json) async {
+    saveCalls++;
+    throw StoreAccessException(
+      StoreAccessIssue.temporary,
+      Exception('temporary storage failure'),
+    );
   }
 }
