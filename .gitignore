@@ -35,6 +35,11 @@ migrate_working_dir/
 /dist/
 /certs/
 
+# Demo capture artifacts
+docs/demo_captures/*.mp4
+docs/demo_captures/final-*.png
+docs/demo_captures/premium-*.png
+
 # Symbolication related
 app.*.symbols
 
