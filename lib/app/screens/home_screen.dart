@@ -445,11 +445,15 @@ class _HomeKpiGrid extends StatelessWidget {
             : 'Salidas de caja de hoy',
       ),
       KpiCard(
-        label: 'Caja actual',
-        value: formatMoney(store.cashBalancePesos),
+        label: 'Caja del día',
+        value: store.todayExpectedCashPesos == null
+            ? 'Sin apertura'
+            : formatMoney(store.todayExpectedCashPesos!),
         icon: Icons.account_balance_wallet_rounded,
         accent: BpcColors.accentStrong,
-        helper: 'Lo que tenés ahora',
+        helper: store.todayExpectedCashPesos == null
+            ? 'Abrí la caja para ver el saldo'
+            : 'Apertura + ventas - gastos',
         onTap: onOpenCash,
       ),
       KpiCard(

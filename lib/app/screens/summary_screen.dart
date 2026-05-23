@@ -99,9 +99,15 @@ class SummaryScreen extends StatelessWidget {
                             SizedBox(
                               width: width,
                               child: MetricCard(
-                                label: 'Queda en caja',
-                                value: formatMoney(store.cashBalancePesos),
-                                helper: 'Lo que tenés ahora',
+                                label: 'Caja del día',
+                                value: store.todayExpectedCashPesos == null
+                                    ? 'Sin apertura'
+                                    : formatMoney(
+                                        store.todayExpectedCashPesos!,
+                                      ),
+                                helper: store.todayExpectedCashPesos == null
+                                    ? 'Abrí la caja para ver el saldo'
+                                    : 'Apertura + ventas - gastos',
                               ),
                             ),
                             SizedBox(

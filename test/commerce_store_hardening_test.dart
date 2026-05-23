@@ -317,6 +317,52 @@ void main() {
       },
     );
   });
+
+  group('Caja del día KPI', () {
+    test(
+      'todayExpectedCashPesos = apertura + ventas - gastos (dashboard truth)',
+      () async {
+        final store = CommerceStore.emptyForTest();
+        expect(store.todayExpectedCashPesos, isNull);
+
+        await store.registerCashOpening(openingBalancePesos: 10000);
+        await store.recordFreeSale(
+          description: 'Venta mostrador',
+          quantityUnits: 1,
+          unitPricePesos: 2500,
+          paymentMethod: 'Efectivo',
+        );
+        await store.recordExpense(
+          concept: 'Limpieza',
+          amountPesos: 500,
+          category: 'Insumos',
+        );
+
+        expect(store.todayOpeningCashPesos, 10000);
+        expect(store.todaySalesPesos, 2500);
+        expect(store.todayExpensesPesos, 500);
+        // Caja del día = 10000 + 2500 - 500 = 12000
+        expect(store.todayExpectedCashPesos, 12000);
+        // cashBalancePesos is the running net of movements only (no opening) =
+        // 2500 - 500 = 2000. Dashboard must NOT use this value.
+        expect(store.cashBalancePesos, 2000);
+        expect(store.todayExpectedCashPesos, isNot(store.cashBalancePesos));
+      },
+    );
+
+    test('todayExpectedCashPesos is null when apertura is not registered today', () async {
+      final store = CommerceStore.emptyForTest();
+      await store.recordFreeSale(
+        description: 'Venta mostrador',
+        quantityUnits: 1,
+        unitPricePesos: 2500,
+        paymentMethod: 'Efectivo',
+      );
+      expect(store.todayOpeningCashPesos, isNull);
+      expect(store.todayExpectedCashPesos, isNull);
+      expect(store.cashBalancePesos, 2500);
+    });
+  });
 }
 
 class _FailingPersistence extends CommercePersistence {

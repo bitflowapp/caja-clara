@@ -33,4 +33,38 @@ void main() {
     expect(find.text('Probá con datos de demo'), findsNothing);
     expect(find.text('Cargar datos de demo'), findsNothing);
   });
+
+  testWidgets(
+    'Home KPI "Caja del día" matches apertura + ventas - gastos',
+    (tester) async {
+      final store = CommerceStore.emptyForTest();
+      await store.registerCashOpening(openingBalancePesos: 10000);
+      await store.recordFreeSale(
+        description: 'Venta mostrador',
+        quantityUnits: 1,
+        unitPricePesos: 2500,
+        paymentMethod: 'Efectivo',
+      );
+
+      await tester.pumpWidget(BPlusCommerceApp(store: store));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Caja del día'), findsWidgets);
+      expect(find.text('Caja actual'), findsNothing);
+      // 10.000 apertura + 2.500 ventas - 0 gastos = 12.500
+      expect(find.text(r'$12.500'), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'Home KPI shows "Sin apertura" when caja is not opened today',
+    (tester) async {
+      final store = CommerceStore.emptyForTest();
+      await tester.pumpWidget(BPlusCommerceApp(store: store));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Caja del día'), findsWidgets);
+      expect(find.text('Sin apertura'), findsWidgets);
+    },
+  );
 }

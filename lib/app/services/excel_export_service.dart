@@ -95,8 +95,8 @@ class ExcelExportService {
       IntCellValue(store.todayExpensesPesos),
     ]);
     _writeRow(sheet, 4, <CellValue>[
-      TextCellValue('Caja actual'),
-      IntCellValue(store.cashBalancePesos),
+      TextCellValue('Caja del día'),
+      IntCellValue(store.todayExpectedCashPesos ?? store.cashBalancePesos),
     ]);
     _writeRow(sheet, 5, <CellValue>[
       TextCellValue('Ganancia estimada simple'),
