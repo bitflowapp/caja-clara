@@ -6,6 +6,7 @@ on:
 
 env:
   FLUTTER_CHANNEL: stable
+  FLUTTER_VERSION: 3.35.6
 
 jobs:
   validate:
@@ -18,6 +19,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: ${{ env.FLUTTER_CHANNEL }}
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
       - name: Flutter pub get
