@@ -14,7 +14,7 @@ class BPlusCommerceApp extends StatelessWidget {
   const BPlusCommerceApp({
     super.key,
     required this.store,
-    required this.barcodeLookupService,
+    this.barcodeLookupService = const DisabledBarcodeLookupService(),
     this.licenseService,
   });
 
@@ -48,9 +48,9 @@ class BPlusCommerceApp extends StatelessWidget {
               return DecoratedBox(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0xFFF3ECDD), Color(0xFFEEE6D8)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFFF8FAFD), Color(0xFFEEF2F7)],
                   ),
                 ),
                 child: child ?? const SizedBox.shrink(),

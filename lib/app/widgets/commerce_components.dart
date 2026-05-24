@@ -15,6 +15,7 @@ class BpcPanel extends StatelessWidget {
     this.radius = 20,
     this.showBorder = true,
     this.showShadow = true,
+    this.elevated,
     this.borderColor,
   });
 
@@ -24,11 +25,13 @@ class BpcPanel extends StatelessWidget {
   final double radius;
   final bool showBorder;
   final bool showShadow;
+  final bool? elevated;
   final Color? borderColor;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final effectiveShadow = elevated ?? showShadow;
     return Container(
       decoration: BoxDecoration(
         color: color ?? scheme.surface,
@@ -40,12 +43,12 @@ class BpcPanel extends StatelessWidget {
                     scheme.outlineVariant.withValues(alpha: 0.34),
               )
             : null,
-        boxShadow: showShadow
+        boxShadow: effectiveShadow
             ? const [
                 BoxShadow(
                   color: BpcColors.shadow,
-                  blurRadius: 12,
-                  offset: Offset(0, 4),
+                  blurRadius: 22,
+                  offset: Offset(0, 8),
                 ),
               ]
             : null,
@@ -211,6 +214,114 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
+/// Tarjeta KPI con icono, etiqueta, valor grande y ayuda corta.
+class KpiCard extends StatelessWidget {
+  const KpiCard({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.icon,
+    this.helper,
+    this.accent = BpcColors.greenDark,
+    this.onTap,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final String? helper;
+  final Color accent;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final content = ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 136),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Icon(icon, color: accent, size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: BpcColors.mutedInk,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Text(
+              value,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                color: BpcColors.ink,
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.4,
+              ),
+            ),
+            if (helper != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                helper!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: BpcColors.subtleInk,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            color: BpcColors.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: BpcColors.line),
+            boxShadow: const [
+              BoxShadow(
+                color: BpcColors.shadow,
+                blurRadius: 20,
+                offset: Offset(0, 8),
+              ),
+            ],
+          ),
+          child: content,
+        ),
+      ),
+    );
+  }
+}
+
+/// Métrica compacta usada en la pantalla de Caja.
 class MetricCard extends StatelessWidget {
   const MetricCard({
     super.key,
@@ -326,9 +437,9 @@ class ActionCard extends StatelessWidget {
             boxShadow: emphasized
                 ? const [
                     BoxShadow(
-                      color: Color(0x22122520),
-                      blurRadius: 16,
-                      offset: Offset(0, 8),
+                      color: Color(0x333B82F6),
+                      blurRadius: 24,
+                      offset: Offset(0, 12),
                     ),
                   ]
                 : null,
@@ -593,13 +704,24 @@ class StockBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: color.withValues(alpha: 0.16)),
       ),
-      child: Text(
-        low ? 'Stock bajo' : 'Stock al dia',
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.w700,
-          fontSize: 12,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            low ? Icons.warning_amber_rounded : Icons.check_circle_rounded,
+            color: color,
+            size: 14,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            low ? 'Stock bajo' : 'Stock ok',
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ),
     );
   }

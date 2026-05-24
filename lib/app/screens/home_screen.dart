@@ -2,54 +2,62 @@ import 'package:flutter/material.dart';
 
 import '../models/movement.dart';
 import '../services/commerce_store.dart';
+import '../services/starter_templates.dart';
 import '../theme/bpc_colors.dart';
 import '../utils/formatters.dart';
 import '../widgets/caja_clara_brand.dart';
 import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
+import '../widgets/input_shortcuts.dart';
 import '../widgets/product_form_dialog.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({
     super.key,
-    required this.onRegisterCashOpening,
     required this.onNewSale,
     required this.onNewExpense,
-    required this.onScanProduct,
     required this.onOpenProducts,
+    required this.onOpenCash,
+    required this.onOpenCashRegister,
     required this.onExportExcel,
+    required this.exportingExcel,
     required this.onApplyStarterTemplate,
-    required this.onLoadDemoData,
-    required this.onChooseEmptyCatalogStart,
+    required this.onLoadCommercialDemo,
+    required this.onCleanCommercialDemo,
+    required this.onResetCommercialDemo,
+    required this.onResetAllData,
     required this.onCreateProductFromFreeSale,
     required this.onCreateProductFromSuggestion,
     required this.onDismissFreeSaleSuggestion,
-    required this.exportingExcel,
     required this.applyingStarterTemplate,
-    required this.loadingDemoData,
-    required this.hasCashOpeningToday,
-    required this.savingCashEvent,
+    required this.loadingCommercialDemo,
+    required this.cleaningCommercialDemo,
+    required this.resettingCommercialDemo,
+    required this.resettingAllData,
   });
 
-  final VoidCallback onRegisterCashOpening;
   final VoidCallback onNewSale;
   final VoidCallback onNewExpense;
-  final VoidCallback onScanProduct;
   final VoidCallback onOpenProducts;
+  final VoidCallback onOpenCash;
+  final VoidCallback onOpenCashRegister;
   final VoidCallback onExportExcel;
+  final bool exportingExcel;
   final VoidCallback onApplyStarterTemplate;
-  final VoidCallback onLoadDemoData;
-  final VoidCallback onChooseEmptyCatalogStart;
+  final VoidCallback onLoadCommercialDemo;
+  final VoidCallback onCleanCommercialDemo;
+  final VoidCallback onResetCommercialDemo;
+  final VoidCallback onResetAllData;
   final Future<void> Function(Movement movement) onCreateProductFromFreeSale;
   final Future<void> Function(FreeSaleSuggestion suggestion)
   onCreateProductFromSuggestion;
   final Future<void> Function(FreeSaleSuggestion suggestion)
   onDismissFreeSaleSuggestion;
-  final bool exportingExcel;
   final bool applyingStarterTemplate;
-  final bool loadingDemoData;
-  final bool hasCashOpeningToday;
-  final bool savingCashEvent;
+  final bool loadingCommercialDemo;
+  final bool cleaningCommercialDemo;
+  final bool resettingCommercialDemo;
+  final bool resettingAllData;
 
   @override
   Widget build(BuildContext context) {
@@ -60,67 +68,83 @@ class HomeScreen extends StatelessWidget {
         final now = DateTime.now();
         final recent = store.recentMovements();
         final suggestions = store.freeSaleSuggestions;
-        final showInitialSetupChoice =
-            !store.hasProducts && store.shouldPromptInitialCatalogSetup;
-        final todaySignals = store.hasProducts || store.hasMovements
-            ? _buildHomeFocusItems(store)
-            : const <_HomeFocusItem>[];
+        const demoControlsEnabled = InputShortcutScope.demoControlsEnabled;
 
         return SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (showInitialSetupChoice) ...[
+              _HomeGreeting(now: now),
+              const SizedBox(height: 14),
+              _CashStatusBanner(
+                store: store,
+                onOpenCashRegister: onOpenCashRegister,
+              ),
+              if (demoControlsEnabled &&
+                  (store.hasProducts || store.hasMovements)) ...[
+                const SizedBox(height: 14),
+                _CommercialDemoCard(
+                  hasDemoData: store.hasCommercialDemoData,
+                  onCleanCommercialDemo: onCleanCommercialDemo,
+                  onResetCommercialDemo: onResetCommercialDemo,
+                  onResetAllData: onResetAllData,
+                  cleaningCommercialDemo: cleaningCommercialDemo,
+                  resettingCommercialDemo: resettingCommercialDemo,
+                  resettingAllData: resettingAllData,
+                ),
+              ],
+              if (!store.hasProducts) ...[
+                const SizedBox(height: 14),
                 _StarterTemplateCard(
                   onApplyStarterTemplate: onApplyStarterTemplate,
-                  onLoadDemoData: onLoadDemoData,
-                  onChooseEmptyCatalogStart: onChooseEmptyCatalogStart,
                   onAddProduct: () => showProductEditor(context, store),
+                  onLoadCommercialDemo:
+                      demoControlsEnabled && store.canLoadCommercialDemo
+                      ? onLoadCommercialDemo
+                      : null,
                   applyingStarterTemplate: applyingStarterTemplate,
-                  loadingDemoData: loadingDemoData,
-                  canLoadDemoData: store.isEmptyState,
-                  hasMovements: store.hasMovements,
-                  showInitialSetupChoice: true,
+                  loadingCommercialDemo: loadingCommercialDemo,
                 ),
+              ] else if (!store.hasMovements) ...[
                 const SizedBox(height: 14),
+                _GuideCard(
+                  title: 'Empezá por acá',
+                  steps: const [
+                    'Tocá Nueva venta y escribí qué estás vendiendo.',
+                    'Cargá la cantidad y el precio, y guardá.',
+                    'Vas a ver la caja del día actualizada al instante.',
+                  ],
+                  actionLabel: 'Registrar primera venta',
+                  onAction: onNewSale,
+                ),
               ],
-              _ActionWorkspace(
-                onRegisterCashOpening: onRegisterCashOpening,
-                onNewSale: onNewSale,
-                onNewExpense: onNewExpense,
-                onScanProduct: onScanProduct,
-                lowStockCount: store.lowStockCount,
+              const SizedBox(height: 18),
+              const SectionHeader(
+                title: 'Hoy en un vistazo',
+                subtitle: 'Lo que está pasando en tu negocio ahora mismo.',
+              ),
+              const SizedBox(height: 12),
+              _HomeKpiGrid(
+                store: store,
+                onOpenCash: onOpenCash,
+                onOpenProducts: onOpenProducts,
+              ),
+              const SizedBox(height: 18),
+              _PrimaryActions(onNewSale: onNewSale),
+              const SizedBox(height: 12),
+              _QuickActionsPanel(
                 onAddProduct: () => showProductEditor(context, store),
-                onOpenLowStock: onOpenProducts,
+                onOpenCash: onOpenCash,
+                onNewExpense: onNewExpense,
                 onExportExcel: onExportExcel,
                 exportingExcel: exportingExcel,
-                hasProducts: store.hasProducts,
-                hasCashOpeningToday: hasCashOpeningToday,
-                savingCashEvent: savingCashEvent,
               ),
-              if (!store.hasProducts && !showInitialSetupChoice) ...[
-                const SizedBox(height: 14),
-                _StarterTemplateCard(
-                  onApplyStarterTemplate: onApplyStarterTemplate,
-                  onLoadDemoData: onLoadDemoData,
-                  onChooseEmptyCatalogStart: onChooseEmptyCatalogStart,
-                  onAddProduct: () => showProductEditor(context, store),
-                  applyingStarterTemplate: applyingStarterTemplate,
-                  loadingDemoData: loadingDemoData,
-                  canLoadDemoData: store.isEmptyState,
-                  hasMovements: store.hasMovements,
-                  showInitialSetupChoice: store.shouldPromptInitialCatalogSetup,
+              if (store.hasProducts && store.lowStockCount > 0) ...[
+                const SizedBox(height: 12),
+                _LowStockBanner(
+                  count: store.lowStockCount,
+                  onTap: onOpenProducts,
                 ),
-              ],
-              const SizedBox(height: 16),
-              _HeaderStrip(now: now, store: store),
-              if (todaySignals.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                _HomeFocusPanel(items: todaySignals),
-              ],
-              if (store.hasProducts) ...[
-                const SizedBox(height: 16),
-                _CatalogReadinessCard(store: store),
               ],
               if (suggestions.isNotEmpty) ...[
                 const SizedBox(height: 16),
@@ -132,22 +156,689 @@ class HomeScreen extends StatelessWidget {
                       onDismissFreeSaleSuggestion(suggestions.first),
                 ),
               ],
-              const SizedBox(height: 16),
-              _HomeMovementsPanel(
-                store: store,
-                recent: recent,
-                applyingStarterTemplate: applyingStarterTemplate,
-                onNewSale: onNewSale,
-                onApplyStarterTemplate: onApplyStarterTemplate,
-                onAddProduct: () => showProductEditor(context, store),
-                onCreateProductFromFreeSale: onCreateProductFromFreeSale,
-                showInitialSetupChoice: store.shouldPromptInitialCatalogSetup,
+              const SizedBox(height: 18),
+              const SectionHeader(
+                title: 'Últimos movimientos',
+                subtitle: 'Cada venta y cada gasto del día, en orden.',
               ),
+              const SizedBox(height: 10),
+              if (recent.isEmpty)
+                EmptyCard(
+                  icon: Icons.receipt_long_rounded,
+                  title: store.hasProducts
+                      ? 'Todavía no registraste ventas hoy'
+                      : 'Caja Clara está lista para empezar.',
+                  message: store.hasProducts
+                      ? 'Cuando registres una venta o un gasto, lo ves acá al instante.'
+                      : demoControlsEnabled
+                      ? 'Cargá productos, registrá ventas o probá una demo cuando quieras.'
+                      : 'Cargá productos o usá una plantilla para empezar a vender.',
+                  action: Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      FilledButton(
+                        onPressed: store.hasProducts
+                            ? onNewSale
+                            : onApplyStarterTemplate,
+                        child: Text(
+                          store.hasProducts
+                              ? 'Registrar primera venta'
+                              : applyingStarterTemplate
+                              ? 'Cargando plantilla...'
+                              : 'Cargar plantilla kiosco',
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => showProductEditor(context, store),
+                        child: const Text('Cargar producto'),
+                      ),
+                      if (!store.hasProducts &&
+                          demoControlsEnabled &&
+                          store.canLoadCommercialDemo)
+                        TextButton(
+                          onPressed: loadingCommercialDemo
+                              ? null
+                              : onLoadCommercialDemo,
+                          child: Text(
+                            loadingCommercialDemo
+                                ? 'Cargando demo...'
+                                : 'Cargar datos de demo',
+                          ),
+                        ),
+                    ],
+                  ),
+                )
+              else
+                BpcPanel(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
+                  child: Column(
+                    children: [
+                      for (var index = 0; index < recent.length; index++)
+                        MovementsListTile(
+                          movement: recent[index],
+                          productName: store
+                              .productById(recent[index].productId ?? '')
+                              ?.name,
+                          onCreateProductFromFreeSale: recent[index].isFreeSale
+                              ? () => onCreateProductFromFreeSale(recent[index])
+                              : null,
+                          showDivider: index != recent.length - 1,
+                        ),
+                    ],
+                  ),
+                ),
               const SizedBox(height: 18),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+/// Saludo del día con la marca, compacto y claro.
+class _HomeGreeting extends StatelessWidget {
+  const _HomeGreeting({required this.now});
+
+  final DateTime now;
+
+  String get _greeting {
+    final hour = now.hour;
+    if (hour < 13) {
+      return 'Buen día';
+    }
+    if (hour < 20) {
+      return 'Buenas tardes';
+    }
+    return 'Buenas noches';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return BpcPanel(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      elevated: false,
+      child: Row(
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            padding: const EdgeInsets.all(9),
+            decoration: BoxDecoration(
+              color: BpcColors.accentStrong,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: BpcColors.accentStrong.withValues(alpha: 0.24),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: const CajaClaraSymbol(size: 36),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$_greeting · ${formatShortDate(now)}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: BpcColors.subtleInk,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Caja Clara',
+                  style: theme.textTheme.titleLarge?.copyWith(fontSize: 24),
+                ),
+              ],
+            ),
+          ),
+          if (MediaQuery.sizeOf(context).width >= 420) ...[
+            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: BpcColors.accentSoft,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: BpcColors.accent.withValues(alpha: 0.18),
+                ),
+              ),
+              child: Text(
+                'Luna Systems',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: BpcColors.accentStrong,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Banner de estado de caja: guía a abrir la caja antes de vender.
+class _CashStatusBanner extends StatelessWidget {
+  const _CashStatusBanner({
+    required this.store,
+    required this.onOpenCashRegister,
+  });
+
+  final CommerceStore store;
+  final VoidCallback onOpenCashRegister;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final open = store.hasCashOpeningToday;
+    final color = open ? BpcColors.income : BpcColors.accentStrong;
+    final opening = store.todayOpeningCashPesos;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.24)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              open ? Icons.lock_open_rounded : Icons.savings_rounded,
+              color: color,
+            ),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  open ? 'Caja abierta' : 'Todavía no abriste la caja',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: BpcColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  open
+                      ? 'Apertura del día: ${formatMoney(opening ?? 0)}.'
+                      : 'Primero abrí la caja para empezar a vender.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: BpcColors.subtleInk,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          open
+              ? OutlinedButton(
+                  onPressed: onOpenCashRegister,
+                  child: const Text('Editar'),
+                )
+              : FilledButton.icon(
+                  onPressed: onOpenCashRegister,
+                  icon: const Icon(Icons.savings_rounded, size: 18),
+                  label: const Text('Abrir caja'),
+                ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Grilla de 4 KPIs principales del Home.
+class _HomeKpiGrid extends StatelessWidget {
+  const _HomeKpiGrid({
+    required this.store,
+    required this.onOpenCash,
+    required this.onOpenProducts,
+  });
+
+  final CommerceStore store;
+  final VoidCallback onOpenCash;
+  final VoidCallback onOpenProducts;
+
+  @override
+  Widget build(BuildContext context) {
+    final lowStock = store.lowStockCount;
+    final cards = <Widget>[
+      KpiCard(
+        label: 'Ventas',
+        value: formatMoney(store.todaySalesPesos),
+        icon: Icons.trending_up_rounded,
+        accent: BpcColors.accent,
+        helper:
+            '${store.todaySalesCount} ${store.todaySalesCount == 1 ? 'venta' : 'ventas'} registradas',
+      ),
+      KpiCard(
+        label: 'Gastos',
+        value: formatMoney(store.todayExpensesPesos),
+        icon: Icons.south_east_rounded,
+        accent: BpcColors.expense,
+        helper: store.todayExpensesPesos == 0
+            ? 'Sin gastos registrados'
+            : 'Salidas de caja de hoy',
+      ),
+      KpiCard(
+        label: 'Caja del día',
+        value: store.todayExpectedCashPesos == null
+            ? 'Sin apertura'
+            : formatMoney(store.todayExpectedCashPesos!),
+        icon: Icons.account_balance_wallet_rounded,
+        accent: BpcColors.accentStrong,
+        helper: store.todayExpectedCashPesos == null
+            ? 'Abrí la caja para ver el saldo'
+            : 'Apertura + ventas - gastos',
+        onTap: onOpenCash,
+      ),
+      KpiCard(
+        label: 'Productos',
+        value: '${store.products.length}',
+        icon: Icons.inventory_2_rounded,
+        accent: lowStock == 0 ? BpcColors.accent : BpcColors.warning,
+        helper: lowStock == 0
+            ? 'Catálogo activo'
+            : lowStock == 1
+            ? '1 producto a reponer'
+            : '$lowStock productos a reponer',
+        onTap: onOpenProducts,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 720
+            ? 4
+            : constraints.maxWidth >= 440
+            ? 2
+            : 1;
+        final spacing = 12.0;
+        final width =
+            (constraints.maxWidth - spacing * (columns - 1)) / columns;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final card in cards) SizedBox(width: width, child: card),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PrimaryActions extends StatelessWidget {
+  const _PrimaryActions({required this.onNewSale});
+
+  final VoidCallback onNewSale;
+
+  @override
+  Widget build(BuildContext context) {
+    return ActionCard(
+      title: 'Nueva venta',
+      subtitle: 'Vendé en segundos y se actualiza la caja.',
+      icon: Icons.shopping_bag_rounded,
+      onTap: onNewSale,
+      fillColor: BpcColors.accentStrong,
+      contentColor: Colors.white,
+      emphasized: true,
+    );
+  }
+}
+
+/// Accesos rápidos del Home en grilla de tarjetas.
+class _QuickActionsPanel extends StatelessWidget {
+  const _QuickActionsPanel({
+    required this.onAddProduct,
+    required this.onOpenCash,
+    required this.onNewExpense,
+    required this.onExportExcel,
+    required this.exportingExcel,
+  });
+
+  final VoidCallback onAddProduct;
+  final VoidCallback onOpenCash;
+  final VoidCallback onNewExpense;
+  final VoidCallback onExportExcel;
+  final bool exportingExcel;
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = <Widget>[
+      _QuickAction(
+        title: 'Cargar producto',
+        subtitle: 'Nombre, precio, stock y código',
+        icon: Icons.add_box_rounded,
+        onTap: onAddProduct,
+      ),
+      _QuickAction(
+        title: 'Registrar gasto',
+        subtitle: 'Anotá una salida de la caja',
+        icon: Icons.receipt_long_rounded,
+        onTap: onNewExpense,
+      ),
+      _QuickAction(
+        title: 'Ver caja del día',
+        subtitle: 'Cuánto entró, salió y queda',
+        icon: Icons.account_balance_wallet_rounded,
+        onTap: onOpenCash,
+      ),
+      _QuickAction(
+        title: 'Exportar Excel',
+        subtitle: 'Guardá un respaldo del día',
+        icon: Icons.file_download_rounded,
+        onTap: exportingExcel ? null : onExportExcel,
+        busy: exportingExcel,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 560 ? 2 : 1;
+        const spacing = 12.0;
+        final width =
+            (constraints.maxWidth - spacing * (columns - 1)) / columns;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final action in actions) SizedBox(width: width, child: action),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _QuickAction extends StatelessWidget {
+  const _QuickAction({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+    this.busy = false,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: BpcColors.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: BpcColors.line),
+            boxShadow: const [
+              BoxShadow(
+                color: BpcColors.shadow,
+                blurRadius: 16,
+                offset: Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: BpcColors.greenDark.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: busy
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(icon, color: BpcColors.greenDark, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: BpcColors.ink,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: BpcColors.subtleInk,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: BpcColors.subtleInk,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GuideCard extends StatelessWidget {
+  const _GuideCard({
+    required this.title,
+    required this.steps,
+    required this.actionLabel,
+    required this.onAction,
+  });
+
+  final String title;
+  final List<String> steps;
+  final String actionLabel;
+  final VoidCallback onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return BpcPanel(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+      color: BpcColors.surfaceStrong,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: BpcColors.greenDark.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.flag_rounded,
+                  color: BpcColors.greenDark,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: BpcColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          for (var index = 0; index < steps.length; index++)
+            Padding(
+              padding: EdgeInsets.only(
+                bottom: index == steps.length - 1 ? 0 : 8,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: const BoxDecoration(
+                      color: BpcColors.greenDark,
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      '${index + 1}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Text(
+                        steps[index],
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: BpcColors.ink,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 14),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.tonalIcon(
+              onPressed: onAction,
+              icon: const Icon(Icons.arrow_forward_rounded),
+              label: Text(actionLabel),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LowStockBanner extends StatelessWidget {
+  const _LowStockBanner({required this.count, required this.onTap});
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+          decoration: BoxDecoration(
+            color: BpcColors.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: BpcColors.accent.withValues(alpha: 0.18)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: BpcColors.accentSoft,
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Icon(
+                  Icons.inventory_2_rounded,
+                  color: BpcColors.accentStrong,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Hay productos con poco stock',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: BpcColors.ink,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      count == 1
+                          ? 'Te falta 1 producto por reponer.'
+                          : 'Te faltan $count productos por reponer.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: BpcColors.mutedInk,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              TextButton(onPressed: onTap, child: const Text('Ver productos')),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -165,24 +856,35 @@ class _FreeSaleSuggestionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return BpcPanel(
-      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      color: BpcColors.surfaceStrong,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Venta libre repetida',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: BpcColors.ink,
-              fontWeight: FontWeight.w900,
-            ),
+          Row(
+            children: [
+              const Icon(
+                Icons.tips_and_updates_rounded,
+                color: BpcColors.gold,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Venta libre repetida',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: BpcColors.ink,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 6),
           Text(
-            '"${suggestion.displayDescription}" se viene vendiendo seguido. Si quieres, puedes pasarlo al catalogo sin tocar la historia.',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: BpcColors.subtleInk),
+            '"${suggestion.displayDescription}" se viene vendiendo seguido. Si querés, podés pasarlo al catálogo sin tocar la historia.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: BpcColors.subtleInk,
+            ),
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -190,12 +892,12 @@ class _FreeSaleSuggestionCard extends StatelessWidget {
             runSpacing: 10,
             children: [
               _SuggestionMeta(
-                label: 'Se vendio',
+                label: 'Se vendió',
                 value:
                     '${suggestion.repeatCount} ${suggestion.repeatCount == 1 ? 'vez' : 'veces'}',
               ),
               _SuggestionMeta(
-                label: 'Ultima venta',
+                label: 'Última venta',
                 value: formatCompactDateLabel(suggestion.latestSoldAt),
               ),
               _SuggestionMeta(
@@ -204,7 +906,7 @@ class _FreeSaleSuggestionCard extends StatelessWidget {
               ),
               if (suggestion.latestUnitPricePesos != null)
                 _SuggestionMeta(
-                  label: 'Ultimo precio',
+                  label: 'Último precio',
                   value: formatMoney(suggestion.latestUnitPricePesos!),
                 ),
             ],
@@ -219,7 +921,7 @@ class _FreeSaleSuggestionCard extends StatelessWidget {
                 icon: const Icon(Icons.add_box_rounded),
                 label: const Text('Crear producto'),
               ),
-              TextButton(onPressed: onDismiss, child: const Text('Mas tarde')),
+              TextButton(onPressed: onDismiss, child: const Text('Más tarde')),
             ],
           ),
         ],
@@ -236,8 +938,13 @@ class _SuggestionMeta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 112, maxWidth: 168),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: BpcColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: BpcColors.line),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -262,678 +969,132 @@ class _SuggestionMeta extends StatelessWidget {
   }
 }
 
-class _HeaderStrip extends StatelessWidget {
-  const _HeaderStrip({required this.now, required this.store});
+class _CommercialDemoCard extends StatelessWidget {
+  const _CommercialDemoCard({
+    required this.hasDemoData,
+    required this.onCleanCommercialDemo,
+    required this.onResetCommercialDemo,
+    required this.onResetAllData,
+    required this.cleaningCommercialDemo,
+    required this.resettingCommercialDemo,
+    required this.resettingAllData,
+  });
 
-  final DateTime now;
-  final CommerceStore store;
+  final bool hasDemoData;
+  final VoidCallback onCleanCommercialDemo;
+  final VoidCallback onResetCommercialDemo;
+  final VoidCallback onResetAllData;
+  final bool cleaningCommercialDemo;
+  final bool resettingCommercialDemo;
+  final bool resettingAllData;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final statusChips = [
-      _HomeStatusChip(
-        label: store.hasCashOpeningToday ? 'Caja abierta' : 'Abrir caja',
-        color: store.hasCashOpeningToday
-            ? BpcColors.income
-            : Theme.of(context).colorScheme.error,
-        icon: store.hasCashOpeningToday
-            ? Icons.verified_outlined
-            : Icons.login_rounded,
-      ),
-      _HomeStatusChip(
-        label: store.lowStockCount == 0
-            ? 'Stock al dia'
-            : '${store.lowStockCount} con alerta',
-        color: store.lowStockCount == 0
-            ? BpcColors.greenSoft
-            : BpcColors.sandMuted,
-        icon: store.lowStockCount == 0
-            ? Icons.inventory_2_outlined
-            : Icons.warning_amber_rounded,
-      ),
-      _HomeStatusChip(
-        label: store.productsWithBarcodeCount == 0
-            ? 'Sin codigos'
-            : '${store.productsWithBarcodeCount} con codigo',
-        color: store.productsWithBarcodeCount == 0
-            ? BpcColors.sandMuted
-            : BpcColors.greenSoft,
-        icon: Icons.qr_code_2_rounded,
-      ),
-    ];
-    final metrics = [
-      _WorkspaceMetric(
-        label: 'Ventas del dia',
-        value: formatMoney(store.todaySalesPesos),
-        helper: store.todaySalesCount > 0
-            ? '${store.todaySalesCount} ventas hoy'
-            : store.hasProducts
-            ? 'Haz la primera venta del dia'
-            : 'Empieza cargando un producto',
-      ),
-      _WorkspaceMetric(
-        label: 'Caja actual',
-        value: formatMoney(store.cashBalancePesos),
-        helper: store.todayExpectedCashPesos != null
-            ? 'Hoy deberia dar ${formatMoney(store.todayExpectedCashPesos!)}'
-            : store.hasCashOpeningToday
-            ? 'Caja en marcha'
-            : 'Conviene abrir caja',
-      ),
-      _WorkspaceMetric(
-        label: 'Listos para vender',
-        value: '${store.sellableProductsCount}',
-        helper: store.products.isEmpty
-            ? 'Agrega el primero y ya puedes vender'
-            : store.lowStockCount == 0
-            ? '${store.products.length} cargados en total'
-            : '${store.lowStockCount} con alerta',
-      ),
-    ];
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final wide = constraints.maxWidth >= 1040;
-        final brandCard = Container(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-          decoration: BoxDecoration(
-            color: BpcColors.greenDeep,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: const [
-              BoxShadow(
-                color: BpcColors.shadow,
-                blurRadius: 16,
-                offset: Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
+    return BpcPanel(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      color: BpcColors.greenDark.withValues(alpha: 0.06),
+      borderColor: BpcColors.greenDark.withValues(alpha: 0.14),
+      elevated: false,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 760;
+          final copy = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const CajaClaraSmallMark(size: 34),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Caja Clara',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.68),
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Mostrador al dia',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
               Text(
-                formatShortDate(now),
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  color: Colors.white,
+                'Demo comercial',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: BpcColors.ink,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 3),
               Text(
-                'Vende, controla y revisa el dia sin salir de la app.',
+                'Volvé al ejemplo inicial para grabar ventas, gastos, caja y Excel desde cero.',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.82),
+                  color: BpcColors.subtleInk,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 16),
-              Wrap(spacing: 8, runSpacing: 8, children: statusChips),
             ],
-          ),
-        );
-
-        final metricsColumn = Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Hoy en un vistazo',
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: BpcColors.mutedInk,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 10),
-            for (var index = 0; index < metrics.length; index++)
-              _WorkspaceMetricCard(
-                metric: metrics[index],
-                showDivider: index != 0,
-              ),
-          ],
-        );
-
-        if (!wide) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [brandCard, const SizedBox(height: 18), metricsColumn],
           );
-        }
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(flex: 5, child: brandCard),
-            const SizedBox(width: 28),
-            Expanded(flex: 4, child: metricsColumn),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _HomeStatusChip extends StatelessWidget {
-  const _HomeStatusChip({
-    required this.label,
-    required this.color,
-    required this.icon,
-  });
-
-  final String label;
-  final Color color;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WorkspaceMetric {
-  const _WorkspaceMetric({
-    required this.label,
-    required this.value,
-    required this.helper,
-  });
-
-  final String label;
-  final String value;
-  final String helper;
-}
-
-class _WorkspaceMetricCard extends StatelessWidget {
-  const _WorkspaceMetricCard({required this.metric, this.showDivider = true});
-
-  final _WorkspaceMetric metric;
-  final bool showDivider;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(0, 14, 0, 14),
-      decoration: BoxDecoration(
-        border: showDivider
-            ? Border(top: BorderSide(color: BpcColors.line))
-            : null,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            metric.label,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: BpcColors.mutedInk,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            metric.value,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              color: BpcColors.ink,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            metric.helper,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: BpcColors.subtleInk,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HomeFocusPanel extends StatelessWidget {
-  const _HomeFocusPanel({required this.items});
-
-  final List<_HomeFocusItem> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return BpcPanel(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
-      color: Colors.white.withValues(alpha: 0.8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SectionHeader(
-            title: 'Que mirar hoy',
-            subtitle: 'Senales simples para decidir rapido sin abrir reportes.',
-          ),
-          const SizedBox(height: 14),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final columns = constraints.maxWidth >= 980
-                  ? 3
-                  : constraints.maxWidth >= 620
-                  ? 2
-                  : 1;
-              final spacing = 12.0;
-              final totalGap = columns > 1 ? spacing * (columns - 1) : 0.0;
-              final itemWidth = (constraints.maxWidth - totalGap) / columns;
-              return Wrap(
-                spacing: spacing,
-                runSpacing: 12,
-                children: items
-                    .map(
-                      (item) => SizedBox(
-                        width: columns == 1 ? constraints.maxWidth : itemWidth,
-                        child: _HomeFocusCard(item: item),
-                      ),
-                    )
-                    .toList(growable: false),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HomeFocusCard extends StatelessWidget {
-  const _HomeFocusCard({required this.item});
-
-  final _HomeFocusItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: BpcColors.line),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: scheme.primary.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(item.icon, color: scheme.primary),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: BpcColors.ink,
-                    fontWeight: FontWeight.w900,
+          final actions = Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              if (hasDemoData)
+                FilledButton.tonalIcon(
+                  onPressed: cleaningCommercialDemo
+                      ? null
+                      : onCleanCommercialDemo,
+                  icon: cleaningCommercialDemo
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.cleaning_services_rounded),
+                  label: Text(
+                    cleaningCommercialDemo
+                        ? 'Limpiando...'
+                        : 'Limpiar datos de demo',
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  item.message,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: BpcColors.subtleInk,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HomeFocusItem {
-  const _HomeFocusItem({
-    required this.title,
-    required this.message,
-    required this.icon,
-  });
-
-  final String title;
-  final String message;
-  final IconData icon;
-}
-
-List<_HomeFocusItem> _buildHomeFocusItems(CommerceStore store) {
-  final items = <_HomeFocusItem>[];
-  final topSelling = store.topSellingProductsToday(limit: 1);
-  final urgentRestock = store.urgentRestockProducts(limit: 1);
-  final lowRotation = store.lowRotationProducts(limit: 1);
-  final suggestions = store.freeSaleSuggestions;
-
-  if (!store.hasCashOpeningToday) {
-    items.add(
-      const _HomeFocusItem(
-        title: 'Abrir caja',
-        message:
-            'Marca el efectivo inicial y despues comparas el cierre con una referencia real.',
-        icon: Icons.login_rounded,
-      ),
-    );
-  }
-
-  if (store.hasProducts && store.todaySalesCount == 0) {
-    items.add(
-      const _HomeFocusItem(
-        title: 'Primera venta pendiente',
-        message:
-            'En cuanto cobres algo, caja, resumen y comprobante quedan al dia.',
-        icon: Icons.shopping_bag_rounded,
-      ),
-    );
-  }
-
-  if (topSelling.isNotEmpty) {
-    final product = topSelling.first;
-    items.add(
-      _HomeFocusItem(
-        title: 'Mas vendido hoy',
-        message:
-            '${product.product.name} lleva ${product.unitsSold} u. y conviene mirar si alcanza el stock.',
-        icon: Icons.trending_up_rounded,
-      ),
-    );
-  }
-
-  if (urgentRestock.isNotEmpty) {
-    final product = urgentRestock.first;
-    items.add(
-      _HomeFocusItem(
-        title: 'Reponer pronto',
-        message:
-            '${product.product.name} quedo en ${product.product.stockUnits} u. y ya esta pidiendo reposicion.',
-        icon: Icons.inventory_2_rounded,
-      ),
-    );
-  }
-
-  if (suggestions.isNotEmpty) {
-    final suggestion = suggestions.first;
-    items.add(
-      _HomeFocusItem(
-        title: 'Pasar al catalogo',
-        message:
-            '"${suggestion.displayDescription}" ya se vendio ${suggestion.repeatCount} veces y puede quedar como producto.',
-        icon: Icons.add_box_rounded,
-      ),
-    );
-  }
-
-  if (lowRotation.hasEnoughHistory && lowRotation.products.isNotEmpty) {
-    final product = lowRotation.products.first;
-    items.add(
-      _HomeFocusItem(
-        title: 'Revisar antes de comprar',
-        message:
-            '${product.product.name} tiene poca salida. Conviene mirarlo antes de volver a reponer.',
-        icon: Icons.visibility_rounded,
-      ),
-    );
-  }
-
-  if (items.isEmpty && store.hasMovements) {
-    items.add(
-      _HomeFocusItem(
-        title: 'Dia en marcha',
-        message:
-            '${store.todayMovementCount} movimientos guardados. En Resumen ves caja, ventas y gastos del dia.',
-        icon: Icons.insights_rounded,
-      ),
-    );
-  }
-
-  return items.take(3).toList(growable: false);
-}
-
-class _ActionWorkspace extends StatelessWidget {
-  const _ActionWorkspace({
-    required this.onRegisterCashOpening,
-    required this.onNewSale,
-    required this.onNewExpense,
-    required this.onScanProduct,
-    required this.lowStockCount,
-    required this.onAddProduct,
-    required this.onOpenLowStock,
-    required this.onExportExcel,
-    required this.exportingExcel,
-    required this.hasProducts,
-    required this.hasCashOpeningToday,
-    required this.savingCashEvent,
-  });
-
-  final VoidCallback onRegisterCashOpening;
-  final VoidCallback onNewSale;
-  final VoidCallback onNewExpense;
-  final VoidCallback onScanProduct;
-  final int lowStockCount;
-  final VoidCallback onAddProduct;
-  final VoidCallback onOpenLowStock;
-  final VoidCallback onExportExcel;
-  final bool exportingExcel;
-  final bool hasProducts;
-  final bool hasCashOpeningToday;
-  final bool savingCashEvent;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final prioritizeCatalog = !hasProducts;
-    final prioritizeCashOpening = hasProducts && !hasCashOpeningToday;
-    final sectionTitle = prioritizeCatalog
-        ? 'Empieza con tu primer producto'
-        : prioritizeCashOpening
-        ? 'Abre caja y vende'
-        : 'Siguiente paso';
-    final sectionSubtitle = prioritizeCatalog
-        ? 'Con nombre, precio y stock ya puedes arrancar hoy. Lo demas puede esperar.'
-        : prioritizeCashOpening
-        ? 'Marca el efectivo inicial y sigue con la primera venta.'
-        : 'Nueva venta arriba. Caja, gastos y stock quedan a mano.';
-    final primaryOpenCash = ActionCard(
-      title: savingCashEvent
-          ? 'Guardando apertura'
-          : hasCashOpeningToday
-          ? 'Editar apertura'
-          : 'Abrir caja',
-      subtitle: hasCashOpeningToday
-          ? 'La caja ya esta abierta. Ajusta el efectivo si hace falta.'
-          : 'Marca el efectivo inicial del dia.',
-      icon: hasCashOpeningToday ? Icons.edit_note_rounded : Icons.login_rounded,
-      onTap: onRegisterCashOpening,
-      fillColor: prioritizeCashOpening ? scheme.primary : null,
-      contentColor: prioritizeCashOpening ? scheme.onPrimary : null,
-      emphasized: prioritizeCashOpening,
-    );
-    final primaryNewSale = ActionCard(
-      title: 'Nueva venta',
-      subtitle: hasProducts
-          ? 'Elige producto, marca el cobro y confirma.'
-          : 'Si necesitas cobrar ya, usa venta libre.',
-      icon: Icons.shopping_bag_rounded,
-      onTap: onNewSale,
-      fillColor: prioritizeCashOpening || prioritizeCatalog
-          ? null
-          : scheme.primary,
-      contentColor: prioritizeCashOpening || prioritizeCatalog
-          ? null
-          : scheme.onPrimary,
-      emphasized: !prioritizeCashOpening && !prioritizeCatalog,
-    );
-    final primaryAddProduct = ActionCard(
-      title: 'Agregar producto',
-      subtitle: hasProducts
-          ? 'Carga nombre, precio y stock. Lo demas puede esperar.'
-          : 'Empieza con nombre, precio y stock.',
-      icon: Icons.add_box_rounded,
-      onTap: onAddProduct,
-      fillColor: prioritizeCatalog ? scheme.primary : null,
-      contentColor: prioritizeCatalog ? scheme.onPrimary : null,
-      emphasized: prioritizeCatalog,
-    );
-    final orderedPrimaryActions = prioritizeCashOpening
-        ? hasProducts
-              ? [primaryOpenCash, primaryNewSale, primaryAddProduct]
-              : [primaryOpenCash, primaryAddProduct, primaryNewSale]
-        : prioritizeCatalog
-        ? [primaryAddProduct, primaryNewSale, primaryOpenCash]
-        : [primaryNewSale, primaryOpenCash, primaryAddProduct];
-    final secondaryActions = [
-      _ActionShortcut(
-        title: 'Registrar gasto',
-        subtitle: 'Anota una salida y deja la caja del dia clara',
-        icon: Icons.receipt_long_rounded,
-        onTap: onNewExpense,
-      ),
-      _ActionShortcut(
-        title: 'Escanear producto',
-        subtitle: 'Camara, lector o codigo manual',
-        icon: Icons.qr_code_scanner_rounded,
-        onTap: onScanProduct,
-      ),
-      _ActionShortcut(
-        title: 'Ver stock bajo',
-        subtitle: !hasProducts
-            ? 'Todavia no hay productos cargados'
-            : lowStockCount == 0
-            ? 'Sin alertas de reposicion'
-            : '$lowStockCount productos a reponer',
-        icon: Icons.warning_amber_rounded,
-        onTap: onOpenLowStock,
-      ),
-      _ActionShortcut(
-        title: 'Exportar Excel',
-        subtitle: exportingExcel
-            ? 'Preparando archivo'
-            : hasProducts
-            ? 'Comparte o revisa el dia fuera de la app'
-            : 'Disponible cuando empieces a cargar datos',
-        icon: Icons.file_download_rounded,
-        onTap: onExportExcel,
-      ),
-    ];
-
-    return BpcPanel(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
-      color: Colors.white.withValues(alpha: 0.8),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 1040;
-          final shortcuts = _ActionShortcutGroup(
-            title: 'Tambien puedes',
-            actions: secondaryActions,
-          );
-
-          final primaryActions = wide
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(flex: 5, child: orderedPrimaryActions[0]),
-                    const SizedBox(width: 14),
-                    Expanded(flex: 4, child: orderedPrimaryActions[1]),
-                    const SizedBox(width: 14),
-                    Expanded(flex: 4, child: orderedPrimaryActions[2]),
-                  ],
                 )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    orderedPrimaryActions[0],
-                    const SizedBox(height: 12),
-                    orderedPrimaryActions[1],
-                    const SizedBox(height: 12),
-                    orderedPrimaryActions[2],
-                  ],
-                );
+              else
+                FilledButton.tonalIcon(
+                  onPressed: resettingCommercialDemo
+                      ? null
+                      : onResetCommercialDemo,
+                  icon: resettingCommercialDemo
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.restart_alt_rounded),
+                  label: Text(
+                    resettingCommercialDemo
+                        ? 'Reiniciando...'
+                        : 'Restablecer demo',
+                  ),
+                ),
+              TextButton.icon(
+                onPressed: resettingAllData ? null : onResetAllData,
+                icon: resettingAllData
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.delete_forever_rounded),
+                label: Text(
+                  resettingAllData
+                      ? 'Restableciendo...'
+                      : 'Restablecer Caja Clara',
+                ),
+              ),
+            ],
+          );
 
-          if (!wide) {
+          if (compact) {
             return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SectionHeader(title: sectionTitle, subtitle: sectionSubtitle),
-                const SizedBox(height: 16),
-                primaryActions,
-                const SizedBox(height: 18),
-                shortcuts,
-              ],
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [copy, const SizedBox(height: 12), actions],
             );
           }
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          return Row(
             children: [
-              SectionHeader(title: sectionTitle, subtitle: sectionSubtitle),
-              const SizedBox(height: 16),
-              primaryActions,
-              const SizedBox(height: 18),
-              shortcuts,
+              const Icon(
+                Icons.video_settings_rounded,
+                color: BpcColors.greenDark,
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: copy),
+              const SizedBox(width: 12),
+              actions,
             ],
           );
         },
@@ -942,388 +1103,97 @@ class _ActionWorkspace extends StatelessWidget {
   }
 }
 
-class _ActionShortcut {
-  const _ActionShortcut({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final VoidCallback onTap;
-}
-
-class _ActionShortcutGroup extends StatelessWidget {
-  const _ActionShortcutGroup({required this.title, required this.actions});
-
-  final String title;
-  final List<_ActionShortcut> actions;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: BpcColors.mutedInk,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        const SizedBox(height: 8),
-        for (var index = 0; index < actions.length; index++)
-          _ActionShortcutRow(action: actions[index], showDivider: index != 0),
-      ],
-    );
-  }
-}
-
-class _ActionShortcutRow extends StatelessWidget {
-  const _ActionShortcutRow({required this.action, this.showDivider = true});
-
-  final _ActionShortcut action;
-  final bool showDivider;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: action.onTap,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            border: showDivider
-                ? Border(top: BorderSide(color: BpcColors.line))
-                : null,
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  action.icon,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      action.title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: BpcColors.ink,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      action.subtitle,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: BpcColors.subtleInk,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: BpcColors.mutedInk,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HomeMovementsPanel extends StatelessWidget {
-  const _HomeMovementsPanel({
-    required this.store,
-    required this.recent,
-    required this.applyingStarterTemplate,
-    required this.onNewSale,
-    required this.onApplyStarterTemplate,
-    required this.onAddProduct,
-    required this.onCreateProductFromFreeSale,
-    required this.showInitialSetupChoice,
-  });
-
-  final CommerceStore store;
-  final List<Movement> recent;
-  final bool applyingStarterTemplate;
-  final VoidCallback onNewSale;
-  final VoidCallback onApplyStarterTemplate;
-  final VoidCallback onAddProduct;
-  final Future<void> Function(Movement movement) onCreateProductFromFreeSale;
-  final bool showInitialSetupChoice;
-
-  @override
-  Widget build(BuildContext context) {
-    return BpcPanel(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-      color: Colors.white.withValues(alpha: 0.8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SectionHeader(
-            title: 'Ultimos movimientos',
-            subtitle: 'Todo lo que movio caja y stock, en una sola lista.',
-            trailing: Text(
-              recent.isEmpty ? 'Sin actividad' : '${recent.length} recientes',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: BpcColors.mutedInk,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (recent.isEmpty)
-            EmptyCard(
-              title: store.hasProducts
-                  ? 'Todavia no registraste movimientos'
-                  : 'Todavia no hay actividad',
-              message: store.hasProducts
-                  ? 'La primera venta o gasto deja caja, resumen y stock al dia.'
-                  : showInitialSetupChoice
-                  ? 'Arriba puedes cargar tu negocio o recorrer un ejemplo. Aqui vas a ver ventas y gastos del dia.'
-                  : 'Agrega tu primer producto y la actividad del dia va a aparecer aqui.',
-              action: Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                alignment: WrapAlignment.center,
-                children: [
-                  FilledButton(
-                    onPressed: store.hasProducts ? onNewSale : onAddProduct,
-                    child: Text(
-                      store.hasProducts ? 'Nueva venta' : 'Agregar producto',
-                    ),
-                  ),
-                  if (!store.hasProducts && !showInitialSetupChoice)
-                    TextButton(
-                      onPressed: applyingStarterTemplate
-                          ? null
-                          : onApplyStarterTemplate,
-                      child: Text(
-                        applyingStarterTemplate
-                            ? 'Cargando base...'
-                            : 'Cargar base simple',
-                      ),
-                    ),
-                  if (store.hasProducts)
-                    TextButton(
-                      onPressed: onAddProduct,
-                      child: const Text('Agregar producto'),
-                    ),
-                ],
-              ),
-              framed: false,
-            )
-          else
-            Column(
-              children: [
-                for (var index = 0; index < recent.length; index++)
-                  MovementsListTile(
-                    movement: recent[index],
-                    productName: store
-                        .productById(recent[index].productId ?? '')
-                        ?.name,
-                    onCreateProductFromFreeSale: recent[index].isFreeSale
-                        ? () => onCreateProductFromFreeSale(recent[index])
-                        : null,
-                    showDivider: index != recent.length - 1,
-                  ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-}
-
 class _StarterTemplateCard extends StatelessWidget {
   const _StarterTemplateCard({
     required this.onApplyStarterTemplate,
-    required this.onLoadDemoData,
-    required this.onChooseEmptyCatalogStart,
     required this.onAddProduct,
+    required this.onLoadCommercialDemo,
     required this.applyingStarterTemplate,
-    required this.loadingDemoData,
-    required this.canLoadDemoData,
-    required this.hasMovements,
-    required this.showInitialSetupChoice,
+    required this.loadingCommercialDemo,
   });
 
   final VoidCallback onApplyStarterTemplate;
-  final VoidCallback onLoadDemoData;
-  final VoidCallback onChooseEmptyCatalogStart;
   final VoidCallback onAddProduct;
+  final VoidCallback? onLoadCommercialDemo;
   final bool applyingStarterTemplate;
-  final bool loadingDemoData;
-  final bool canLoadDemoData;
-  final bool hasMovements;
-  final bool showInitialSetupChoice;
+  final bool loadingCommercialDemo;
 
   @override
   Widget build(BuildContext context) {
-    final title = showInitialSetupChoice
-        ? 'Empieza hoy'
-        : hasMovements
-        ? 'Catalogo para completar'
-        : 'Catalogo vacio';
-    final message = showInitialSetupChoice
-        ? 'Carga tu negocio ahora o recorre un ejemplo corto. Con un producto bien cargado ya puedes vender.'
-        : hasMovements
-        ? 'Ya hay movimientos guardados en esta PC, asi que conviene sumar productos reales sin tocar ese historial.'
-        : 'Con nombre, precio y stock en un producto ya puedes vender.';
+    final theme = Theme.of(context);
     return BpcPanel(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-      color: Theme.of(
-        context,
-      ).colorScheme.surfaceContainerLow.withValues(alpha: 0.82),
-      showShadow: false,
+      padding: const EdgeInsets.all(18),
+      color: BpcColors.surfaceStrong,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SectionHeader(title: title, subtitle: message),
+          Text(
+            'Arrancá con una base de kiosco',
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: BpcColors.ink,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Elegí cómo empezar:',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: BpcColors.subtleInk,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            onLoadCommercialDemo == null
+                ? 'Cargá productos a mano o usá una base editable para empezar más rápido.'
+                : 'Probá con datos de demo: carga productos, ventas, gastos y stock de ejemplo para ver la app funcionando.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: BpcColors.subtleInk,
+            ),
+          ),
           const SizedBox(height: 14),
           Wrap(
             spacing: 10,
             runSpacing: 10,
             children: [
-              if (showInitialSetupChoice)
+              if (onLoadCommercialDemo != null)
                 FilledButton.icon(
-                  onPressed: loadingDemoData ? null : onChooseEmptyCatalogStart,
-                  icon: const Icon(Icons.add_business_rounded),
-                  label: const Text('Cargar mi negocio'),
-                ),
-              if (showInitialSetupChoice)
-                OutlinedButton.icon(
-                  onPressed: loadingDemoData ? null : onLoadDemoData,
-                  icon: loadingDemoData
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.play_circle_rounded),
-                  label: Text(
-                    loadingDemoData
-                        ? 'Cargando ejemplo...'
-                        : 'Probar con ejemplo',
-                  ),
-                ),
-              if (!showInitialSetupChoice)
-                FilledButton.icon(
-                  onPressed: onAddProduct,
-                  icon: const Icon(Icons.add_box_rounded),
-                  label: const Text('Agregar producto'),
-                ),
-              if (!showInitialSetupChoice && !hasMovements)
-                OutlinedButton.icon(
-                  onPressed: applyingStarterTemplate || loadingDemoData
+                  onPressed: loadingCommercialDemo
                       ? null
-                      : onApplyStarterTemplate,
-                  icon: applyingStarterTemplate
+                      : onLoadCommercialDemo,
+                  icon: loadingCommercialDemo
                       ? const SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.storefront_rounded),
+                      : const Icon(Icons.auto_awesome_rounded),
                   label: Text(
-                    applyingStarterTemplate
-                        ? 'Cargando base...'
-                        : 'Cargar base simple',
+                    loadingCommercialDemo
+                        ? 'Cargando demo...'
+                        : 'Probá con datos de demo',
                   ),
                 ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CatalogReadinessCard extends StatelessWidget {
-  const _CatalogReadinessCard({required this.store});
-
-  final CommerceStore store;
-
-  @override
-  Widget build(BuildContext context) {
-    final withoutPriceCount = store.productsWithoutPriceCount;
-    final withoutBarcodeCount = store.productsWithoutBarcodeCount;
-    final title = store.isCatalogReadyForSelling
-        ? 'Catalogo listo para vender'
-        : withoutPriceCount > 0 && withoutBarcodeCount > 0
-        ? 'Catalogo para revisar'
-        : withoutPriceCount > 0
-        ? 'Productos para completar'
-        : 'Catalogo para revisar';
-    final subtitle = store.isCatalogReadyForSelling
-        ? 'Ya tienes lo necesario para vender y usar lector sin completar nada mas.'
-        : withoutPriceCount > 0 && withoutBarcodeCount > 0
-        ? 'Hay productos para completar antes de trabajar mas comodo.'
-        : withoutPriceCount > 0
-        ? 'Hay productos sin precio. Conviene completarlos antes de vender.'
-        : 'Hay productos sin codigo. Conviene revisarlos antes de usar lector o scanner.';
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(0, 14, 0, 14),
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: BpcColors.line),
-          bottom: BorderSide(color: BpcColors.line),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SectionHeader(title: title, subtitle: subtitle),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 18,
-            runSpacing: 12,
-            children: [
-              _SuggestionMeta(
-                label: 'Listos para vender',
-                value: '${store.sellableProductsCount}',
+              OutlinedButton.icon(
+                onPressed: applyingStarterTemplate
+                    ? null
+                    : onApplyStarterTemplate,
+                icon: applyingStarterTemplate
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.storefront_rounded),
+                label: Text(
+                  applyingStarterTemplate
+                      ? 'Cargando plantilla...'
+                      : 'Cargar $argentinianKioskTemplateName',
+                ),
               ),
-              _SuggestionMeta(
-                label: 'Con precio',
-                value:
-                    '${store.products.length - withoutPriceCount}/${store.products.length}',
-              ),
-              _SuggestionMeta(
-                label: 'Sin codigo',
-                value: '$withoutBarcodeCount',
-              ),
-              _SuggestionMeta(
-                label: 'Para revisar',
-                value: '${store.productsNeedingCatalogReviewCount}',
-              ),
-              _SuggestionMeta(
-                label: 'Alertas de stock',
-                value: '${store.lowStockCount}',
+              TextButton.icon(
+                onPressed: onAddProduct,
+                icon: const Icon(Icons.add_box_rounded),
+                label: const Text('Cargar producto manualmente'),
               ),
             ],
           ),

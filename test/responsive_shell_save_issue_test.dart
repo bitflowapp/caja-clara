@@ -10,7 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   testWidgets(
-    'desktop recoverable save issue becomes summary-only after the top notice settles',
+    'desktop save issue shows guarded save status and retry action',
     (tester) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
@@ -54,14 +54,14 @@ void main() {
 
       await tester.pump();
 
-      expect(find.text('Guardado pendiente'), findsOneWidget);
-      expect(find.text('Pendiente de guardado'), findsOneWidget);
+      expect(find.text('Guardado con problema'), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
 
       await tester.pump(const Duration(seconds: 9));
       await tester.pump();
 
-      expect(find.text('Guardado pendiente'), findsNothing);
-      expect(find.text('Pendiente de guardado'), findsOneWidget);
+      expect(find.text('Guardado con problema'), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
     },
   );
 }

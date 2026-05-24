@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+import 'input_shortcuts.dart';
+
 enum SpeechDictationState {
   idle,
   starting,
@@ -383,6 +385,10 @@ class SpeechDictationActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (InputShortcutScope.demoAutofillEnabled) {
+      return const SizedBox.shrink();
+    }
+
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
@@ -521,6 +527,10 @@ class SpeechDictationHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (InputShortcutScope.demoAutofillEnabled) {
+      return const SizedBox.shrink();
+    }
+
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {

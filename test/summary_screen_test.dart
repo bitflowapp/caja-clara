@@ -2,7 +2,6 @@ import 'package:b_plus_commerce/app/screens/summary_screen.dart';
 import 'package:b_plus_commerce/app/services/commerce_store.dart';
 import 'package:b_plus_commerce/app/widgets/commerce_scope.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -45,53 +44,37 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('summary shows owner signals with honest low-rotation copy', (
+  testWidgets('summary shows Luna cash dashboard and recent movements', (
     tester,
   ) async {
     final store = CommerceStore.seededForTest();
 
     await pumpSummaryScreen(tester, store);
 
-    expect(find.text('Senales para decidir'), findsOneWidget);
-    expect(find.text('Que mirar hoy'), findsOneWidget);
-    expect(find.text('Movimientos de hoy'), findsOneWidget);
-    expect(find.text('Mas vendidos'), findsWidgets);
-    expect(find.text('Reponer pronto'), findsWidgets);
-    expect(find.text('Poca salida'), findsOneWidget);
-    expect(
-      find.text(
-        'Todavia no hay suficiente historial para sugerir productos de baja salida.',
-      ),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Caja del'), findsWidgets);
+    expect(find.text('Tu caja, clara'), findsOneWidget);
+    expect(find.text('Exportar Excel'), findsOneWidget);
+    expect(find.textContaining('Movimientos'), findsWidgets);
+    expect(find.textContaining('Apertura'), findsWidgets);
   });
 
-  testWidgets('summary copies a short daily report', (tester) async {
-    final store = CommerceStore.seededForTest();
-    String copiedText = '';
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
-          if (call.method == 'Clipboard.setData') {
-            copiedText = (call.arguments as Map)['text'] as String? ?? '';
-          }
-          return null;
-        });
-    addTearDown(() {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(SystemChannels.platform, null);
-    });
+  testWidgets('summary shows opening plus sales minus expenses formula', (
+    tester,
+  ) async {
+    final store = CommerceStore.emptyForTest();
+    await store.registerCashOpening(openingBalancePesos: 10000);
+    await store.recordFreeSale(
+      description: 'Venta mostrador',
+      quantityUnits: 1,
+      unitPricePesos: 2500,
+      paymentMethod: 'Efectivo',
+    );
 
     await pumpSummaryScreen(tester, store);
 
-    await tester.ensureVisible(find.text('Copiar para compartir'));
-    await tester.tap(find.text('Copiar para compartir'));
-    await tester.pump();
-
-    expect(copiedText, contains('Resumen de hoy'));
-    expect(copiedText, contains('Que mirar hoy:'));
-    expect(copiedText, contains('Ventas:'));
-    expect(copiedText, contains('Mas vendidos:'));
-    expect(copiedText, contains('Reponer pronto:'));
-    expect(copiedText, contains('Poca salida:'));
+    expect(find.textContaining('ventas - gastos'), findsWidgets);
+    expect(find.text(r'$ 10.000'), findsWidgets);
+    expect(find.text(r'$ 2.500'), findsWidgets);
+    expect(find.text(r'$ 12.500'), findsWidgets);
   });
 }
