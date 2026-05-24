@@ -5,6 +5,7 @@ import '../models/product.dart';
 import '../services/commerce_store.dart';
 import '../theme/bpc_colors.dart';
 import '../utils/formatters.dart';
+import '../utils/payment_methods.dart';
 import '../utils/user_facing_errors.dart';
 import '../utils/text_field_selection.dart';
 import '../widgets/commerce_components.dart';
@@ -73,7 +74,9 @@ class _SaleScreenState extends State<SaleScreen> {
       return;
     }
     final store = CommerceScope.of(context);
-    _paymentMethod = store.lastSalePaymentMethod ?? 'Efectivo';
+    _paymentMethod = resolveSalePaymentMethodSelection(
+      store.lastSalePaymentMethod,
+    );
     _didSeedDefaults = true;
   }
 
@@ -109,11 +112,18 @@ class _SaleScreenState extends State<SaleScreen> {
           final unitPrice = _parseInt(_unitPriceController.text);
           final total = unitPrice * quantity;
           final saleWarning = store.freeSaleReadinessMessage(
-            description: description,
+            description: widget.initialProduct?.name ?? description,
             quantityUnits: quantity,
             unitPricePesos: unitPrice,
           );
-          final canSaveSale = !_saving && saleWarning == null;
+          final productWarning = widget.initialProduct == null
+              ? null
+              : store.saleReadinessMessage(
+                  widget.initialProduct!.id,
+                  quantityUnits: quantity,
+                );
+          final canSaveSale =
+              !_saving && saleWarning == null && productWarning == null;
 
           return KeyboardAwarePageBody(
             child: InputShortcutScope(
@@ -152,7 +162,7 @@ class _SaleScreenState extends State<SaleScreen> {
                           quantity: quantity,
                           unitPrice: unitPrice,
                           total: total,
-                          warning: saleWarning,
+                          warning: saleWarning ?? productWarning,
                         ),
                         const SizedBox(height: 18),
                         _buildActions(context, store, canSaveSale),
@@ -319,13 +329,11 @@ class _SaleScreenState extends State<SaleScreen> {
         initialValue: _paymentMethod,
         isExpanded: true,
         decoration: const InputDecoration(labelText: 'Medio de pago'),
-        items: const [
-          DropdownMenuItem(value: 'Efectivo', child: Text('Efectivo')),
-          DropdownMenuItem(value: 'Débito', child: Text('Débito')),
-          DropdownMenuItem(
-            value: 'Transferencia',
-            child: Text('Transferencia'),
-          ),
+        items: [
+          for (final option in salePaymentMethodOptions(
+            selectedValue: _paymentMethod,
+          ))
+            DropdownMenuItem(value: option, child: Text(option)),
         ],
         onChanged: (value) {
           if (value == null) {
@@ -454,17 +462,23 @@ class _SaleScreenState extends State<SaleScreen> {
     final quantity = _parseInt(_quantityController.text);
     final unitPrice = _parseInt(_unitPriceController.text);
     final validationMessage = store.freeSaleReadinessMessage(
-      description: _descriptionController.text,
+      description: widget.initialProduct?.name ?? _descriptionController.text,
       quantityUnits: quantity,
       unitPricePesos: unitPrice,
     );
+    final productValidationMessage = widget.initialProduct == null
+        ? null
+        : store.saleReadinessMessage(
+            widget.initialProduct!.id,
+            quantityUnits: quantity,
+          );
 
-    if (validationMessage != null) {
+    if (validationMessage != null || productValidationMessage != null) {
       if (_autoValidateMode == AutovalidateMode.disabled) {
         setState(() => _autoValidateMode = AutovalidateMode.onUserInteraction);
       }
       _formKey.currentState!.validate();
-      _showBlockedFeedback(validationMessage);
+      _showBlockedFeedback(validationMessage ?? productValidationMessage!);
       return;
     }
 
@@ -473,12 +487,21 @@ class _SaleScreenState extends State<SaleScreen> {
     final navigator = Navigator.of(context);
 
     try {
-      await store.recordFreeSale(
-        description: _descriptionController.text,
-        quantityUnits: quantity,
-        unitPricePesos: unitPrice,
-        paymentMethod: _paymentMethod,
-      );
+      final product = widget.initialProduct;
+      if (product == null) {
+        await store.recordFreeSale(
+          description: _descriptionController.text,
+          quantityUnits: quantity,
+          unitPricePesos: unitPrice,
+          paymentMethod: _paymentMethod,
+        );
+      } else {
+        await store.recordSale(
+          productId: product.id,
+          quantityUnits: quantity,
+          paymentMethod: _paymentMethod,
+        );
+      }
       if (!mounted) {
         return;
       }

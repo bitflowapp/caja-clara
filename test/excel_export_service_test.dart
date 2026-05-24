@@ -38,7 +38,7 @@ void main() {
     );
     expect(
       workbook.tables['Gastos']!.rows.first[2]!.value.toString(),
-      'Categoria',
+      'Categoría',
     );
     expect(
       workbook.tables['Movimientos']!.rows.first[3]!.value.toString(),

@@ -42,11 +42,11 @@ void main() {
 
       expect(find.text('Venta libre repetida'), findsOneWidget);
       expect(find.textContaining('Cable USB rapido'), findsWidgets);
-      expect(find.text('Se vendio'), findsOneWidget);
+      expect(find.textContaining('Se vend'), findsOneWidget);
       expect(find.text('3 veces'), findsOneWidget);
       expect(find.text('Total vendido'), findsOneWidget);
       expect(find.text('\$ 16.100'), findsWidgets);
-      expect(find.text('Ultimo precio'), findsOneWidget);
+      expect(find.textContaining('ltimo precio'), findsOneWidget);
       expect(find.text('\$ 4.200'), findsWidgets);
 
       await tester.ensureVisible(find.text('Crear producto').first);

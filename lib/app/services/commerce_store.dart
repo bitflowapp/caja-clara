@@ -197,7 +197,9 @@ class CommerceStore extends ChangeNotifier {
     if (raw == null) {
       return null;
     }
-    final normalized = raw.replaceAll(RegExp(r'\s+'), '').trim();
+    final normalized = raw
+        .replaceAll(RegExp(r'[^A-Za-z0-9]'), '')
+        .toUpperCase();
     return normalized.isEmpty ? null : normalized;
   }
 

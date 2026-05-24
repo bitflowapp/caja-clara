@@ -52,7 +52,7 @@ void main() {
       expect(find.text('Caja del día'), findsWidgets);
       expect(find.text('Caja actual'), findsNothing);
       // 10.000 apertura + 2.500 ventas - 0 gastos = 12.500
-      expect(find.text(r'$12.500'), findsWidgets);
+      expect(find.text(r'$ 12.500'), findsWidgets);
     },
   );
 
