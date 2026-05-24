@@ -11,12 +11,15 @@ import '../services/commerce_store.dart';
 import '../services/backup_service.dart';
 import '../services/build_info.dart';
 import '../services/excel_export_service.dart';
+import '../services/license_service.dart';
 import '../theme/bpc_colors.dart';
 import '../utils/user_facing_errors.dart';
 import 'caja_clara_brand.dart';
 import 'commerce_components.dart';
 import 'commerce_scope.dart';
 import 'input_shortcuts.dart';
+import 'license_dialogs.dart';
+import 'license_scope.dart';
 import 'operation_dialogs.dart';
 import 'product_form_dialog.dart';
 import 'quick_help_dialog.dart';
@@ -45,6 +48,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
   bool _savingCashEvent = false;
 
   Future<void> _openSale() async {
+    if (!await ensureLicenseAccess(context, LockedFeature.sales) || !mounted) {
+      return;
+    }
     final message = await Navigator.of(context).push<String>(
       MaterialPageRoute<String>(builder: (_) => const SaleScreen()),
     );
@@ -55,6 +61,10 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
   }
 
   Future<void> _openExpense() async {
+    if (!await ensureLicenseAccess(context, LockedFeature.expenses) ||
+        !mounted) {
+      return;
+    }
     final message = await Navigator.of(context).push<String>(
       MaterialPageRoute<String>(builder: (_) => const ExpenseScreen()),
     );
@@ -902,6 +912,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
   @override
   Widget build(BuildContext context) {
     final store = CommerceScope.of(context);
+    final license = LicenseScope.of(context);
+    final showLicenseBanner =
+        license.shouldShowLicenseUi && license.status != LicenseStatus.active;
     final pages = <CommerceTab, Widget>{
       CommerceTab.home: HomeScreen(
         onNewSale: _openSale,
@@ -1045,6 +1058,13 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                             ),
                             const SizedBox(height: 10),
                           ],
+                          if (showLicenseBanner) ...[
+                            _LicenseStatusBanner(
+                              license: license,
+                              onTap: () => showLicenseManagementDialog(context),
+                            ),
+                            const SizedBox(height: 10),
+                          ],
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton.icon(
@@ -1076,6 +1096,13 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                       message: store.lastError!,
                       retrying: _retryingSave || store.isSaving,
                       onRetry: _retrySave,
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  if (showLicenseBanner) ...[
+                    _LicenseStatusBanner(
+                      license: license,
+                      onTap: () => showLicenseManagementDialog(context),
                     ),
                     const SizedBox(height: 10),
                   ],
@@ -1121,6 +1148,56 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
           ),
         );
       },
+    );
+  }
+}
+
+class _LicenseStatusBanner extends StatelessWidget {
+  const _LicenseStatusBanner({required this.license, required this.onTap});
+
+  final LicenseService license;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = license.isTrialExpired ? BpcColors.expense : BpcColors.accent;
+    return Material(
+      color: color.withValues(alpha: 0.10),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withValues(alpha: 0.24)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.verified_user_outlined, color: color, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  license.statusHeadline,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: onTap,
+                child: Text(
+                  license.isTrialExpired ? 'Activar' : 'Ver licencia',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

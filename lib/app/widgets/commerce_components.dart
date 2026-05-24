@@ -15,6 +15,7 @@ class BpcPanel extends StatelessWidget {
     this.radius = 20,
     this.showBorder = true,
     this.showShadow = true,
+    this.elevated,
     this.borderColor,
   });
 
@@ -24,11 +25,13 @@ class BpcPanel extends StatelessWidget {
   final double radius;
   final bool showBorder;
   final bool showShadow;
+  final bool? elevated;
   final Color? borderColor;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final effectiveShadow = elevated ?? showShadow;
     return Container(
       decoration: BoxDecoration(
         color: color ?? scheme.surface,
@@ -40,7 +43,7 @@ class BpcPanel extends StatelessWidget {
                     scheme.outlineVariant.withValues(alpha: 0.34),
               )
             : null,
-        boxShadow: showShadow
+        boxShadow: effectiveShadow
             ? const [
                 BoxShadow(
                   color: BpcColors.shadow,

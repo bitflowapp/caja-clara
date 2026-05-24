@@ -6,6 +6,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../models/movement.dart';
 import '../models/product.dart';
 import 'commerce_persistence.dart';
+import 'license_service.dart';
 import 'starter_templates.dart';
 import 'store_lock.dart';
 
@@ -76,6 +77,7 @@ class CommerceStore extends ChangeNotifier {
   final List<Product> _products = <Product>[];
   final List<Movement> _movements = <Movement>[];
   final Set<String> _dismissedFreeSaleSuggestions = <String>{};
+  LicenseService? _licenseService;
 
   bool _ready = false;
   bool _saving = false;
@@ -103,6 +105,18 @@ class CommerceStore extends ChangeNotifier {
   bool get canUndoLastMovement =>
       _movements.isNotEmpty &&
       _movements.first.resolvedOrigin != MovementOrigin.restore;
+
+  void attachLicenseService(LicenseService licenseService) {
+    _licenseService = licenseService;
+  }
+
+  void _ensureFeatureAvailable(LockedFeature feature) {
+    final licenseService = _licenseService;
+    if (licenseService == null || licenseService.canUse(feature)) {
+      return;
+    }
+    throw LicenseRestrictionException(licenseService.blockingMessage(feature));
+  }
 
   bool get hasCashOpeningToday =>
       _cashOpeningAt != null && _isSameDay(_cashOpeningAt!, DateTime.now());
@@ -499,6 +513,7 @@ class CommerceStore extends ChangeNotifier {
   }
 
   Future<StarterTemplateApplyResult> applyArgentinianKioskTemplate() async {
+    _ensureFeatureAvailable(LockedFeature.templates);
     final existingProducts = List<Product>.of(_products, growable: false);
     final existingKeys = existingProducts
         .map(_starterTemplateKeyForProduct)
@@ -552,6 +567,7 @@ class CommerceStore extends ChangeNotifier {
       _cashClosingAt == null;
 
   Future<CommercialDemoApplyResult> loadCommercialDemo() async {
+    _ensureFeatureAvailable(LockedFeature.demoData);
     if (!canLoadCommercialDemo) {
       return const CommercialDemoApplyResult(applied: false);
     }
@@ -560,10 +576,12 @@ class CommerceStore extends ChangeNotifier {
   }
 
   Future<CommercialDemoApplyResult> resetCommercialDemo() async {
+    _ensureFeatureAvailable(LockedFeature.demoData);
     return _applyCommercialDemo();
   }
 
   Future<CommercialDemoCleanupResult> cleanCommercialDemoData() async {
+    _ensureFeatureAvailable(LockedFeature.demoData);
     final demoProductIds = _products
         .where(_isCommercialDemoProduct)
         .map((product) => product.id)
@@ -848,6 +866,7 @@ class CommerceStore extends ChangeNotifier {
   }
 
   Future<void> addProduct(Product product) async {
+    _ensureFeatureAvailable(LockedFeature.catalog);
     final sanitized = _validateProduct(product);
     await _runPersistedMutation(() {
       final index = _products.indexWhere((item) => item.id == sanitized.id);
@@ -866,6 +885,7 @@ class CommerceStore extends ChangeNotifier {
     String? note,
     DateTime? createdAt,
   }) async {
+    _ensureFeatureAvailable(LockedFeature.stock);
     final index = _products.indexWhere((product) => product.id == productId);
     if (index == -1) {
       throw StateError('No se encontró el producto.');
@@ -902,6 +922,7 @@ class CommerceStore extends ChangeNotifier {
   }
 
   Future<void> removeProduct(String productId) async {
+    _ensureFeatureAvailable(LockedFeature.catalog);
     final productExists = _products.any((product) => product.id == productId);
     if (!productExists) {
       throw StateError('No se encontró el producto.');
@@ -937,6 +958,7 @@ class CommerceStore extends ChangeNotifier {
     required String paymentMethod,
     DateTime? createdAt,
   }) async {
+    _ensureFeatureAvailable(LockedFeature.sales);
     final index = _products.indexWhere((product) => product.id == productId);
     if (index == -1) {
       throw StateError('No se encontró el producto.');
@@ -990,6 +1012,7 @@ class CommerceStore extends ChangeNotifier {
     required String paymentMethod,
     DateTime? createdAt,
   }) async {
+    _ensureFeatureAvailable(LockedFeature.sales);
     final cleanDescription = description.trim();
     final readinessMessage = freeSaleReadinessMessage(
       description: cleanDescription,
@@ -1029,6 +1052,7 @@ class CommerceStore extends ChangeNotifier {
     required String category,
     DateTime? createdAt,
   }) async {
+    _ensureFeatureAvailable(LockedFeature.expenses);
     final cleanConcept = concept.trim();
     final cleanCategory = category.trim().isEmpty ? 'General' : category.trim();
 
@@ -1061,6 +1085,7 @@ class CommerceStore extends ChangeNotifier {
     DateTime? createdAt,
     bool overwrite = false,
   }) async {
+    _ensureFeatureAvailable(LockedFeature.cash);
     final timestamp = createdAt ?? DateTime.now();
     if (openingBalancePesos < 0) {
       throw StateError('La apertura no puede ser negativa.');
@@ -1100,6 +1125,7 @@ class CommerceStore extends ChangeNotifier {
     DateTime? createdAt,
     bool overwrite = false,
   }) async {
+    _ensureFeatureAvailable(LockedFeature.cash);
     final timestamp = createdAt ?? DateTime.now();
     if (!hasCashOpeningToday) {
       throw StateError('Registrá primero una apertura de caja.');
@@ -1213,6 +1239,7 @@ class CommerceStore extends ChangeNotifier {
   }
 
   Future<void> restoreSnapshot(Map<String, dynamic> snapshot) async {
+    _ensureFeatureAvailable(LockedFeature.restore);
     final parsed = _parseSnapshot(snapshot);
     await _runPersistedMutation(() {
       _applySnapshot(parsed);

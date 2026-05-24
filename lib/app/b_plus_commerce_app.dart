@@ -14,7 +14,7 @@ class BPlusCommerceApp extends StatelessWidget {
   const BPlusCommerceApp({
     super.key,
     required this.store,
-    required this.barcodeLookupService,
+    this.barcodeLookupService = const DisabledBarcodeLookupService(),
     this.licenseService,
   });
 
