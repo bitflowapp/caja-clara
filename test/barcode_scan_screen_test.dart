@@ -168,6 +168,10 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 450));
 
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Precio'),
+        '2500',
+      );
       await openAdvancedProductOptions(tester);
 
       expect(

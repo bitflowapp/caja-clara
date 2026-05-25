@@ -11,121 +11,262 @@ void main() {
     CommerceStore store, {
     Product? initialProduct,
   }) async {
-    final savedMessage = ValueNotifier<String?>(null);
-    addTearDown(savedMessage.dispose);
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
 
     await tester.pumpWidget(
       CommerceScope(
         store: store,
-        child: MaterialApp(
-          home: Builder(
-            builder: (context) {
-              return Scaffold(
-                body: ValueListenableBuilder<String?>(
-                  valueListenable: savedMessage,
-                  builder: (context, message, _) {
-                    return Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          FilledButton(
-                            onPressed: () async {
-                              final result = await Navigator.of(context)
-                                  .push<String>(
-                                    MaterialPageRoute<String>(
-                                      builder: (_) => SaleScreen(
-                                        initialProduct: initialProduct,
-                                      ),
-                                    ),
-                                  );
-                              savedMessage.value = result;
-                            },
-                            child: const Text('Abrir venta'),
-                          ),
-                          if (message != null) ...[
-                            const SizedBox(height: 12),
-                            Text(message),
-                          ],
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              );
-            },
-          ),
-        ),
+        child: MaterialApp(home: SaleScreen(initialProduct: initialProduct)),
       ),
     );
-
-    await tester.tap(find.text('Abrir venta'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 300));
   }
 
-  Finder saveButtonFinder() => find
+  Finder checkoutButtonFinder() => find
       .ancestor(
         of: find.text('Registrar venta'),
         matching: find.bySubtype<ButtonStyleButton>(),
       )
       .first;
 
-  ButtonStyleButton saveButton(WidgetTester tester) {
-    return tester.widget<ButtonStyleButton>(saveButtonFinder());
+  ButtonStyleButton checkoutButton(WidgetTester tester) {
+    return tester.widget<ButtonStyleButton>(checkoutButtonFinder());
   }
 
-  testWidgets('quick sale starts empty and requires explicit valid input', (
+  TextFormField textFormFieldByLabel(WidgetTester tester, String label) {
+    return tester.widget<TextFormField>(
+      find.widgetWithText(TextFormField, label),
+    );
+  }
+
+  Future<void> openProductEditorFromSale(WidgetTester tester) async {
+    await tester.tap(find.text('Nuevo producto'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 450));
+  }
+
+  Future<void> openAdvancedProductOptions(WidgetTester tester) async {
+    if (find.text('Ver mas opciones').evaluate().isEmpty) {
+      return;
+    }
+    await tester.ensureVisible(find.text('Ver mas opciones'));
+    await tester.tap(find.text('Ver mas opciones'));
+    await tester.pump();
+  }
+
+  Future<void> saveVisibleProductForm(WidgetTester tester) async {
+    await tester.ensureVisible(find.text('Guardar producto'));
+    await tester.tap(find.text('Guardar producto'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+  }
+
+  Future<void> acceptAddCreatedProductToCart(WidgetTester tester) async {
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Agregar'),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+  }
+
+  testWidgets('sale screen starts as a fast cart flow', (tester) async {
+    final store = CommerceStore.emptyForTest();
+
+    await pumpSaleScreen(tester, store);
+
+    expect(find.text('Nueva venta'), findsOneWidget);
+    expect(
+      find.widgetWithText(TextField, 'Escaner USB o codigo'),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(TextField, 'Buscar producto'), findsOneWidget);
+    expect(find.text('Carrito vacio'), findsOneWidget);
+    expect(find.text('Producto o detalle'), findsNothing);
+    expect(checkoutButton(tester).onPressed, isNull);
+  });
+
+  testWidgets('search adds a product to cart and checkout records sale', (
+    tester,
+  ) async {
+    final store = CommerceStore.seededForTest();
+    final product = store.products.firstWhere((item) => item.pricePesos > 0);
+    final initialMovements = store.movements.length;
+    final initialStock = product.stockUnits;
+
+    await pumpSaleScreen(tester, store);
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Buscar producto'),
+      product.name,
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('Agregar').first);
+    await tester.pump();
+
+    expect(find.text(product.name), findsWidgets);
+    expect(checkoutButton(tester).onPressed, isNotNull);
+
+    await tester.ensureVisible(checkoutButtonFinder());
+    checkoutButton(tester).onPressed?.call();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(store.movements.length, initialMovements + 1);
+    expect(store.movements.first.title, 'Venta');
+    expect(store.movements.first.productId, product.id);
+    expect(store.productById(product.id)!.stockUnits, initialStock - 1);
+    expect(store.productById(product.id)!.soldCount, product.soldCount + 1);
+    expect(find.textContaining('Venta registrada'), findsOneWidget);
+  });
+
+  testWidgets(
+    'manual product creation from sale screen is immediately sellable',
+    (tester) async {
+      final store = CommerceStore.emptyForTest();
+
+      await pumpSaleScreen(tester, store);
+      await openProductEditorFromSale(tester);
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Nombre'),
+        'Coca-Cola 2.25L',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Precio'),
+        '3500',
+      );
+      await openAdvancedProductOptions(tester);
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Categoria'),
+        'Soda',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Codigo de barras'),
+        '7790001000011',
+      );
+
+      await saveVisibleProductForm(tester);
+
+      final product = store.productByBarcode('7790001000011');
+      expect(product, isNotNull);
+      expect(product!.name, 'Coca-Cola 2.25L');
+      expect(product.category, 'Soda');
+      expect(product.pricePesos, 3500);
+      expect(product.stockUnits, greaterThan(0));
+
+      await acceptAddCreatedProductToCart(tester);
+      expect(find.text('Coca-Cola 2.25L'), findsWidgets);
+
+      await tester.ensureVisible(checkoutButtonFinder());
+      checkoutButton(tester).onPressed?.call();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(store.movements.first.title, 'Venta');
+      expect(store.movements.first.productId, product.id);
+      expect(store.productById(product.id)!.soldCount, 1);
+      expect(store.productById(product.id)!.stockUnits, product.stockUnits - 1);
+    },
+  );
+
+  testWidgets('unknown scanner barcode opens product form prefilled', (
     tester,
   ) async {
     final store = CommerceStore.emptyForTest();
 
     await pumpSaleScreen(tester, store);
 
-    expect(find.text('Nueva venta'), findsOneWidget);
-    expect(find.widgetWithText(TextFormField, 'Producto o detalle'), findsOneWidget);
-    expect(find.widgetWithText(TextFormField, 'Cantidad'), findsOneWidget);
-    expect(find.widgetWithText(TextFormField, 'Precio'), findsOneWidget);
-    expect(find.text('Buscar producto'), findsNothing);
-    expect(saveButton(tester).onPressed, isNull);
-
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Producto o detalle'),
-      'Agua mineral 500 ml',
+      find.widgetWithText(TextField, 'Escaner USB o codigo'),
+      '991122334455',
     );
-    await tester.enterText(find.widgetWithText(TextFormField, 'Precio'), '2500');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 450));
 
-    expect(find.text(r'$ 2.500'), findsWidgets);
-    expect(saveButton(tester).onPressed, isNotNull);
+    await openAdvancedProductOptions(tester);
+
+    expect(
+      textFormFieldByLabel(tester, 'Codigo de barras').controller?.text,
+      '991122334455',
+    );
   });
 
-  testWidgets('quick sale saves without catalog dependency', (tester) async {
+  testWidgets('manual product creation rejects missing positive price', (
+    tester,
+  ) async {
     final store = CommerceStore.emptyForTest();
-    final initialCash = store.cashBalancePesos;
-    final initialMovements = store.movements.length;
+
+    await pumpSaleScreen(tester, store);
+    await openProductEditorFromSale(tester);
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Nombre'),
+      'Producto sin precio',
+    );
+    await saveVisibleProductForm(tester);
+
+    expect(find.text('El precio debe ser mayor a 0.'), findsOneWidget);
+    expect(store.products, isEmpty);
+  });
+
+  testWidgets('daily summary shows sales expenses net and sale count', (
+    tester,
+  ) async {
+    final store = CommerceStore.emptyForTest();
+    await store.registerCashOpening(openingBalancePesos: 10000);
+    await store.addProduct(
+      const Product(
+        id: 'p-coke',
+        name: 'Coca-Cola 2.25L',
+        category: 'Soda',
+        stockUnits: 10,
+        minStockUnits: 0,
+        costPesos: 0,
+        pricePesos: 3500,
+        barcode: '7790001000011',
+      ),
+    );
+    await store.recordSale(
+      productId: 'p-coke',
+      quantityUnits: 1,
+      paymentMethod: 'Efectivo',
+    );
+    await store.recordExpense(
+      concept: 'Supplier',
+      category: 'Supplier',
+      amountPesos: 5000,
+    );
 
     await pumpSaleScreen(tester, store);
 
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Producto o detalle'),
-      'Agua mineral 500 ml',
-    );
-    await tester.enterText(find.widgetWithText(TextFormField, 'Precio'), '2500');
+    await tester.tap(find.text('Cierre').last);
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
-    await tester.ensureVisible(saveButtonFinder());
-    await tester.tap(saveButtonFinder());
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-
-    expect(store.movements.length, initialMovements + 1);
-    expect(store.cashBalancePesos, initialCash + 2500);
-    expect(store.movements.first.isFreeSale, isTrue);
-    expect(store.movements.first.subtitle, 'Agua mineral 500 ml');
-    expect(find.text('Venta registrada.'), findsOneWidget);
+    expect(find.text('Ventas'), findsOneWidget);
+    expect(find.text(r'$ 3.500'), findsOneWidget);
+    expect(find.text('Gastos'), findsOneWidget);
+    expect(find.text(r'$ 5.000'), findsOneWidget);
+    expect(find.text('Neto'), findsOneWidget);
+    expect(find.text(r'-$ 1.500'), findsOneWidget);
+    expect(find.text('Cantidad de ventas'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Caja del dia'), findsOneWidget);
+    expect(find.text(r'$ 8.500'), findsOneWidget);
   });
 
-  testWidgets('sale opened from a product records catalog sale and updates stock', (
+  testWidgets('sale opened from a product starts with that product in cart', (
     tester,
   ) async {
     final store = CommerceStore.seededForTest();
@@ -136,11 +277,10 @@ void main() {
     await pumpSaleScreen(tester, store, initialProduct: product);
 
     expect(find.text(product.name), findsWidgets);
-    expect(find.text(formatProductPrice(product.pricePesos)), findsNothing);
-    expect(saveButton(tester).onPressed, isNotNull);
+    expect(checkoutButton(tester).onPressed, isNotNull);
 
-    await tester.ensureVisible(saveButtonFinder());
-    await tester.tap(saveButtonFinder());
+    await tester.ensureVisible(checkoutButtonFinder());
+    checkoutButton(tester).onPressed?.call();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
@@ -148,7 +288,7 @@ void main() {
     expect(store.movements.first.title, 'Venta');
     expect(store.movements.first.productId, product.id);
     expect(store.productById(product.id)!.stockUnits, initialStock - 1);
-    expect(find.text('Venta registrada.'), findsOneWidget);
+    expect(find.textContaining('Venta registrada'), findsOneWidget);
   });
 
   testWidgets('new sale uses cash by default when there is no history', (
@@ -179,5 +319,3 @@ void main() {
     expect(find.text('Mercado Pago'), findsOneWidget);
   });
 }
-
-String formatProductPrice(int value) => r'$ ' + value.toString();

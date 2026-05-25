@@ -870,12 +870,23 @@ class CommerceStore extends ChangeNotifier {
   Future<void> addProduct(Product product) async {
     _ensureFeatureAvailable(LockedFeature.catalog);
     final sanitized = _validateProduct(product);
+    final timestamp = DateTime.now();
     await _runPersistedMutation(() {
       final index = _products.indexWhere((item) => item.id == sanitized.id);
       if (index == -1) {
-        _products.add(sanitized);
+        _products.add(
+          sanitized.copyWith(
+            createdAt: _hasStoredTimestamp(sanitized.createdAt)
+                ? sanitized.createdAt
+                : timestamp,
+            updatedAt: timestamp,
+          ),
+        );
       } else {
-        _products[index] = sanitized;
+        _products[index] = sanitized.copyWith(
+          createdAt: _products[index].createdAt,
+          updatedAt: timestamp,
+        );
       }
       _sortProducts();
     });
@@ -900,6 +911,7 @@ class CommerceStore extends ChangeNotifier {
     await _runPersistedMutation(() {
       _products[index] = product.copyWith(
         stockUnits: product.stockUnits + quantityUnits,
+        updatedAt: DateTime.now(),
       );
       _movements.insert(
         0,
@@ -984,6 +996,8 @@ class CommerceStore extends ChangeNotifier {
     await _runPersistedMutation(() {
       _products[index] = product.copyWith(
         stockUnits: product.stockUnits - quantityUnits,
+        soldCount: product.soldCount + quantityUnits,
+        updatedAt: timestamp,
       );
       _movements.insert(
         0,
@@ -1194,6 +1208,10 @@ class CommerceStore extends ChangeNotifier {
         final product = _products[index];
         _products[index] = product.copyWith(
           stockUnits: product.stockUnits + quantity,
+          soldCount: product.soldCount > quantity
+              ? product.soldCount - quantity
+              : 0,
+          updatedAt: DateTime.now(),
         );
         _sortProducts();
       } else if (movement.kind == MovementKind.adjustment) {
@@ -1216,6 +1234,7 @@ class CommerceStore extends ChangeNotifier {
           }
           _products[index] = product.copyWith(
             stockUnits: product.stockUnits - quantity,
+            updatedAt: DateTime.now(),
           );
           _sortProducts();
         }
@@ -1376,6 +1395,9 @@ class CommerceStore extends ChangeNotifier {
         (!allowZeroPrice && product.pricePesos == 0)) {
       throw StateError('El precio debe ser mayor a 0.');
     }
+    if (product.soldCount < 0) {
+      throw StateError('Las ventas acumuladas no pueden ser negativas.');
+    }
     for (final existing in againstProducts ?? _products) {
       if (normalizedBarcode != null &&
           existing.id != product.id &&
@@ -1391,8 +1413,16 @@ class CommerceStore extends ChangeNotifier {
           ? null
           : product.category?.trim(),
       barcode: normalizedBarcode,
+      imagePath: product.imagePath?.trim().isEmpty == true
+          ? null
+          : product.imagePath?.trim(),
+      visualSignature: product.visualSignature?.trim().isEmpty == true
+          ? null
+          : product.visualSignature?.trim(),
     );
   }
+
+  bool _hasStoredTimestamp(DateTime value) => value.millisecondsSinceEpoch > 0;
 
   void _validateMovement(Movement movement, Set<String> productIds) {
     if (movement.amountPesos < 0) {

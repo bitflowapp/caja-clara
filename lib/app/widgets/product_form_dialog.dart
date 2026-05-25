@@ -1,3 +1,4 @@
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -5,6 +6,7 @@ import '../models/product.dart';
 import '../services/commerce_store.dart';
 import '../services/license_service.dart';
 import '../services/starter_templates.dart';
+import '../services/visual_signature_service.dart';
 import '../utils/formatters.dart';
 import '../utils/user_facing_errors.dart';
 import '../utils/text_field_selection.dart';
@@ -23,6 +25,9 @@ class ProductEditorSeed {
     this.minStockUnits,
     this.category,
     this.barcode,
+    this.imagePath,
+    this.visualSignature,
+    this.isFavorite,
     this.lookupSourceLabel,
     this.suggestedBrand,
     this.lookupMessage,
@@ -34,6 +39,9 @@ class ProductEditorSeed {
   final int? minStockUnits;
   final String? category;
   final String? barcode;
+  final String? imagePath;
+  final String? visualSignature;
+  final bool? isFavorite;
   final String? lookupSourceLabel;
   final String? suggestedBrand;
   final String? lookupMessage;
@@ -178,6 +186,9 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   final _priceEditorController = MobileFieldEditorController();
   final _nameDictation = SpeechDictationController();
   final _categoryDictation = SpeechDictationController();
+  String? _imagePath;
+  String? _visualSignature;
+  bool _isFavorite = false;
   bool _showAdvancedFields = false;
   bool _saving = false;
 
@@ -207,6 +218,9 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     _barcodeController = TextEditingController(
       text: product?.barcode ?? seed?.barcode ?? widget.initialBarcode ?? '',
     );
+    _imagePath = product?.imagePath ?? seed?.imagePath;
+    _visualSignature = product?.visualSignature ?? seed?.visualSignature;
+    _isFavorite = product?.isFavorite ?? seed?.isFavorite ?? false;
     _showAdvancedFields = _shouldStartWithAdvancedFieldsOpen();
     selectAllTextOnFocus(_nameFocusNode, _nameController);
     selectAllTextOnFocus(_categoryFocusNode, _categoryController);
@@ -439,14 +453,17 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                             ? 'Toca para cargar el precio'
                             : formatMoney(parsed);
                       },
-                      validator: (value) => _intMin(value, 0, 'El precio'),
+                      validator: (value) => _intMin(value, 1, 'El precio'),
                     )
                   : EnsureVisibleWhenFocused(
                       focusNode: _priceFocusNode,
                       child: TextFormField(
                         controller: _priceController,
                         focusNode: _priceFocusNode,
-                        decoration: const InputDecoration(labelText: 'Precio'),
+                        decoration: const InputDecoration(
+                          labelText: 'Precio',
+                          prefixText: '\$ ',
+                        ),
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
@@ -459,7 +476,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                           _stockFocusNode,
                           controller: _stockController,
                         ),
-                        validator: (value) => _intMin(value, 0, 'El precio'),
+                        validator: (value) => _intMin(value, 1, 'El precio'),
                       ),
                     ),
             ),
@@ -498,6 +515,8 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
             ),
           ],
         ),
+        const SizedBox(height: 14),
+        _buildProductLearningTools(context),
         const SizedBox(height: 18),
         Container(
           width: double.infinity,
@@ -547,6 +566,81 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildProductLearningTools(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final hasPhoto =
+        (_imagePath ?? '').trim().isNotEmpty &&
+        (_visualSignature ?? '').trim().isNotEmpty;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.4)),
+      ),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          SizedBox(
+            width: 320,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Venta rapida',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  hasPhoto
+                      ? 'Foto vinculada: ${_fileName(_imagePath!)}'
+                      : 'Favorito y foto son opcionales.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.outline,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          FilterChip(
+            selected: _isFavorite,
+            onSelected: (selected) => setState(() => _isFavorite = selected),
+            avatar: const Icon(Icons.star_rounded, size: 18),
+            label: const Text('Favorito'),
+          ),
+          OutlinedButton.icon(
+            onPressed: _saving ? null : _pickPhoto,
+            icon: Icon(
+              hasPhoto ? Icons.image_search_rounded : Icons.add_a_photo_rounded,
+            ),
+            label: Text(hasPhoto ? 'Cambiar foto' : 'Agregar foto'),
+          ),
+          if (hasPhoto)
+            TextButton.icon(
+              onPressed: _saving
+                  ? null
+                  : () {
+                      setState(() {
+                        _imagePath = null;
+                        _visualSignature = null;
+                      });
+                    },
+              icon: const Icon(Icons.close_rounded),
+              label: const Text('Quitar foto'),
+            ),
+        ],
+      ),
     );
   }
 
@@ -902,6 +996,45 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     return int.tryParse(normalized) ?? 0;
   }
 
+  Future<void> _pickPhoto() async {
+    try {
+      const imageTypeGroup = XTypeGroup(
+        label: 'Imagen',
+        extensions: <String>['jpg', 'jpeg', 'png', 'webp', 'bmp'],
+      );
+      final file = await openFile(
+        acceptedTypeGroups: <XTypeGroup>[imageTypeGroup],
+      );
+      if (file == null) {
+        return;
+      }
+
+      final bytes = await file.readAsBytes();
+      final signature = VisualSignatureService.generate(bytes);
+      if (!mounted) {
+        return;
+      }
+      if (signature.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No pudimos leer esa imagen.')),
+        );
+        return;
+      }
+
+      setState(() {
+        _imagePath = file.path.isEmpty ? file.name : file.path;
+        _visualSignature = signature;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(userFacingErrorMessage(error))));
+    }
+  }
+
   bool _shouldStartWithAdvancedFieldsOpen() {
     final seed = widget.seed;
     final product = widget.product;
@@ -944,6 +1077,11 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     return '$count datos extra cargados. Puedes revisarlos solo si hacen falta.';
   }
 
+  String _fileName(String path) {
+    final parts = path.split(RegExp(r'[\\/]'));
+    return parts.isEmpty ? path : parts.last;
+  }
+
   Future<void> _save() async {
     _dismissKeyboard();
     if (!_formKey.currentState!.validate()) {
@@ -964,6 +1102,14 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
           ? null
           : _categoryController.text.trim(),
       barcode: CommerceStore.normalizeBarcode(_barcodeController.text),
+      imagePath: (_imagePath ?? '').trim().isEmpty ? null : _imagePath?.trim(),
+      visualSignature: (_visualSignature ?? '').trim().isEmpty
+          ? null
+          : _visualSignature?.trim(),
+      isFavorite: _isFavorite,
+      soldCount: widget.product?.soldCount ?? 0,
+      createdAt: widget.product?.createdAt,
+      updatedAt: widget.product?.updatedAt,
     );
 
     final existingByName = widget.store.productByNormalizedName(

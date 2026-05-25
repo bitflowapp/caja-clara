@@ -231,7 +231,9 @@ void main() {
 
     test('undo last sale restores stock and movement count', () async {
       final store = CommerceStore.seededForTest();
-      final initialStock = store.productById('p-2')!.stockUnits;
+      final initialProduct = store.productById('p-2')!;
+      final initialStock = initialProduct.stockUnits;
+      final initialSoldCount = initialProduct.soldCount;
       final initialMovements = store.movements.length;
 
       await store.recordSale(
@@ -241,11 +243,13 @@ void main() {
       );
 
       expect(store.productById('p-2')!.stockUnits, initialStock - 1);
+      expect(store.productById('p-2')!.soldCount, initialSoldCount + 1);
       expect(store.movements.length, initialMovements + 1);
 
       await store.undoLastMovement();
 
       expect(store.productById('p-2')!.stockUnits, initialStock);
+      expect(store.productById('p-2')!.soldCount, initialSoldCount);
       expect(store.movements.length, initialMovements);
     });
 
@@ -350,18 +354,21 @@ void main() {
       },
     );
 
-    test('todayExpectedCashPesos is null when apertura is not registered today', () async {
-      final store = CommerceStore.emptyForTest();
-      await store.recordFreeSale(
-        description: 'Venta mostrador',
-        quantityUnits: 1,
-        unitPricePesos: 2500,
-        paymentMethod: 'Efectivo',
-      );
-      expect(store.todayOpeningCashPesos, isNull);
-      expect(store.todayExpectedCashPesos, isNull);
-      expect(store.cashBalancePesos, 2500);
-    });
+    test(
+      'todayExpectedCashPesos is null when apertura is not registered today',
+      () async {
+        final store = CommerceStore.emptyForTest();
+        await store.recordFreeSale(
+          description: 'Venta mostrador',
+          quantityUnits: 1,
+          unitPricePesos: 2500,
+          paymentMethod: 'Efectivo',
+        );
+        expect(store.todayOpeningCashPesos, isNull);
+        expect(store.todayExpectedCashPesos, isNull);
+        expect(store.cashBalancePesos, 2500);
+      },
+    );
   });
 }
 

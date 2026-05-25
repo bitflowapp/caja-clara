@@ -1,27 +1,26 @@
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../models/product.dart';
+import '../services/barcode_scanner_input.dart';
 import '../services/commerce_store.dart';
+import '../services/product_catalog_service.dart';
+import '../services/visual_signature_service.dart';
 import '../theme/bpc_colors.dart';
 import '../utils/formatters.dart';
 import '../utils/payment_methods.dart';
 import '../utils/user_facing_errors.dart';
-import '../utils/text_field_selection.dart';
 import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
 import '../widgets/input_shortcuts.dart';
 import '../widgets/keyboard_aware_form.dart';
-import '../widgets/mobile_field_editor.dart';
+import '../widgets/operation_dialogs.dart';
+import '../widgets/product_form_dialog.dart';
+import 'expense_screen.dart';
 
-/// Pantalla Nueva venta — flujo único de venta rápida (venta libre).
-///
-/// Se cargan descripción, cantidad y precio a mano. Al guardar, la caja del
-/// día se actualiza sola. No depende del catálogo de productos.
 class SaleScreen extends StatefulWidget {
   const SaleScreen({super.key, this.initialProduct});
 
-  /// Producto opcional para precargar descripción y precio (uso del escáner).
   final Product? initialProduct;
 
   @override
@@ -29,42 +28,20 @@ class SaleScreen extends StatefulWidget {
 }
 
 class _SaleScreenState extends State<SaleScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _descriptionController = TextEditingController();
-  final _quantityController = TextEditingController(text: '1');
-  final _unitPriceController = TextEditingController();
-  final _descriptionFocusNode = FocusNode();
-  final _quantityFocusNode = FocusNode();
-  final _unitPriceFocusNode = FocusNode();
-  final _paymentFocusNode = FocusNode();
-  final _descriptionEditorController = MobileFieldEditorController();
-  final _quantityEditorController = MobileFieldEditorController();
-  final _unitPriceEditorController = MobileFieldEditorController();
+  final _searchController = TextEditingController();
+  final _scannerController = TextEditingController();
+  final _searchFocusNode = FocusNode();
+  final _scannerFocusNode = FocusNode();
+  final List<_CartLine> _cart = <_CartLine>[];
 
-  String _paymentMethod = 'Efectivo';
-  AutovalidateMode _autoValidateMode = AutovalidateMode.disabled;
+  String _paymentMethod = defaultSalePaymentMethod;
   bool _didSeedDefaults = false;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    final initial = widget.initialProduct;
-    if (initial != null) {
-      _descriptionController.text = initial.name;
-      if (initial.pricePesos > 0) {
-        _unitPriceController.text = initial.pricePesos.toString();
-      }
-    } else if (InputShortcutScope.demoAutofillEnabled) {
-      _descriptionController.text = 'Café frío';
-      _quantityController.text = '2';
-      _unitPriceController.text = '1800';
-    }
-    _descriptionController.addListener(_handleDraftChanged);
-    _quantityController.addListener(_handleDraftChanged);
-    _unitPriceController.addListener(_handleDraftChanged);
-    selectAllTextOnFocus(_quantityFocusNode, _quantityController);
-    selectAllTextOnFocus(_unitPriceFocusNode, _unitPriceController);
+    _searchController.addListener(_refreshDraft);
   }
 
   @override
@@ -77,99 +54,103 @@ class _SaleScreenState extends State<SaleScreen> {
     _paymentMethod = resolveSalePaymentMethodSelection(
       store.lastSalePaymentMethod,
     );
+    final initialProduct = widget.initialProduct;
+    if (initialProduct != null) {
+      _addProduct(initialProduct, showFeedback: false);
+    }
     _didSeedDefaults = true;
   }
 
   @override
   void dispose() {
-    _descriptionController
-      ..removeListener(_handleDraftChanged)
+    _searchController
+      ..removeListener(_refreshDraft)
       ..dispose();
-    _quantityController
-      ..removeListener(_handleDraftChanged)
-      ..dispose();
-    _unitPriceController
-      ..removeListener(_handleDraftChanged)
-      ..dispose();
-    _descriptionFocusNode.dispose();
-    _quantityFocusNode.dispose();
-    _unitPriceFocusNode.dispose();
-    _paymentFocusNode.dispose();
+    _scannerController.dispose();
+    _searchFocusNode.dispose();
+    _scannerFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final store = CommerceScope.of(context);
-    final useMobileEditor = useMobileFieldEditor(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Nueva venta')),
+      appBar: AppBar(
+        title: const Text('Nueva venta'),
+        actions: [
+          IconButton(
+            tooltip: 'Registrar gasto',
+            onPressed: _saving ? null : _openExpense,
+            icon: const Icon(Icons.receipt_long_rounded),
+          ),
+          IconButton(
+            tooltip: 'Cierre del dia',
+            onPressed: _saving ? null : () => _showDailySummary(store),
+            icon: const Icon(Icons.summarize_rounded),
+          ),
+        ],
+      ),
       body: AnimatedBuilder(
         animation: store,
         builder: (context, _) {
-          final quantity = _parseInt(_quantityController.text);
-          final description = _descriptionController.text.trim();
-          final unitPrice = _parseInt(_unitPriceController.text);
-          final total = unitPrice * quantity;
-          final saleWarning = store.freeSaleReadinessMessage(
-            description: widget.initialProduct?.name ?? description,
-            quantityUnits: quantity,
-            unitPricePesos: unitPrice,
-          );
-          final productWarning = widget.initialProduct == null
-              ? null
-              : store.saleReadinessMessage(
-                  widget.initialProduct!.id,
-                  quantityUnits: quantity,
-                );
-          final canSaveSale =
-              !_saving && saleWarning == null && productWarning == null;
-
+          final catalog = ProductCatalogService(store);
           return KeyboardAwarePageBody(
             child: InputShortcutScope(
-              onSave: _saving ? null : () => _submitSale(store),
+              onSave: _cart.isEmpty || _saving ? null : () => _checkout(store),
               onCancel: _saving ? null : () => Navigator.of(context).maybePop(),
-              onFocusSearch: () => _moveFocusTo(
-                _descriptionFocusNode,
-                controller: _descriptionController,
-              ),
-              onDemoAutofill: _fillPremiumDemoSale,
-              child: BpcPanel(
-                child: FocusTraversalGroup(
-                  child: Form(
-                    key: _formKey,
-                    autovalidateMode: _autoValidateMode,
-                    child: Column(
+              onFocusSearch: () => _searchFocusNode.requestFocus(),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= 980;
+                  final catalogPane = _CatalogPane(
+                    catalog: catalog,
+                    searchController: _searchController,
+                    scannerController: _scannerController,
+                    searchFocusNode: _searchFocusNode,
+                    scannerFocusNode: _scannerFocusNode,
+                    onBarcodeSubmitted: (value) =>
+                        _handleBarcodeSubmitted(store, value),
+                    onAddProduct: _addProduct,
+                    onCreateProduct: () => _createProductAndAsk(store),
+                    onPhotoLookup: () => _handlePhotoLookup(store),
+                    onExpense: _openExpense,
+                    onDailySummary: () => _showDailySummary(store),
+                  );
+                  final cartPane = _CartPane(
+                    cart: _cart,
+                    paymentMethod: _paymentMethod,
+                    saving: _saving,
+                    onIncrease: _increaseQuantity,
+                    onDecrease: _decreaseQuantity,
+                    onRemove: _removeLine,
+                    onPaymentChanged: (value) =>
+                        setState(() => _paymentMethod = value),
+                    onCheckout: _cart.isEmpty || _saving
+                        ? null
+                        : () => _checkout(store),
+                  );
+
+                  if (wide) {
+                    return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Venta rápida',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Cargá una venta rápida. Al guardar, la caja del día se actualiza sola.',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: BpcColors.subtleInk),
-                        ),
-                        const SizedBox(height: 18),
-                        _buildDescriptionField(useMobileEditor),
-                        const SizedBox(height: 14),
-                        _buildFieldsRow(useMobileEditor),
-                        const SizedBox(height: 16),
-                        _SaleSummary(
-                          description: description,
-                          quantity: quantity,
-                          unitPrice: unitPrice,
-                          total: total,
-                          warning: saleWarning ?? productWarning,
-                        ),
-                        const SizedBox(height: 18),
-                        _buildActions(context, store, canSaveSale),
+                        Expanded(flex: 6, child: catalogPane),
+                        const SizedBox(width: 18),
+                        Expanded(flex: 5, child: cartPane),
                       ],
-                    ),
-                  ),
-                ),
+                    );
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      catalogPane,
+                      const SizedBox(height: 18),
+                      cartPane,
+                    ],
+                  );
+                },
               ),
             ),
           );
@@ -178,470 +159,823 @@ class _SaleScreenState extends State<SaleScreen> {
     );
   }
 
-  Widget _buildDescriptionField(bool useMobileEditor) {
-    if (useMobileEditor) {
-      return MobileFieldEditorFormField(
-        controller: _descriptionController,
-        editorController: _descriptionEditorController,
-        nextEditorController: _quantityEditorController,
-        nextFieldLabel: 'Cantidad',
-        labelText: 'Producto o detalle',
-        editorContext: 'Nueva venta',
-        hintText: 'Ej. Alfajor, gaseosa, servicio',
-        emptyDisplayText: 'Tocá para cargar el detalle',
-        keyboardType: TextInputType.text,
-        textCapitalization: TextCapitalization.sentences,
-        validator: _validateDescription,
-      );
+  void _addProduct(Product product, {bool showFeedback = true}) {
+    final currentIndex = _cart.indexWhere(
+      (line) => line.product.id == product.id,
+    );
+    if (currentIndex == -1) {
+      setState(() {
+        _cart.add(_CartLine(product: product));
+      });
+    } else {
+      _increaseQuantity(_cart[currentIndex]);
     }
-    return EnsureVisibleWhenFocused(
-      focusNode: _descriptionFocusNode,
-      child: TextFormField(
-        controller: _descriptionController,
-        focusNode: _descriptionFocusNode,
-        autofocus: true,
-        keyboardType: TextInputType.text,
-        textInputAction: TextInputAction.next,
-        textCapitalization: TextCapitalization.sentences,
-        onTapOutside: (_) => _descriptionFocusNode.unfocus(),
-        onFieldSubmitted: (_) =>
-            _moveFocusTo(_quantityFocusNode, controller: _quantityController),
-        decoration: const InputDecoration(
-          labelText: 'Producto o detalle',
-          hintText: 'Ej. Alfajor, gaseosa, servicio',
-          prefixIcon: Icon(Icons.sell_rounded),
-        ),
-        validator: _validateDescription,
-      ),
-    );
-  }
-
-  Widget _buildFieldsRow(bool useMobileEditor) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 720
-            ? 3
-            : constraints.maxWidth >= 480
-            ? 2
-            : 1;
-        const spacing = 12.0;
-        final fieldWidth =
-            (constraints.maxWidth - spacing * (columns - 1)) / columns;
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: [
-            SizedBox(
-              width: fieldWidth,
-              child: _buildQuantityField(useMobileEditor),
-            ),
-            SizedBox(
-              width: fieldWidth,
-              child: _buildPriceField(useMobileEditor),
-            ),
-            SizedBox(width: fieldWidth, child: _buildPaymentField()),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildQuantityField(bool useMobileEditor) {
-    if (useMobileEditor) {
-      return MobileFieldEditorFormField(
-        controller: _quantityController,
-        editorController: _quantityEditorController,
-        nextEditorController: _unitPriceEditorController,
-        nextFieldLabel: 'Precio',
-        labelText: 'Cantidad',
-        editorContext: 'Nueva venta',
-        emptyDisplayText: 'Tocá para cargar la cantidad',
-        keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        validator: (value) =>
-            _parseInt(value) <= 0 ? 'Ingresá una cantidad' : null,
-      );
+    _scannerController.clear();
+    if (showFeedback) {
+      _showMessage('${product.name} agregado al carrito.');
     }
-    return EnsureVisibleWhenFocused(
-      focusNode: _quantityFocusNode,
-      child: TextFormField(
-        controller: _quantityController,
-        focusNode: _quantityFocusNode,
-        keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        textInputAction: TextInputAction.next,
-        decoration: const InputDecoration(labelText: 'Cantidad'),
-        onTapOutside: (_) => _quantityFocusNode.unfocus(),
-        onFieldSubmitted: (_) => _moveFocusTo(
-          _unitPriceFocusNode,
-          controller: _unitPriceController,
-        ),
-        validator: (value) =>
-            _parseInt(value) <= 0 ? 'Ingresá una cantidad' : null,
-      ),
-    );
   }
 
-  Widget _buildPriceField(bool useMobileEditor) {
-    if (useMobileEditor) {
-      return MobileFieldEditorFormField(
-        controller: _unitPriceController,
-        editorController: _unitPriceEditorController,
-        labelText: 'Precio',
-        editorContext: 'Nueva venta',
-        emptyDisplayText: 'Tocá para cargar el precio',
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        prefixText: '\$ ',
-        displayValueBuilder: (value) {
-          final parsed = _parseInt(value);
-          return parsed <= 0 ? 'Tocá para cargar el precio' : formatMoney(parsed);
-        },
-        validator: (value) =>
-            _parseInt(value) <= 0 ? 'Ingresá un precio' : null,
-      );
-    }
-    return EnsureVisibleWhenFocused(
-      focusNode: _unitPriceFocusNode,
-      child: TextFormField(
-        controller: _unitPriceController,
-        focusNode: _unitPriceFocusNode,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        textInputAction: TextInputAction.next,
-        decoration: const InputDecoration(
-          labelText: 'Precio',
-          prefixText: '\$ ',
-        ),
-        onTapOutside: (_) => _unitPriceFocusNode.unfocus(),
-        onFieldSubmitted: (_) => _moveFocusTo(_paymentFocusNode),
-        validator: (value) =>
-            _parseInt(value) <= 0 ? 'Ingresá un precio' : null,
-      ),
-    );
+  void _increaseQuantity(_CartLine line) {
+    setState(() {
+      line.quantity += 1;
+    });
   }
 
-  Widget _buildPaymentField() {
-    return EnsureVisibleWhenFocused(
-      focusNode: _paymentFocusNode,
-      child: DropdownButtonFormField<String>(
-        focusNode: _paymentFocusNode,
-        initialValue: _paymentMethod,
-        isExpanded: true,
-        decoration: const InputDecoration(labelText: 'Medio de pago'),
-        items: [
-          for (final option in salePaymentMethodOptions(
-            selectedValue: _paymentMethod,
-          ))
-            DropdownMenuItem(value: option, child: Text(option)),
-        ],
-        onChanged: (value) {
-          if (value == null) {
-            return;
-          }
-          setState(() => _paymentMethod = value);
-        },
-        onTap: () {
-          _dismissKeyboard();
-          _paymentFocusNode.requestFocus();
-        },
-      ),
-    );
+  void _decreaseQuantity(_CartLine line) {
+    setState(() {
+      if (line.quantity <= 1) {
+        _cart.remove(line);
+      } else {
+        line.quantity -= 1;
+      }
+    });
   }
 
-  Widget _buildActions(
-    BuildContext context,
+  void _removeLine(_CartLine line) {
+    setState(() {
+      _cart.remove(line);
+    });
+  }
+
+  Future<void> _handleBarcodeSubmitted(
     CommerceStore store,
-    bool canSaveSale,
-  ) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final compact = constraints.maxWidth < 520;
-        final saveButton = FilledButton.icon(
-          onPressed: canSaveSale ? () => _submitSale(store) : null,
-          style: compact
-              ? FilledButton.styleFrom(minimumSize: const Size.fromHeight(52))
-              : null,
-          icon: _saving
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.check_circle_rounded),
-          label: Text(_saving ? 'Guardando...' : 'Registrar venta'),
-        );
-
-        final cancelButton = TextButton(
-          onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
-        );
-
-        if (compact) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              saveButton,
-              const SizedBox(height: 10),
-              cancelButton,
-            ],
-          );
-        }
-        return Row(
-          children: [
-            const Spacer(),
-            cancelButton,
-            const SizedBox(width: 12),
-            saveButton,
-          ],
-        );
-      },
-    );
-  }
-
-  String? _validateDescription(String? value) {
-    return (value ?? '').trim().isEmpty ? 'Escribí qué estás vendiendo.' : null;
-  }
-
-  int _parseInt(String? value) {
-    final normalized = (value ?? '').replaceAll(RegExp(r'[^0-9]'), '');
-    if (normalized.isEmpty) {
-      return 0;
-    }
-    return int.tryParse(normalized) ?? 0;
-  }
-
-  void _handleDraftChanged() {
-    if (!mounted) {
+    String rawInput,
+  ) async {
+    final barcode = BarcodeScannerInput.parseSubmitted(rawInput);
+    _scannerController.clear();
+    if (barcode == null) {
+      _showMessage('Escanea o escribe un codigo valido.');
       return;
     }
-    setState(() {});
+
+    final product = ProductCatalogService(store).findByBarcode(barcode);
+    if (product != null) {
+      _addProduct(product);
+      return;
+    }
+
+    final result = await _openProductEditor(store, barcode: barcode);
+    if (result == null || !mounted) {
+      return;
+    }
+    await _askAddCreatedProductToCart(result.product);
   }
 
-  void _dismissKeyboard() {
-    FocusManager.instance.primaryFocus?.unfocus();
+  Future<ProductEditorResult?> _openProductEditor(
+    CommerceStore store, {
+    String? barcode,
+    String? imagePath,
+    String? visualSignature,
+  }) {
+    return showProductEditor(
+      context,
+      store,
+      initialBarcode: barcode,
+      seed: ProductEditorSeed(
+        stockUnits: 10,
+        minStockUnits: 0,
+        barcode: barcode,
+        imagePath: imagePath,
+        visualSignature: visualSignature,
+      ),
+    );
   }
 
-  void _moveFocusTo(FocusNode focusNode, {TextEditingController? controller}) {
-    _dismissKeyboard();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+  Future<void> _createProductAndAsk(CommerceStore store) async {
+    final result = await _openProductEditor(store);
+    if (result == null || !mounted) {
+      return;
+    }
+    await _askAddCreatedProductToCart(result.product);
+  }
+
+  Future<void> _handlePhotoLookup(CommerceStore store) async {
+    try {
+      const imageTypeGroup = XTypeGroup(
+        label: 'Imagen',
+        extensions: <String>['jpg', 'jpeg', 'png', 'webp', 'bmp'],
+      );
+      final file = await openFile(
+        acceptedTypeGroups: <XTypeGroup>[imageTypeGroup],
+      );
+      if (file == null) {
+        return;
+      }
+
+      final signature = VisualSignatureService.generate(
+        await file.readAsBytes(),
+      );
+      if (signature.isEmpty) {
+        _showMessage('No pudimos leer esa imagen.');
+        return;
+      }
+
+      final match = ProductCatalogService(store).bestVisualMatch(signature);
+      if (match != null && mounted) {
+        await _confirmVisualMatch(match);
+        return;
+      }
+
       if (!mounted) {
         return;
       }
-      if (controller != null) {
-        focusAndSelectAll(focusNode, controller);
+      final result = await _openProductEditor(
+        store,
+        imagePath: file.path.isEmpty ? file.name : file.path,
+        visualSignature: signature,
+      );
+      if (result == null || !mounted) {
+        _showMessage('No hubo coincidencia segura.');
         return;
       }
-      focusNode.requestFocus();
-    });
+      await _askAddCreatedProductToCart(result.product);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showMessage(userFacingErrorMessage(error));
+    }
   }
 
-  void _showBlockedFeedback(String message) {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+  Future<void> _confirmVisualMatch(VisualProductMatch match) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Producto sugerido'),
+          content: Text(
+            'Parece ${match.product.name}. Revisa antes de agregarlo.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Agregar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == true && mounted) {
+      _addProduct(match.product);
+    }
+  }
+
+  Future<void> _askAddCreatedProductToCart(Product product) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Producto guardado'),
+          content: Text('Agregar ${product.name} al carrito ahora?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('No'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Agregar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == true && mounted) {
+      _addProduct(product);
+    }
+  }
+
+  Future<void> _openExpense() async {
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(builder: (_) => const ExpenseScreen()),
+    );
+    if (!mounted || result == null) {
+      return;
+    }
+    _showMessage(result);
+  }
+
+  Future<void> _showDailySummary(CommerceStore store) {
+    return showDialog<void>(
+      context: context,
+      builder: (context) {
+        final totalSales = store.todaySalesPesos;
+        final totalExpenses = store.todayExpensesPesos;
+        final net = totalSales - totalExpenses;
+        final expectedCash = store.todayExpectedCashPesos;
+        return AlertDialog(
+          title: const Text('Cierre del dia'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _DailySummaryRow(label: 'Ventas', value: formatMoney(totalSales)),
+              _DailySummaryRow(
+                label: 'Gastos',
+                value: formatMoney(totalExpenses),
+              ),
+              const Divider(),
+              _DailySummaryRow(label: 'Neto', value: formatMoney(net)),
+              _DailySummaryRow(
+                label: 'Cantidad de ventas',
+                value: store.todaySalesCount.toString(),
+              ),
+              _DailySummaryRow(
+                label: 'Caja del dia',
+                value: expectedCash == null ? '-' : formatMoney(expectedCash),
+              ),
+              if (expectedCash == null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Para cerrar caja, primero registrá una apertura desde la pestaña Resumen.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: BpcColors.subtleInk,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Volver'),
+            ),
+            FilledButton(
+              onPressed: store.hasCashOpeningToday
+                  ? () async {
+                      Navigator.of(context).pop();
+                      await _registerCashClosing(store);
+                    }
+                  : null,
+              child: const Text('Cerrar caja'),
+            ),
+          ],
+        );
+      },
     );
   }
 
-  void _fillPremiumDemoSale() {
-    setState(() {
-      _descriptionController.text = 'Café frío';
-      _quantityController.text = '2';
-      _unitPriceController.text = '1800';
-      _paymentMethod = 'Efectivo';
-      _autoValidateMode = AutovalidateMode.disabled;
-    });
-    _dismissKeyboard();
-  }
-
-  Future<void> _submitSale(CommerceStore store) async {
+  Future<void> _registerCashClosing(CommerceStore store) async {
     if (_saving) {
       return;
     }
-    final quantity = _parseInt(_quantityController.text);
-    final unitPrice = _parseInt(_unitPriceController.text);
-    final validationMessage = store.freeSaleReadinessMessage(
-      description: widget.initialProduct?.name ?? _descriptionController.text,
-      quantityUnits: quantity,
-      unitPricePesos: unitPrice,
-    );
-    final productValidationMessage = widget.initialProduct == null
-        ? null
-        : store.saleReadinessMessage(
-            widget.initialProduct!.id,
-            quantityUnits: quantity,
-          );
 
-    if (validationMessage != null || productValidationMessage != null) {
-      if (_autoValidateMode == AutovalidateMode.disabled) {
-        setState(() => _autoValidateMode = AutovalidateMode.onUserInteraction);
-      }
-      _formKey.currentState!.validate();
-      _showBlockedFeedback(validationMessage ?? productValidationMessage!);
+    final amount = await showAmountEntryDialog(
+      context,
+      title: store.hasCashClosingToday ? 'Actualizar cierre' : 'Cierre de caja',
+      label: 'Caja contada',
+      confirmLabel: store.hasCashClosingToday ? 'Actualizar' : 'Guardar',
+      helper: 'Ingresa el monto contado al cierre.',
+      initialValue: store.todayClosingCashPesos,
+    );
+    if (amount == null || !mounted) {
       return;
     }
 
-    setState(() => _saving = true);
-    final messenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
+    var overwrite = false;
+    if (store.hasCashClosingToday) {
+      overwrite = await showDangerConfirmationDialog(
+        context,
+        title: 'Reemplazar cierre',
+        message: 'Ya existe un cierre registrado hoy. Se reemplazara.',
+        confirmLabel: 'Reemplazar',
+      );
+      if (!overwrite || !mounted) {
+        return;
+      }
+    }
 
+    setState(() => _saving = true);
     try {
-      final product = widget.initialProduct;
-      if (product == null) {
-        await store.recordFreeSale(
-          description: _descriptionController.text,
-          quantityUnits: quantity,
-          unitPricePesos: unitPrice,
-          paymentMethod: _paymentMethod,
-        );
-      } else {
+      await store.registerCashClosing(
+        closingBalancePesos: amount,
+        overwrite: overwrite,
+      );
+      if (!mounted) {
+        return;
+      }
+      _showMessage('Cierre de caja registrado.');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showMessage(
+        'No se pudo registrar el cierre: ${userFacingErrorMessage(error)}',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  Future<void> _checkout(CommerceStore store) async {
+    if (_cart.isEmpty || _saving) {
+      return;
+    }
+
+    for (final line in _cart) {
+      final message = store.saleReadinessMessage(
+        line.product.id,
+        quantityUnits: line.quantity,
+      );
+      if (message != null) {
+        _showMessage('${line.product.name}: $message');
+        return;
+      }
+    }
+
+    setState(() => _saving = true);
+    try {
+      final total = _cart.fold<int>(0, (sum, line) => sum + line.total);
+      for (final line in List<_CartLine>.of(_cart)) {
         await store.recordSale(
-          productId: product.id,
-          quantityUnits: quantity,
+          productId: line.product.id,
+          quantityUnits: line.quantity,
           paymentMethod: _paymentMethod,
         );
       }
       if (!mounted) {
         return;
       }
-      messenger.hideCurrentSnackBar();
-      navigator.pop('Venta registrada.');
+      setState(() {
+        _cart.clear();
+        _saving = false;
+      });
+      _searchController.clear();
+      _showMessage('Venta registrada: ${formatMoney(total)}');
+      _scannerFocusNode.requestFocus();
     } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() => _saving = false);
-      messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(
-        SnackBar(content: Text(userFacingErrorMessage(error))),
-      );
+      _showMessage(userFacingErrorMessage(error));
     }
+  }
+
+  void _refreshDraft() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _showMessage(String message) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
-/// Resumen claro de la venta en curso.
-class _SaleSummary extends StatelessWidget {
-  const _SaleSummary({
-    required this.description,
-    required this.quantity,
-    required this.unitPrice,
-    required this.total,
-    required this.warning,
+class _CatalogPane extends StatelessWidget {
+  const _CatalogPane({
+    required this.catalog,
+    required this.searchController,
+    required this.scannerController,
+    required this.searchFocusNode,
+    required this.scannerFocusNode,
+    required this.onBarcodeSubmitted,
+    required this.onAddProduct,
+    required this.onCreateProduct,
+    required this.onPhotoLookup,
+    required this.onExpense,
+    required this.onDailySummary,
   });
 
-  final String description;
-  final int quantity;
-  final int unitPrice;
-  final int total;
-  final String? warning;
+  final ProductCatalogService catalog;
+  final TextEditingController searchController;
+  final TextEditingController scannerController;
+  final FocusNode searchFocusNode;
+  final FocusNode scannerFocusNode;
+  final ValueChanged<String> onBarcodeSubmitted;
+  final ValueChanged<Product> onAddProduct;
+  final VoidCallback onCreateProduct;
+  final VoidCallback onPhotoLookup;
+  final VoidCallback onExpense;
+  final VoidCallback onDailySummary;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: BpcColors.surfaceStrong,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: BpcColors.line),
-      ),
+    final query = searchController.text;
+    final results = catalog.searchByName(query);
+    final favorites = catalog.getFavorites();
+    final frequent = catalog.getFrequentProducts();
+    final quickProducts = <Product>[
+      ...favorites,
+      for (final product in frequent)
+        if (!favorites.any((favorite) => favorite.id == product.id)) product,
+    ].take(12).toList(growable: false);
+
+    return BpcPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Resumen', style: theme.textTheme.titleMedium),
+          SectionHeader(
+            title: 'Venta de mostrador',
+            subtitle: 'Escanea, busca o toca un producto. Menos pasos.',
+            trailing: IconButton(
+              tooltip: 'Buscar por foto',
+              onPressed: onPhotoLookup,
+              icon: const Icon(Icons.photo_camera_rounded),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: scannerController,
+            focusNode: scannerFocusNode,
+            autofocus: true,
+            textInputAction: TextInputAction.search,
+            decoration: const InputDecoration(
+              labelText: 'Escaner USB o codigo',
+              hintText: 'Escanea y Enter',
+              prefixIcon: Icon(Icons.qr_code_scanner_rounded),
+            ),
+            onSubmitted: onBarcodeSubmitted,
+          ),
           const SizedBox(height: 12),
-          _SummaryRow(
-            label: 'Producto o detalle',
-            value: description.isEmpty ? 'Sin cargar' : description,
+          TextField(
+            controller: searchController,
+            focusNode: searchFocusNode,
+            textInputAction: TextInputAction.search,
+            decoration: const InputDecoration(
+              labelText: 'Buscar producto',
+              hintText: 'Nombre del producto',
+              prefixIcon: Icon(Icons.search_rounded),
+            ),
           ),
-          _SummaryRow(label: 'Cantidad', value: quantity.toString()),
-          _SummaryRow(
-            label: 'Precio',
-            value: unitPrice <= 0 ? '-' : formatMoney(unitPrice),
-          ),
-          const Divider(height: 20, color: BpcColors.line),
-          Row(
+          const SizedBox(height: 16),
+          if (query.trim().isNotEmpty)
+            _ProductResults(products: results, onAddProduct: onAddProduct)
+          else
+            _QuickProducts(products: quickProducts, onAddProduct: onAddProduct),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
             children: [
-              Expanded(
-                child: Text(
-                  'Total',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
+              FilledButton.icon(
+                onPressed: onCreateProduct,
+                icon: const Icon(Icons.add_box_rounded),
+                label: const Text('Nuevo producto'),
               ),
-              Text(
-                formatMoney(total),
-                style: theme.textTheme.titleLarge?.copyWith(
-                  color: BpcColors.income,
-                  fontWeight: FontWeight.w900,
-                ),
+              OutlinedButton.icon(
+                onPressed: onPhotoLookup,
+                icon: const Icon(Icons.image_search_rounded),
+                label: const Text('Buscar por foto'),
+              ),
+              OutlinedButton.icon(
+                onPressed: onExpense,
+                icon: const Icon(Icons.receipt_long_rounded),
+                label: const Text('Gasto'),
+              ),
+              OutlinedButton.icon(
+                onPressed: onDailySummary,
+                icon: const Icon(Icons.summarize_rounded),
+                label: const Text('Cierre'),
               ),
             ],
           ),
-          if (warning != null) ...[
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(
-                  Icons.info_outline_rounded,
-                  size: 18,
-                  color: BpcColors.warning,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    warning!,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: BpcColors.warning,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );
   }
 }
 
-class _SummaryRow extends StatelessWidget {
-  const _SummaryRow({required this.label, required this.value});
+class _ProductResults extends StatelessWidget {
+  const _ProductResults({required this.products, required this.onAddProduct});
+
+  final List<Product> products;
+  final ValueChanged<Product> onAddProduct;
+
+  @override
+  Widget build(BuildContext context) {
+    if (products.isEmpty) {
+      return const EmptyCard(
+        title: 'Sin resultados',
+        message: 'Si no existe, crealo una vez y queda listo.',
+        icon: Icons.search_off_rounded,
+        framed: false,
+      );
+    }
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 300),
+      child: ListView.separated(
+        shrinkWrap: true,
+        itemCount: products.length,
+        separatorBuilder: (_, _) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          final product = products[index];
+          return ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(product.name),
+            subtitle: Text(_productSubtitle(product)),
+            trailing: FilledButton(
+              onPressed: () => onAddProduct(product),
+              child: const Text('Agregar'),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _QuickProducts extends StatelessWidget {
+  const _QuickProducts({required this.products, required this.onAddProduct});
+
+  final List<Product> products;
+  final ValueChanged<Product> onAddProduct;
+
+  @override
+  Widget build(BuildContext context) {
+    if (products.isEmpty) {
+      return const EmptyCard(
+        title: 'Sin favoritos aun',
+        message:
+            'Marca productos como favoritos o vende algunos para verlos aca.',
+        icon: Icons.star_border_rounded,
+        framed: false,
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Favoritos y frecuentes',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final product in products)
+              ActionChip(
+                avatar: Icon(
+                  product.isFavorite
+                      ? Icons.star_rounded
+                      : Icons.local_fire_department_rounded,
+                  size: 18,
+                ),
+                label: Text(
+                  '${product.name}  ${formatMoney(product.pricePesos)}',
+                ),
+                onPressed: () => onAddProduct(product),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _CartPane extends StatelessWidget {
+  const _CartPane({
+    required this.cart,
+    required this.paymentMethod,
+    required this.saving,
+    required this.onIncrease,
+    required this.onDecrease,
+    required this.onRemove,
+    required this.onPaymentChanged,
+    required this.onCheckout,
+  });
+
+  final List<_CartLine> cart;
+  final String paymentMethod;
+  final bool saving;
+  final ValueChanged<_CartLine> onIncrease;
+  final ValueChanged<_CartLine> onDecrease;
+  final ValueChanged<_CartLine> onRemove;
+  final ValueChanged<String> onPaymentChanged;
+  final VoidCallback? onCheckout;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = cart.fold<int>(0, (sum, line) => sum + line.total);
+    return BpcPanel(
+      color: BpcColors.surfaceStrong,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(
+            title: 'Carrito',
+            subtitle: cart.isEmpty
+                ? 'Agrega productos para cobrar.'
+                : '${cart.length} productos',
+          ),
+          const SizedBox(height: 16),
+          if (cart.isEmpty)
+            const EmptyCard(
+              title: 'Carrito vacio',
+              message: 'Escanea o busca un producto para empezar.',
+              icon: Icons.shopping_cart_outlined,
+              framed: false,
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: cart.length,
+              separatorBuilder: (_, _) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final line = cart[index];
+                return _CartLineTile(
+                  line: line,
+                  onIncrease: () => onIncrease(line),
+                  onDecrease: () => onDecrease(line),
+                  onRemove: () => onRemove(line),
+                );
+              },
+            ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            initialValue: paymentMethod,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Medio de pago'),
+            items: [
+              for (final option in salePaymentMethodOptions(
+                selectedValue: paymentMethod,
+              ))
+                DropdownMenuItem(value: option, child: Text(option)),
+            ],
+            onChanged: saving
+                ? null
+                : (value) {
+                    if (value != null) {
+                      onPaymentChanged(value);
+                    }
+                  },
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: BpcColors.line),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Total',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Text(
+                  formatMoney(total),
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: BpcColors.income,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: onCheckout,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(54),
+              ),
+              icon: saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.check_circle_rounded),
+              label: Text(saving ? 'Cobrando...' : 'Registrar venta'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CartLineTile extends StatelessWidget {
+  const _CartLineTile({
+    required this.line,
+    required this.onIncrease,
+    required this.onDecrease,
+    required this.onRemove,
+  });
+
+  final _CartLine line;
+  final VoidCallback onIncrease;
+  final VoidCallback onDecrease;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  line.product.name,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${formatMoney(line.product.pricePesos)} c/u',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: BpcColors.subtleInk),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Restar',
+            onPressed: onDecrease,
+            icon: const Icon(Icons.remove_circle_outline_rounded),
+          ),
+          Text(
+            line.quantity.toString(),
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          IconButton(
+            tooltip: 'Sumar',
+            onPressed: onIncrease,
+            icon: const Icon(Icons.add_circle_outline_rounded),
+          ),
+          SizedBox(
+            width: 96,
+            child: Text(
+              formatMoney(line.total),
+              textAlign: TextAlign.end,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Quitar',
+            onPressed: onRemove,
+            icon: const Icon(Icons.delete_outline_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DailySummaryRow extends StatelessWidget {
+  const _DailySummaryRow({required this.label, required this.value});
 
   final String label;
   final String value;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: BpcColors.subtleInk,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: theme.textTheme.titleMedium,
-            ),
-          ),
+          Expanded(child: Text(label)),
+          Text(value, style: Theme.of(context).textTheme.titleMedium),
         ],
       ),
     );
   }
+}
+
+class _CartLine {
+  _CartLine({required this.product}) : quantity = 1;
+
+  final Product product;
+  int quantity;
+
+  int get total => product.pricePesos * quantity;
+}
+
+String _productSubtitle(Product product) {
+  final parts = <String>[
+    formatMoney(product.pricePesos),
+    'Stock ${product.stockUnits}',
+    if ((product.category ?? '').trim().isNotEmpty) product.category!.trim(),
+    if ((product.barcode ?? '').trim().isNotEmpty) 'Cod. ${product.barcode}',
+  ];
+  return parts.join(' / ');
 }
