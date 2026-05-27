@@ -6,7 +6,7 @@ class BpcTheme {
   static ThemeData light() {
     final cs = ColorScheme.fromSeed(
       seedColor: BpcColors.greenDark,
-      brightness: Brightness.light,
+      brightness: Brightness.dark,
       surface: BpcColors.surface,
       error: BpcColors.expense,
     );
@@ -19,9 +19,20 @@ class BpcTheme {
         tertiary: BpcColors.accentSoft,
         outline: BpcColors.mutedInk,
         outlineVariant: BpcColors.line,
+        surface: BpcColors.surface,
         surfaceContainerLow: BpcColors.surfaceStrong,
+        surfaceContainer: BpcColors.surface,
+        surfaceContainerHigh: BpcColors.surface,
         surfaceContainerHighest: BpcColors.paperShade,
+        primaryContainer: BpcColors.accentSoft,
+        onPrimaryContainer: BpcColors.ink,
+        secondaryContainer: BpcColors.surfaceStrong,
+        onSecondaryContainer: BpcColors.ink,
+        errorContainer: BpcColors.expenseSoft,
+        onErrorContainer: BpcColors.ink,
         onSurface: BpcColors.ink,
+        onPrimary: Colors.white,
+        onError: BpcColors.ink,
       ),
       scaffoldBackgroundColor: BpcColors.paper,
       appBarTheme: const AppBarTheme(
@@ -37,7 +48,7 @@ class BpcTheme {
         ),
       ),
       navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: BpcColors.paper,
+        backgroundColor: BpcColors.surfaceTint,
         selectedIconTheme: const IconThemeData(
           color: BpcColors.accent,
           size: 22,
@@ -65,7 +76,7 @@ class BpcTheme {
         minExtendedWidth: 220,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: BpcColors.surface,
+        backgroundColor: BpcColors.surfaceTint,
         indicatorColor: BpcColors.accentSoft,
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
@@ -136,6 +147,37 @@ class BpcTheme {
         behavior: SnackBarBehavior.floating,
       ),
       dividerColor: BpcColors.line,
+      canvasColor: BpcColors.paper,
+      dialogTheme: DialogThemeData(
+        backgroundColor: BpcColors.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+          side: const BorderSide(color: BpcColors.line),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: BpcColors.surface,
+        surfaceTintColor: Colors.transparent,
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: BpcColors.surface,
+        surfaceTintColor: Colors.transparent,
+        textStyle: const TextStyle(color: BpcColors.ink),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: BpcColors.line),
+        ),
+      ),
+      menuTheme: MenuThemeData(
+        style: MenuStyle(
+          backgroundColor: WidgetStateProperty.all(BpcColors.surface),
+          surfaceTintColor: WidgetStateProperty.all(Colors.transparent),
+          side: WidgetStateProperty.all(
+            const BorderSide(color: BpcColors.line),
+          ),
+        ),
+      ),
       cardTheme: CardThemeData(
         color: BpcColors.surface,
         elevation: 0,
@@ -162,7 +204,7 @@ class BpcTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: BpcColors.surface,
+        fillColor: BpcColors.surfaceStrong,
         hintStyle: const TextStyle(
           color: BpcColors.subtleInk,
           fontWeight: FontWeight.w600,

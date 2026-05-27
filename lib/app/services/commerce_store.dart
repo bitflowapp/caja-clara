@@ -973,6 +973,11 @@ class CommerceStore extends ChangeNotifier {
     DateTime? createdAt,
   }) async {
     _ensureFeatureAvailable(LockedFeature.sales);
+    if (hasCashClosingToday) {
+      throw StateError(
+        'La caja está cerrada. Abrí una nueva caja para registrar movimientos.',
+      );
+    }
     final index = _products.indexWhere((product) => product.id == productId);
     if (index == -1) {
       throw StateError('No se encontró el producto.');
@@ -1029,6 +1034,11 @@ class CommerceStore extends ChangeNotifier {
     DateTime? createdAt,
   }) async {
     _ensureFeatureAvailable(LockedFeature.sales);
+    if (hasCashClosingToday) {
+      throw StateError(
+        'La caja está cerrada. Abrí una nueva caja para registrar movimientos.',
+      );
+    }
     final cleanDescription = description.trim();
     final readinessMessage = freeSaleReadinessMessage(
       description: cleanDescription,
@@ -1069,6 +1079,11 @@ class CommerceStore extends ChangeNotifier {
     DateTime? createdAt,
   }) async {
     _ensureFeatureAvailable(LockedFeature.expenses);
+    if (hasCashClosingToday) {
+      throw StateError(
+        'La caja está cerrada. Abrí una nueva caja para registrar movimientos.',
+      );
+    }
     final cleanConcept = concept.trim();
     final cleanCategory = category.trim().isEmpty ? 'General' : category.trim();
 

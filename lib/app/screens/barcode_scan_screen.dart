@@ -1455,7 +1455,7 @@ class _LookupInfo extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.all(emphasized ? 16 : 14),
         decoration: BoxDecoration(
-          color: emphasized ? Colors.white : scheme.surfaceContainerLow,
+          color: emphasized ? BpcColors.surface : scheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(18),
           border: emphasized ? Border.all(color: BpcColors.line) : null,
         ),

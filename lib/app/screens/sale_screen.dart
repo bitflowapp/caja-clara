@@ -19,9 +19,10 @@ import '../widgets/product_form_dialog.dart';
 import 'expense_screen.dart';
 
 class SaleScreen extends StatefulWidget {
-  const SaleScreen({super.key, this.initialProduct});
+  const SaleScreen({super.key, this.initialProduct, this.onOpenCashRegister});
 
   final Product? initialProduct;
+  final VoidCallback? onOpenCashRegister;
 
   @override
   State<SaleScreen> createState() => _SaleScreenState();
@@ -94,6 +95,14 @@ class _SaleScreenState extends State<SaleScreen> {
       body: AnimatedBuilder(
         animation: store,
         builder: (context, _) {
+          if (store.hasCashClosingToday) {
+            return _ClosedRegisterBlocker(
+              message:
+                  'La caja está cerrada. Abrí una nueva caja para registrar ventas.',
+              onGoBack: () => Navigator.of(context).maybePop(),
+              onOpenCashRegister: widget.onOpenCashRegister,
+            );
+          }
           final catalog = ProductCatalogService(store);
           return KeyboardAwarePageBody(
             child: InputShortcutScope(
@@ -481,6 +490,13 @@ class _SaleScreenState extends State<SaleScreen> {
       return;
     }
 
+    if (store.hasCashClosingToday) {
+      _showMessage(
+        'La caja está cerrada. Abrí una nueva caja para registrar ventas.',
+      );
+      return;
+    }
+
     for (final line in _cart) {
       final message = store.saleReadinessMessage(
         line.product.id,
@@ -821,7 +837,7 @@ class _CartPane extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: BpcColors.surface,
               borderRadius: BorderRadius.circular(18),
               border: Border.all(color: BpcColors.line),
             ),
@@ -978,4 +994,84 @@ String _productSubtitle(Product product) {
     if ((product.barcode ?? '').trim().isNotEmpty) 'Cod. ${product.barcode}',
   ];
   return parts.join(' / ');
+}
+
+class _ClosedRegisterBlocker extends StatelessWidget {
+  const _ClosedRegisterBlocker({
+    required this.message,
+    required this.onGoBack,
+    this.onOpenCashRegister,
+  });
+
+  final String message;
+  final VoidCallback onGoBack;
+  final VoidCallback? onOpenCashRegister;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: BpcColors.mutedInk.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.lock_rounded,
+                color: BpcColors.mutedInk,
+                size: 32,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Caja cerrada',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: BpcColors.ink,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: BpcColors.mutedInk,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (onOpenCashRegister != null) ...[
+              FilledButton.icon(
+                onPressed: () async {
+                  await Navigator.of(context).maybePop();
+                  onOpenCashRegister?.call();
+                },
+                icon: const Icon(Icons.savings_rounded),
+                label: const Text('Abrir caja'),
+              ),
+              const SizedBox(height: 10),
+              TextButton.icon(
+                onPressed: onGoBack,
+                icon: const Icon(Icons.arrow_back_rounded),
+                label: const Text('Volver al inicio'),
+              ),
+            ] else ...[
+              FilledButton.icon(
+                onPressed: onGoBack,
+                icon: const Icon(Icons.arrow_back_rounded),
+                label: const Text('Volver al inicio'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }

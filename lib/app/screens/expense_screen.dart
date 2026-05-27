@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/commerce_store.dart';
+import '../theme/bpc_colors.dart';
 import '../utils/formatters.dart';
 import '../utils/user_facing_errors.dart';
 import '../utils/text_field_selection.dart';
@@ -13,7 +14,9 @@ import '../widgets/mobile_field_editor.dart';
 import '../widgets/speech_dictation.dart';
 
 class ExpenseScreen extends StatefulWidget {
-  const ExpenseScreen({super.key});
+  const ExpenseScreen({super.key, this.onOpenCashRegister});
+
+  final VoidCallback? onOpenCashRegister;
 
   @override
   State<ExpenseScreen> createState() => _ExpenseScreenState();
@@ -70,6 +73,16 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
     final store = CommerceScope.of(context);
     final useMobileSensitiveFieldEditor = useMobileFieldEditor(context);
     final demoMode = InputShortcutScope.demoAutofillEnabled;
+    if (store.hasCashClosingToday) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Registrar gasto')),
+        body: _ClosedRegisterExpenseBlocker(
+          onGoBack: () => Navigator.of(context).maybePop(),
+          onOpenCashRegister: widget.onOpenCashRegister,
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Registrar gasto')),
       body: KeyboardAwarePageBody(
@@ -426,6 +439,19 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
       return;
     }
 
+    if (store.hasCashClosingToday) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'La caja está cerrada. Abrí una nueva caja para registrar gastos.',
+            ),
+          ),
+        );
+      return;
+    }
+
     setState(() => _saving = true);
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
@@ -488,5 +514,83 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
       _categoryController.text = 'Insumos';
     });
     _dismissKeyboard();
+  }
+}
+
+class _ClosedRegisterExpenseBlocker extends StatelessWidget {
+  const _ClosedRegisterExpenseBlocker({
+    required this.onGoBack,
+    this.onOpenCashRegister,
+  });
+
+  final VoidCallback onGoBack;
+  final VoidCallback? onOpenCashRegister;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: BpcColors.mutedInk.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.lock_rounded,
+                color: BpcColors.mutedInk,
+                size: 32,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Caja cerrada',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: BpcColors.ink,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'La caja está cerrada. Abrí una nueva caja para registrar gastos.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: BpcColors.mutedInk,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (onOpenCashRegister != null) ...[
+              FilledButton.icon(
+                onPressed: () async {
+                  await Navigator.of(context).maybePop();
+                  onOpenCashRegister?.call();
+                },
+                icon: const Icon(Icons.savings_rounded),
+                label: const Text('Abrir caja'),
+              ),
+              const SizedBox(height: 10),
+              TextButton.icon(
+                onPressed: onGoBack,
+                icon: const Icon(Icons.arrow_back_rounded),
+                label: const Text('Volver al inicio'),
+              ),
+            ] else ...[
+              FilledButton.icon(
+                onPressed: onGoBack,
+                icon: const Icon(Icons.arrow_back_rounded),
+                label: const Text('Volver al inicio'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }

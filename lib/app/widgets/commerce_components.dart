@@ -47,8 +47,8 @@ class BpcPanel extends StatelessWidget {
             ? const [
                 BoxShadow(
                   color: BpcColors.shadow,
-                  blurRadius: 22,
-                  offset: Offset(0, 8),
+                  blurRadius: 16,
+                  offset: Offset(0, 5),
                 ),
               ]
             : null,
@@ -237,7 +237,7 @@ class KpiCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final content = ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 136),
+      constraints: const BoxConstraints(minHeight: 124),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         child: Column(
@@ -273,7 +273,7 @@ class KpiCard extends StatelessWidget {
               value,
               style: theme.textTheme.headlineMedium?.copyWith(
                 color: BpcColors.ink,
-                fontSize: 28,
+                fontSize: 25,
                 fontWeight: FontWeight.w900,
                 letterSpacing: -0.4,
               ),
@@ -309,8 +309,8 @@ class KpiCard extends StatelessWidget {
             boxShadow: const [
               BoxShadow(
                 color: BpcColors.shadow,
-                blurRadius: 20,
-                offset: Offset(0, 8),
+                blurRadius: 12,
+                offset: Offset(0, 4),
               ),
             ],
           ),
@@ -422,7 +422,7 @@ class ActionCard extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.16)
         : scheme.primary.withValues(alpha: 0.08);
     return Material(
-      color: fillColor ?? scheme.surfaceContainerLow.withValues(alpha: 0.42),
+      color: fillColor ?? scheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(emphasized ? 24 : 20),
       child: InkWell(
         borderRadius: BorderRadius.circular(emphasized ? 24 : 20),
@@ -440,9 +440,9 @@ class ActionCard extends StatelessWidget {
             boxShadow: emphasized
                 ? const [
                     BoxShadow(
-                      color: Color(0x333B82F6),
-                      blurRadius: 24,
-                      offset: Offset(0, 12),
+                      color: Color(0x222F5EC6),
+                      blurRadius: 18,
+                      offset: Offset(0, 8),
                     ),
                   ]
                 : null,

@@ -64,7 +64,7 @@ class SummaryScreen extends StatelessWidget {
               const SizedBox(height: 12),
               BpcPanel(
                 padding: const EdgeInsets.all(16),
-                color: Colors.white.withValues(alpha: 0.78),
+                color: BpcColors.surface,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -158,56 +158,93 @@ class SummaryScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  FilledButton.tonalIcon(
-                    onPressed: savingCashEvent ? null : onRegisterCashOpening,
-                    icon: const Icon(Icons.login_rounded),
-                    label: Text(
-                      store.hasCashOpeningToday
-                          ? 'Editar apertura'
-                          : 'Apertura de caja',
+              BpcPanel(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                color: BpcColors.surfaceStrong,
+                showShadow: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Qué querés hacer con la caja',
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: savingCashEvent ? null : onRegisterCashClosing,
-                    icon: const Icon(Icons.logout_rounded),
-                    label: Text(
-                      store.hasCashClosingToday
-                          ? 'Editar cierre'
-                          : 'Cierre de caja',
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        FilledButton.tonalIcon(
+                          onPressed: savingCashEvent
+                              ? null
+                              : () async {
+                                  if (store.hasCashClosingToday) {
+                                    final ok = await _confirmEditClosedCash(
+                                      context,
+                                    );
+                                    if (!ok) return;
+                                  }
+                                  onRegisterCashOpening();
+                                },
+                          icon: const Icon(Icons.login_rounded),
+                          label: Text(
+                            store.hasCashOpeningToday
+                                ? 'Editar apertura'
+                                : 'Abrir caja',
+                          ),
+                        ),
+                        FilledButton.tonalIcon(
+                          onPressed: savingCashEvent
+                              ? null
+                              : () async {
+                                  if (store.hasCashClosingToday) {
+                                    final ok = await _confirmEditClosedCash(
+                                      context,
+                                    );
+                                    if (!ok) return;
+                                  }
+                                  onRegisterCashClosing();
+                                },
+                          icon: const Icon(Icons.logout_rounded),
+                          label: Text(
+                            store.hasCashClosingToday
+                                ? 'Editar cierre'
+                                : 'Cerrar caja',
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: onShareDailySummary,
+                          icon: const Icon(Icons.ios_share_rounded),
+                          label: const Text('Compartir resumen'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: exportingExcel ? null : onExportExcel,
+                          icon: exportingExcel
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.file_download_rounded),
+                          label: Text(
+                            exportingExcel ? 'Exportando' : 'Exportar',
+                          ),
+                        ),
+                        _CashMoreActionsMenu(
+                          store: store,
+                          exportingBackup: exportingBackup,
+                          restoringBackup: restoringBackup,
+                          undoingMovement: undoingMovement,
+                          onExportBackup: onExportBackup,
+                          onRestoreBackup: onRestoreBackup,
+                          onUndoLastMovement: onUndoLastMovement,
+                        ),
+                      ],
                     ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: exportingExcel ? null : onExportExcel,
-                    icon: exportingExcel
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.file_download_rounded),
-                    label: Text(
-                      exportingExcel ? 'Exportando Excel' : 'Exportar Excel',
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: onShareDailySummary,
-                    icon: const Icon(Icons.ios_share_rounded),
-                    label: const Text('Compartir resumen'),
-                  ),
-                  _CashMoreActionsMenu(
-                    store: store,
-                    exportingBackup: exportingBackup,
-                    restoringBackup: restoringBackup,
-                    undoingMovement: undoingMovement,
-                    onExportBackup: onExportBackup,
-                    onRestoreBackup: onRestoreBackup,
-                    onUndoLastMovement: onUndoLastMovement,
-                  ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: 18),
               if (suggestions.isNotEmpty) ...[
@@ -260,6 +297,30 @@ class SummaryScreen extends StatelessWidget {
       },
     );
   }
+}
+
+Future<bool> _confirmEditClosedCash(BuildContext context) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Editar caja cerrada'),
+      content: const Text(
+        'Esto puede cambiar los números del cierre. '
+        'Continuá solo si necesitás corregir un dato.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: const Text('Editar igual'),
+        ),
+      ],
+    ),
+  );
+  return result ?? false;
 }
 
 Color? _closingValueColor(CommerceStore store) {
@@ -556,7 +617,9 @@ class _FormulaChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: emphasized ? theme.colorScheme.surface : Colors.white,
+        color: emphasized
+            ? theme.colorScheme.surface
+            : theme.colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: emphasized

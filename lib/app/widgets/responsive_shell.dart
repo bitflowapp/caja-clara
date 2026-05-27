@@ -53,7 +53,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       return;
     }
     final message = await Navigator.of(context).push<String>(
-      MaterialPageRoute<String>(builder: (_) => const SaleScreen()),
+      MaterialPageRoute<String>(
+        builder: (_) => SaleScreen(onOpenCashRegister: _registerCashOpening),
+      ),
     );
     if (!mounted || message == null) {
       return;
@@ -67,7 +69,10 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
       return;
     }
     final message = await Navigator.of(context).push<String>(
-      MaterialPageRoute<String>(builder: (_) => const ExpenseScreen()),
+      MaterialPageRoute<String>(
+        builder: (_) =>
+            ExpenseScreen(onOpenCashRegister: _registerCashOpening),
+      ),
     );
     if (!mounted || message == null) {
       return;
@@ -96,7 +101,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       const SnackBar(
-        content: Text('Resumen del día copiado. Pegalo en WhatsApp o donde quieras.'),
+        content: Text(
+          'Resumen del día copiado. Pegalo en WhatsApp o donde quieras.',
+        ),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -987,6 +994,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
 
         if (wide) {
           return Scaffold(
+            backgroundColor: BpcColors.paper,
             body: SafeArea(
               child: Row(
                 children: [
@@ -994,7 +1002,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
                     width: 238,
                     margin: const EdgeInsets.fromLTRB(16, 16, 0, 16),
                     decoration: BoxDecoration(
-                      color: BpcColors.surface.withValues(alpha: 0.88),
+                      color: BpcColors.surfaceTint,
                       borderRadius: BorderRadius.circular(28),
                       border: Border.all(color: BpcColors.line),
                       boxShadow: const [
@@ -1105,6 +1113,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         }
 
         return Scaffold(
+          backgroundColor: BpcColors.paper,
           body: SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -1251,7 +1260,7 @@ class _ProductsIconBadge extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               child: Text(
-                '$count',
+                count > 9 ? '9+' : '$count',
                 style: TextStyle(
                   color: scheme.onError,
                   fontSize: 10,

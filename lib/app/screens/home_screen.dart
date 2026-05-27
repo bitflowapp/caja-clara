@@ -5,7 +5,6 @@ import '../services/commerce_store.dart';
 import '../services/starter_templates.dart';
 import '../theme/bpc_colors.dart';
 import '../utils/formatters.dart';
-import '../widgets/caja_clara_brand.dart';
 import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
 import '../widgets/input_shortcuts.dart';
@@ -69,7 +68,6 @@ class HomeScreen extends StatelessWidget {
     return AnimatedBuilder(
       animation: store,
       builder: (context, _) {
-        final now = DateTime.now();
         final recent = store.recentMovements();
         final suggestions = store.freeSaleSuggestions;
         const demoControlsEnabled = InputShortcutScope.demoControlsEnabled;
@@ -78,13 +76,15 @@ class HomeScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _HomeGreeting(now: now),
-              const SizedBox(height: 14),
-              _CashStatusBanner(
+              _CashStatusBanner(store: store, onOpenCash: onOpenCash),
+              const SizedBox(height: 12),
+              _ContextualActionPanel(
                 store: store,
+                onNewSale: onNewSale,
+                onNewExpense: onNewExpense,
+                onOpenCash: onOpenCash,
                 onOpenCashRegister: onOpenCashRegister,
                 onCloseCashRegister: onCloseCashRegister,
-                onNewSale: onNewSale,
               ),
               if (demoControlsEnabled &&
                   (store.hasProducts || store.hasMovements)) ...[
@@ -130,17 +130,24 @@ class HomeScreen extends StatelessWidget {
                 subtitle: 'Lo que está pasando en tu negocio ahora mismo.',
               ),
               const SizedBox(height: 12),
-              _HomeKpiGrid(
-                store: store,
-                onOpenCash: onOpenCash,
-              ),
+              _HomeKpiGrid(store: store, onOpenCash: onOpenCash),
               const SizedBox(height: 18),
-              _PrimaryActions(onNewSale: onNewSale),
+              const SectionHeader(
+                title: 'Accesos principales',
+                subtitle: 'Lo básico para trabajar durante el día.',
+              ),
               const SizedBox(height: 12),
-              _QuickActionsPanel(
-                onAddProduct: () => showProductEditor(context, store),
-                onOpenCash: onOpenCash,
+              _MainQuickActionsPanel(
+                onNewSale: onNewSale,
                 onNewExpense: onNewExpense,
+                onOpenProducts: onOpenProducts,
+                onOpenCash: onOpenCash,
+                isRegisterClosed: store.hasCashClosingToday,
+              ),
+              const SizedBox(height: 14),
+              _SecondaryActionsPanel(
+                onOpenCash: onOpenCash,
+                onShareDailySummary: onShareDailySummary,
                 onExportExcel: onExportExcel,
                 exportingExcel: exportingExcel,
               ),
@@ -254,113 +261,23 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-/// Saludo del día con la marca, compacto y claro.
-class _HomeGreeting extends StatelessWidget {
-  const _HomeGreeting({required this.now});
-
-  final DateTime now;
-
-  String get _greeting {
-    final hour = now.hour;
-    if (hour < 13) {
-      return 'Buen día';
-    }
-    if (hour < 20) {
-      return 'Buenas tardes';
-    }
-    return 'Buenas noches';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return BpcPanel(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-      elevated: false,
-      child: Row(
-        children: [
-          Container(
-            width: 54,
-            height: 54,
-            padding: const EdgeInsets.all(9),
-            decoration: BoxDecoration(
-              color: BpcColors.accentStrong,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: BpcColors.accentStrong.withValues(alpha: 0.24),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: const CajaClaraSymbol(size: 36),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '$_greeting · ${formatShortDate(now)}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: BpcColors.subtleInk,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Caja Clara',
-                  style: theme.textTheme.titleLarge?.copyWith(fontSize: 24),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Banner de estado de caja con 3 estados claros:
-///   - cerrada (sin apertura hoy)  → CTA "Abrir caja".
-///   - abierta (apertura y aún sin cierre) → CTAs "Nueva venta" + "Cerrar caja".
-///   - día cerrado (apertura y cierre) → CTA "Editar cierre".
 class _CashStatusBanner extends StatelessWidget {
-  const _CashStatusBanner({
-    required this.store,
-    required this.onOpenCashRegister,
-    required this.onCloseCashRegister,
-    required this.onNewSale,
-  });
+  const _CashStatusBanner({required this.store, required this.onOpenCash});
 
   final CommerceStore store;
-  final VoidCallback onOpenCashRegister;
-  final VoidCallback onCloseCashRegister;
-  final VoidCallback onNewSale;
+  final VoidCallback onOpenCash;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasOpening = store.hasCashOpeningToday;
-    final hasClosing = store.hasCashClosingToday;
     final opening = store.todayOpeningCashPesos;
     final closing = store.todayClosingCashPesos;
-
-    final _CashStatusVariant variant;
-    if (!hasOpening) {
-      variant = _CashStatusVariant.closed;
-    } else if (!hasClosing) {
-      variant = _CashStatusVariant.open;
-    } else {
-      variant = _CashStatusVariant.dayClosed;
-    }
+    final variant = _cashStatusVariant(store);
 
     final color = switch (variant) {
       _CashStatusVariant.closed => BpcColors.accentStrong,
       _CashStatusVariant.open => BpcColors.income,
-      _CashStatusVariant.dayClosed => BpcColors.mutedInk,
+      _CashStatusVariant.dayClosed => const Color(0xFFD97706),
     };
     final icon = switch (variant) {
       _CashStatusVariant.closed => Icons.savings_rounded,
@@ -370,67 +287,82 @@ class _CashStatusBanner extends StatelessWidget {
     final title = switch (variant) {
       _CashStatusVariant.closed => 'Caja cerrada',
       _CashStatusVariant.open => 'Caja abierta',
-      _CashStatusVariant.dayClosed => 'Día cerrado',
+      _CashStatusVariant.dayClosed => 'Caja cerrada',
     };
     final subtitle = switch (variant) {
       _CashStatusVariant.closed =>
-        'Anotá el efectivo inicial para empezar a vender.',
+        'Abrí la caja para empezar a registrar movimientos.',
       _CashStatusVariant.open =>
-        'Apertura del día: ${formatMoney(opening ?? 0)}.',
+        'Inicio: ${formatMoney(opening ?? 0)} · esperada ahora: ${formatMoney(store.todayExpectedCashPesos ?? opening ?? 0)}.',
       _CashStatusVariant.dayClosed =>
-        'Cierre contado: ${formatMoney(closing ?? 0)}.',
+        'Cierre contado: ${formatMoney(closing ?? 0)} · diferencia: ${_differenceLabel(store.todayClosingDifferencePesos)}.',
     };
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.09),
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withValues(alpha: 0.24)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: color),
+        onTap: onOpenCash,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(16, 15, 16, 15),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.13),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: color.withValues(alpha: 0.38)),
           ),
-          const SizedBox(width: 13),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: BpcColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: BpcColors.subtleInk,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Icon(icon, color: color),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Estado de caja',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: BpcColors.subtleInk,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: BpcColors.mutedInk,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 10),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: BpcColors.subtleInk,
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          _CashStatusActions(
-            variant: variant,
-            onOpenCashRegister: onOpenCashRegister,
-            onCloseCashRegister: onCloseCashRegister,
-            onNewSale: onNewSale,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -438,63 +370,180 @@ class _CashStatusBanner extends StatelessWidget {
 
 enum _CashStatusVariant { closed, open, dayClosed }
 
-class _CashStatusActions extends StatelessWidget {
-  const _CashStatusActions({
-    required this.variant,
+_CashStatusVariant _cashStatusVariant(CommerceStore store) {
+  if (!store.hasCashOpeningToday) {
+    return _CashStatusVariant.closed;
+  }
+  if (!store.hasCashClosingToday) {
+    return _CashStatusVariant.open;
+  }
+  return _CashStatusVariant.dayClosed;
+}
+
+String _differenceLabel(int? diff) {
+  if (diff == null) return 'sin cierre';
+  if (diff == 0) return 'coincide';
+  if (diff < 0) return 'faltan ${formatMoney(diff.abs())}';
+  return 'sobran ${formatMoney(diff)}';
+}
+
+class _ContextualActionPanel extends StatelessWidget {
+  const _ContextualActionPanel({
+    required this.store,
+    required this.onNewSale,
+    required this.onNewExpense,
+    required this.onOpenCash,
     required this.onOpenCashRegister,
     required this.onCloseCashRegister,
-    required this.onNewSale,
   });
 
-  final _CashStatusVariant variant;
+  final CommerceStore store;
+  final VoidCallback onNewSale;
+  final VoidCallback onNewExpense;
+  final VoidCallback onOpenCash;
   final VoidCallback onOpenCashRegister;
   final VoidCallback onCloseCashRegister;
-  final VoidCallback onNewSale;
 
   @override
   Widget build(BuildContext context) {
-    switch (variant) {
-      case _CashStatusVariant.closed:
-        return FilledButton.icon(
-          onPressed: onOpenCashRegister,
-          icon: const Icon(Icons.savings_rounded, size: 18),
-          label: const Text('Abrir caja'),
+    final variant = _cashStatusVariant(store);
+    final primary = switch (variant) {
+      _CashStatusVariant.closed => _PrimaryActionData(
+        title: 'Abrir caja',
+        subtitle: 'Cargá el efectivo inicial y empezá a vender.',
+        icon: Icons.savings_rounded,
+        onTap: onOpenCashRegister,
+      ),
+      _CashStatusVariant.open => _PrimaryActionData(
+        title: 'Nueva venta',
+        subtitle: 'Vendé en segundos y la caja se actualiza sola.',
+        icon: Icons.point_of_sale_rounded,
+        onTap: onNewSale,
+      ),
+      _CashStatusVariant.dayClosed => _PrimaryActionData(
+        title: 'Abrir caja',
+        subtitle: 'Empezá un nuevo día con el saldo inicial.',
+        icon: Icons.savings_rounded,
+        onTap: onOpenCashRegister,
+      ),
+    };
+
+    final supporting = switch (variant) {
+      _CashStatusVariant.closed => <_SupportingActionData>[],
+      _CashStatusVariant.open => <_SupportingActionData>[
+        _SupportingActionData(
+          title: 'Registrar gasto',
+          icon: Icons.receipt_long_rounded,
+          onTap: onNewExpense,
+        ),
+        _SupportingActionData(
+          title: 'Cerrar caja',
+          icon: Icons.logout_rounded,
+          onTap: onCloseCashRegister,
+        ),
+      ],
+      _CashStatusVariant.dayClosed => <_SupportingActionData>[
+        _SupportingActionData(
+          title: 'Ver cierre',
+          icon: Icons.summarize_rounded,
+          onTap: onOpenCash,
+        ),
+      ],
+    };
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 760;
+        final primaryCard = ActionCard(
+          title: primary.title,
+          subtitle: primary.subtitle,
+          icon: primary.icon,
+          onTap: primary.onTap,
+          fillColor: BpcColors.accentStrong,
+          contentColor: Colors.white,
+          emphasized: true,
         );
-      case _CashStatusVariant.open:
-        return Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          alignment: WrapAlignment.end,
-          crossAxisAlignment: WrapCrossAlignment.center,
+        final secondaryRow = _SupportingActionsRow(actions: supporting);
+
+        if (supporting.isEmpty) {
+          return primaryCard;
+        }
+
+        if (!wide) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [primaryCard, const SizedBox(height: 10), secondaryRow],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            OutlinedButton.icon(
-              onPressed: onCloseCashRegister,
-              icon: const Icon(Icons.logout_rounded, size: 18),
-              label: const Text('Cerrar caja'),
-            ),
-            FilledButton.icon(
-              onPressed: onNewSale,
-              icon: const Icon(Icons.point_of_sale_rounded, size: 18),
-              label: const Text('Nueva venta'),
-            ),
+            Expanded(flex: 3, child: primaryCard),
+            const SizedBox(width: 12),
+            Expanded(flex: 2, child: secondaryRow),
           ],
         );
-      case _CashStatusVariant.dayClosed:
-        return OutlinedButton.icon(
-          onPressed: onCloseCashRegister,
-          icon: const Icon(Icons.edit_rounded, size: 18),
-          label: const Text('Editar cierre'),
-        );
-    }
+      },
+    );
+  }
+}
+
+class _PrimaryActionData {
+  const _PrimaryActionData({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+}
+
+class _SupportingActionData {
+  const _SupportingActionData({
+    required this.title,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String title;
+  final IconData icon;
+  final VoidCallback onTap;
+}
+
+class _SupportingActionsRow extends StatelessWidget {
+  const _SupportingActionsRow({required this.actions});
+
+  final List<_SupportingActionData> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return BpcPanel(
+      padding: const EdgeInsets.all(12),
+      showShadow: false,
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          for (final action in actions)
+            OutlinedButton.icon(
+              onPressed: action.onTap,
+              icon: Icon(action.icon, size: 18),
+              label: Text(action.title),
+            ),
+        ],
+      ),
+    );
   }
 }
 
 /// Grilla de 4 KPIs principales del Home.
 class _HomeKpiGrid extends StatelessWidget {
-  const _HomeKpiGrid({
-    required this.store,
-    required this.onOpenCash,
-  });
+  const _HomeKpiGrid({required this.store, required this.onOpenCash});
 
   final CommerceStore store;
   final VoidCallback onOpenCash;
@@ -510,18 +559,26 @@ class _HomeKpiGrid extends StatelessWidget {
           m.createdAt.month == now.month &&
           m.createdAt.day == now.day,
     );
-    final profitValue = !hasSalesToday
-        ? '—'
-        : hasFreeSalesToday
-        ? '—'
-        : formatMoney(store.todayEstimatedProfitPesos);
-    final profitHelper = !hasSalesToday
-        ? 'Cuando registres ventas, vas a ver tu ganancia estimada del día.'
-        : hasFreeSalesToday
-        ? 'Sumá costo a tus productos del catálogo para verla bien.'
-        : 'Ventas con costo − gastos de hoy';
-    final profitAccent = !hasSalesToday || hasFreeSalesToday
+    final profitIsReliable = hasSalesToday && !hasFreeSalesToday;
+    final difference = store.todayClosingDifferencePesos;
+    final differenceValue = difference == null
+        ? 'Sin cierre'
+        : difference == 0
+        ? formatMoney(0)
+        : difference < 0
+        ? '-${formatMoney(difference.abs())}'
+        : '+${formatMoney(difference)}';
+    final differenceHelper = difference == null
+        ? 'Al cerrar, comparamos contado vs esperado'
+        : difference == 0
+        ? 'La caja coincide'
+        : difference < 0
+        ? 'Falta efectivo al cierre'
+        : 'Sobra efectivo al cierre';
+    final differenceAccent = difference == null
         ? BpcColors.mutedInk
+        : difference < 0
+        ? BpcColors.expense
         : BpcColors.income;
 
     final cards = <Widget>[
@@ -543,7 +600,7 @@ class _HomeKpiGrid extends StatelessWidget {
             : 'Salidas de caja de hoy',
       ),
       KpiCard(
-        label: 'Caja del día',
+        label: 'Caja esperada',
         value: store.todayExpectedCashPesos == null
             ? 'Sin apertura'
             : formatMoney(store.todayExpectedCashPesos!),
@@ -555,29 +612,51 @@ class _HomeKpiGrid extends StatelessWidget {
         onTap: onOpenCash,
       ),
       KpiCard(
-        label: 'Ganancia hoy',
-        value: profitValue,
-        icon: Icons.payments_rounded,
-        accent: profitAccent,
-        helper: profitHelper,
+        label: 'Diferencia',
+        value: differenceValue,
+        icon: Icons.balance_rounded,
+        accent: differenceAccent,
+        helper: differenceHelper,
+        onTap: onOpenCash,
       ),
+      if (profitIsReliable)
+        KpiCard(
+          label: 'Ganancia estimada',
+          value: formatMoney(store.todayEstimatedProfitPesos),
+          icon: Icons.payments_rounded,
+          accent: BpcColors.income,
+          helper: 'Ventas con costo - gastos de hoy',
+        ),
     ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final columns = constraints.maxWidth >= 720
-            ? 4
+            ? (profitIsReliable ? 5 : 4)
             : constraints.maxWidth >= 440
             ? 2
             : 1;
         final spacing = 12.0;
         final width =
             (constraints.maxWidth - spacing * (columns - 1)) / columns;
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (final card in cards) SizedBox(width: width, child: card),
+            Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              children: [
+                for (final card in cards) SizedBox(width: width, child: card),
+              ],
+            ),
+            if (!profitIsReliable) ...[
+              const SizedBox(height: 10),
+              _ProfitReliabilityNote(
+                message: !hasSalesToday
+                    ? 'Ganancia estimada: aparece cuando registres ventas con costos cargados.'
+                    : 'Ganancia estimada: no la mostramos porque hay ventas libres sin costo confiable.',
+              ),
+            ],
           ],
         );
       },
@@ -585,75 +664,101 @@ class _HomeKpiGrid extends StatelessWidget {
   }
 }
 
-class _PrimaryActions extends StatelessWidget {
-  const _PrimaryActions({required this.onNewSale});
+class _ProfitReliabilityNote extends StatelessWidget {
+  const _ProfitReliabilityNote({required this.message});
 
-  final VoidCallback onNewSale;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
-    return ActionCard(
-      title: 'Nueva venta',
-      subtitle: 'Vendé en segundos y se actualiza la caja.',
-      icon: Icons.shopping_bag_rounded,
-      onTap: onNewSale,
-      fillColor: BpcColors.accentStrong,
-      contentColor: Colors.white,
-      emphasized: true,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
+      decoration: BoxDecoration(
+        color: BpcColors.surfaceStrong,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: BpcColors.line),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.info_outline_rounded,
+            color: BpcColors.mutedInk,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: BpcColors.mutedInk,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-/// Accesos rápidos del Home en grilla de tarjetas.
-class _QuickActionsPanel extends StatelessWidget {
-  const _QuickActionsPanel({
-    required this.onAddProduct,
-    required this.onOpenCash,
+class _MainQuickActionsPanel extends StatelessWidget {
+  const _MainQuickActionsPanel({
+    required this.onNewSale,
     required this.onNewExpense,
-    required this.onExportExcel,
-    required this.exportingExcel,
+    required this.onOpenProducts,
+    required this.onOpenCash,
+    required this.isRegisterClosed,
   });
 
-  final VoidCallback onAddProduct;
-  final VoidCallback onOpenCash;
+  final VoidCallback onNewSale;
   final VoidCallback onNewExpense;
-  final VoidCallback onExportExcel;
-  final bool exportingExcel;
+  final VoidCallback onOpenProducts;
+  final VoidCallback onOpenCash;
+  final bool isRegisterClosed;
+
+  static const _closedReason =
+      'La caja está cerrada. Abrí una nueva caja para registrar movimientos.';
 
   @override
   Widget build(BuildContext context) {
     final actions = <Widget>[
       _QuickAction(
-        title: 'Cargar producto',
-        subtitle: 'Nombre, precio, stock y código',
-        icon: Icons.add_box_rounded,
-        onTap: onAddProduct,
+        title: 'Nueva venta',
+        subtitle: isRegisterClosed ? 'Caja cerrada' : 'Registrar una venta',
+        icon: Icons.point_of_sale_rounded,
+        onTap: isRegisterClosed ? null : onNewSale,
+        disabledReason: isRegisterClosed ? _closedReason : null,
       ),
       _QuickAction(
         title: 'Registrar gasto',
-        subtitle: 'Anotá una salida de la caja',
+        subtitle: isRegisterClosed ? 'Caja cerrada' : 'Anotar una salida',
         icon: Icons.receipt_long_rounded,
-        onTap: onNewExpense,
+        onTap: isRegisterClosed ? null : onNewExpense,
+        disabledReason: isRegisterClosed ? _closedReason : null,
       ),
       _QuickAction(
-        title: 'Ver caja del día',
-        subtitle: 'Cuánto entró, salió y queda',
+        title: 'Productos',
+        subtitle: 'Precios, stock y códigos',
+        icon: Icons.inventory_2_rounded,
+        onTap: onOpenProducts,
+      ),
+      _QuickAction(
+        title: 'Cierre / resumen',
+        subtitle: 'Ver caja y cerrar el día',
         icon: Icons.account_balance_wallet_rounded,
         onTap: onOpenCash,
-      ),
-      _QuickAction(
-        title: 'Exportar Excel',
-        subtitle: 'Guardá un respaldo del día',
-        icon: Icons.file_download_rounded,
-        onTap: exportingExcel ? null : onExportExcel,
-        busy: exportingExcel,
       ),
     ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 560 ? 2 : 1;
-        const spacing = 12.0;
+        final columns = constraints.maxWidth >= 760
+            ? 4
+            : constraints.maxWidth >= 520
+            ? 2
+            : 1;
+        const spacing = 10.0;
         final width =
             (constraints.maxWidth - spacing * (columns - 1)) / columns;
         return Wrap(
@@ -668,25 +773,135 @@ class _QuickActionsPanel extends StatelessWidget {
   }
 }
 
+class _SecondaryActionsPanel extends StatelessWidget {
+  const _SecondaryActionsPanel({
+    required this.onOpenCash,
+    required this.onShareDailySummary,
+    required this.onExportExcel,
+    required this.exportingExcel,
+  });
+
+  final VoidCallback onOpenCash;
+  final VoidCallback onShareDailySummary;
+  final VoidCallback onExportExcel;
+  final bool exportingExcel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      width: double.infinity,
+      child: BpcPanel(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        showShadow: false,
+        color: BpcColors.surfaceStrong,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Más acciones',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: BpcColors.ink,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Historial, reportes y respaldos del día.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: BpcColors.mutedInk,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _SecondaryActionChip(
+                  icon: Icons.history_rounded,
+                  label: 'Historial',
+                  onTap: onOpenCash,
+                ),
+                _SecondaryActionChip(
+                  icon: Icons.bar_chart_rounded,
+                  label: 'Reportes',
+                  onTap: onOpenCash,
+                ),
+                _SecondaryActionChip(
+                  icon: Icons.ios_share_rounded,
+                  label: 'Compartir resumen',
+                  onTap: onShareDailySummary,
+                ),
+                _SecondaryActionChip(
+                  icon: Icons.file_download_rounded,
+                  label: exportingExcel ? 'Exportando...' : 'Exportar',
+                  onTap: exportingExcel ? null : onExportExcel,
+                  busy: exportingExcel,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SecondaryActionChip extends StatelessWidget {
+  const _SecondaryActionChip({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.busy = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: busy
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Icon(icon, size: 18),
+      label: Text(label),
+    );
+  }
+}
+
 class _QuickAction extends StatelessWidget {
   const _QuickAction({
     required this.title,
     required this.subtitle,
     required this.icon,
     required this.onTap,
-    this.busy = false,
+    this.disabledReason,
   });
 
   final String title;
   final String subtitle;
   final IconData icon;
   final VoidCallback? onTap;
-  final bool busy;
+  final String? disabledReason;
+
+  bool get _disabled => onTap == null;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Material(
+    final iconColor = _disabled ? BpcColors.mutedInk : BpcColors.greenDark;
+    final titleColor = _disabled ? BpcColors.mutedInk : BpcColors.ink;
+    final subtitleColor = _disabled ? BpcColors.mutedInk : BpcColors.subtleInk;
+
+    Widget card = Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
@@ -695,16 +910,11 @@ class _QuickAction extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: BpcColors.surface,
+            color: _disabled
+                ? BpcColors.surface.withValues(alpha: 0.55)
+                : BpcColors.surface,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: BpcColors.line),
-            boxShadow: const [
-              BoxShadow(
-                color: BpcColors.shadow,
-                blurRadius: 16,
-                offset: Offset(0, 6),
-              ),
-            ],
           ),
           child: Row(
             children: [
@@ -712,15 +922,10 @@ class _QuickAction extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: BpcColors.greenDark.withValues(alpha: 0.08),
+                  color: iconColor.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: busy
-                    ? const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(icon, color: BpcColors.greenDark, size: 22),
+                child: Icon(icon, color: iconColor, size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -731,7 +936,7 @@ class _QuickAction extends StatelessWidget {
                     Text(
                       title,
                       style: theme.textTheme.titleMedium?.copyWith(
-                        color: BpcColors.ink,
+                        color: titleColor,
                         fontWeight: FontWeight.w900,
                         fontSize: 15,
                       ),
@@ -740,22 +945,27 @@ class _QuickAction extends StatelessWidget {
                     Text(
                       subtitle,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: BpcColors.subtleInk,
+                        color: subtitleColor,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
-                color: BpcColors.subtleInk,
+                color: _disabled ? BpcColors.mutedInk : BpcColors.subtleInk,
               ),
             ],
           ),
         ),
       ),
     );
+
+    if (_disabled && disabledReason != null) {
+      card = Tooltip(message: disabledReason!, child: card);
+    }
+    return card;
   }
 }
 
@@ -917,6 +1127,8 @@ class _LowStockBanner extends StatelessWidget {
                     Text(
                       count == 1
                           ? 'Te falta 1 producto por reponer.'
+                          : count > 10
+                          ? 'Revisá el stock de tus productos.'
                           : 'Te faltan $count productos por reponer.',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: BpcColors.mutedInk,
