@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../theme/bpc_colors.dart';
 import '../utils/formatters.dart';
 import '../utils/text_field_selection.dart';
 import 'commerce_components.dart';
@@ -41,7 +42,7 @@ Future<bool> showDangerConfirmationDialog(
                 child: Text(
                   message,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF6B2216),
+                    color: BpcColors.ink,
                     fontWeight: FontWeight.w700,
                   ),
                 ),

@@ -162,7 +162,7 @@ class SaleReceiptCard extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(18, compact ? 18 : 20, 18, 18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: BpcColors.surface,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: BpcColors.line),
         boxShadow: const [

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/movement.dart';
 import '../services/commerce_store.dart';
+import '../theme/bpc_colors.dart';
 import '../utils/formatters.dart';
 import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
@@ -20,6 +21,7 @@ class SummaryScreen extends StatelessWidget {
     required this.onRegisterCashOpening,
     required this.onRegisterCashClosing,
     required this.savingCashEvent,
+    required this.onShareDailySummary,
     required this.onCreateProductFromFreeSale,
     required this.onCreateProductFromSuggestion,
     required this.onDismissFreeSaleSuggestion,
@@ -36,6 +38,7 @@ class SummaryScreen extends StatelessWidget {
   final VoidCallback onRegisterCashOpening;
   final VoidCallback onRegisterCashClosing;
   final bool savingCashEvent;
+  final VoidCallback onShareDailySummary;
   final Future<void> Function(Movement movement) onCreateProductFromFreeSale;
   final Future<void> Function(FreeSaleSuggestion suggestion)
   onCreateProductFromSuggestion;
@@ -61,7 +64,7 @@ class SummaryScreen extends StatelessWidget {
               const SizedBox(height: 12),
               BpcPanel(
                 padding: const EdgeInsets.all(16),
-                color: Colors.white.withValues(alpha: 0.78),
+                color: BpcColors.surface,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -135,10 +138,8 @@ class SummaryScreen extends StatelessWidget {
                                 value: store.todayClosingCashPesos == null
                                     ? 'Sin cierre'
                                     : formatMoney(store.todayClosingCashPesos!),
-                                helper:
-                                    store.todayClosingDifferencePesos == null
-                                    ? 'Caja contada al cierre'
-                                    : 'Diferencia: ${formatMoney(store.todayClosingDifferencePesos!)}',
+                                valueColor: _closingValueColor(store),
+                                helper: _closingHelperText(store),
                               ),
                             ),
                           ],
@@ -149,55 +150,101 @@ class SummaryScreen extends StatelessWidget {
                       const SizedBox(height: 12),
                       _CashFormulaCard(store: store),
                     ],
+                    if (store.todayClosingDifferencePesos != null) ...[
+                      const SizedBox(height: 12),
+                      _CashDifferenceBanner(store: store),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  FilledButton.tonalIcon(
-                    onPressed: savingCashEvent ? null : onRegisterCashOpening,
-                    icon: const Icon(Icons.login_rounded),
-                    label: Text(
-                      store.hasCashOpeningToday
-                          ? 'Editar apertura'
-                          : 'Apertura de caja',
+              BpcPanel(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                color: BpcColors.surfaceStrong,
+                showShadow: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Qué querés hacer con la caja',
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: savingCashEvent ? null : onRegisterCashClosing,
-                    icon: const Icon(Icons.logout_rounded),
-                    label: Text(
-                      store.hasCashClosingToday
-                          ? 'Editar cierre'
-                          : 'Cierre de caja',
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        FilledButton.tonalIcon(
+                          onPressed: savingCashEvent
+                              ? null
+                              : () async {
+                                  if (store.hasCashClosingToday) {
+                                    final ok = await _confirmEditClosedCash(
+                                      context,
+                                    );
+                                    if (!ok) return;
+                                  }
+                                  onRegisterCashOpening();
+                                },
+                          icon: const Icon(Icons.login_rounded),
+                          label: Text(
+                            store.hasCashOpeningToday
+                                ? 'Editar apertura'
+                                : 'Abrir caja',
+                          ),
+                        ),
+                        FilledButton.tonalIcon(
+                          onPressed: savingCashEvent
+                              ? null
+                              : () async {
+                                  if (store.hasCashClosingToday) {
+                                    final ok = await _confirmEditClosedCash(
+                                      context,
+                                    );
+                                    if (!ok) return;
+                                  }
+                                  onRegisterCashClosing();
+                                },
+                          icon: const Icon(Icons.logout_rounded),
+                          label: Text(
+                            store.hasCashClosingToday
+                                ? 'Editar cierre'
+                                : 'Cerrar caja',
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: onShareDailySummary,
+                          icon: const Icon(Icons.ios_share_rounded),
+                          label: const Text('Compartir resumen'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: exportingExcel ? null : onExportExcel,
+                          icon: exportingExcel
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.file_download_rounded),
+                          label: Text(
+                            exportingExcel ? 'Exportando' : 'Exportar',
+                          ),
+                        ),
+                        _CashMoreActionsMenu(
+                          store: store,
+                          exportingBackup: exportingBackup,
+                          restoringBackup: restoringBackup,
+                          undoingMovement: undoingMovement,
+                          onExportBackup: onExportBackup,
+                          onRestoreBackup: onRestoreBackup,
+                          onUndoLastMovement: onUndoLastMovement,
+                        ),
+                      ],
                     ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: exportingExcel ? null : onExportExcel,
-                    icon: exportingExcel
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.file_download_rounded),
-                    label: Text(
-                      exportingExcel ? 'Exportando Excel' : 'Exportar Excel',
-                    ),
-                  ),
-                  _CashMoreActionsMenu(
-                    store: store,
-                    exportingBackup: exportingBackup,
-                    restoringBackup: restoringBackup,
-                    undoingMovement: undoingMovement,
-                    onExportBackup: onExportBackup,
-                    onRestoreBackup: onRestoreBackup,
-                    onUndoLastMovement: onUndoLastMovement,
-                  ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: 18),
               if (suggestions.isNotEmpty) ...[
@@ -248,6 +295,129 @@ class SummaryScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+Future<bool> _confirmEditClosedCash(BuildContext context) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Editar caja cerrada'),
+      content: const Text(
+        'Esto puede cambiar los números del cierre. '
+        'Continuá solo si necesitás corregir un dato.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: const Text('Editar igual'),
+        ),
+      ],
+    ),
+  );
+  return result ?? false;
+}
+
+Color? _closingValueColor(CommerceStore store) {
+  final diff = store.todayClosingDifferencePesos;
+  if (diff == null) return null;
+  if (diff == 0) return null;
+  return diff < 0 ? BpcColors.expense : BpcColors.income;
+}
+
+String _closingHelperText(CommerceStore store) {
+  final diff = store.todayClosingDifferencePesos;
+  if (diff == null) return 'Caja contada al cierre';
+  if (diff == 0) return 'Coincide exacto con lo esperado';
+  if (diff < 0) return 'Te faltan ${formatMoney(diff.abs())}';
+  return 'Sobran ${formatMoney(diff)}';
+}
+
+/// Banner destacado debajo de la grilla cuando ya se hizo cierre del día:
+/// muestra la diferencia con color (verde sobra/coincide, rojo falta).
+class _CashDifferenceBanner extends StatelessWidget {
+  const _CashDifferenceBanner({required this.store});
+
+  final CommerceStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final diff = store.todayClosingDifferencePesos;
+    final expected = store.todayExpectedCashPesos;
+    final closing = store.todayClosingCashPesos;
+    if (diff == null || expected == null || closing == null) {
+      return const SizedBox.shrink();
+    }
+
+    final isShort = diff < 0;
+    final isExact = diff == 0;
+    final color = isExact
+        ? BpcColors.mutedInk
+        : (isShort ? BpcColors.expense : BpcColors.income);
+    final icon = isExact
+        ? Icons.check_circle_rounded
+        : (isShort ? Icons.warning_amber_rounded : Icons.savings_rounded);
+    final headline = isExact
+        ? 'Caja coincide exacto'
+        : isShort
+        ? 'Te faltan ${formatMoney(diff.abs())}'
+        : 'Sobran ${formatMoney(diff)}';
+    final detail =
+        'Esperado ${formatMoney(expected)} · '
+        'contaste ${formatMoney(closing)}';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.30)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  headline,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  detail,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: BpcColors.subtleInk,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -447,7 +617,9 @@ class _FormulaChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: emphasized ? theme.colorScheme.surface : Colors.white,
+        color: emphasized
+            ? theme.colorScheme.surface
+            : theme.colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: emphasized

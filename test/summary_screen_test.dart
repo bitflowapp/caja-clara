@@ -33,6 +33,7 @@ void main() {
               onRegisterCashOpening: () {},
               onRegisterCashClosing: () {},
               savingCashEvent: false,
+              onShareDailySummary: () {},
               onCreateProductFromFreeSale: (_) async {},
               onCreateProductFromSuggestion: (_) async {},
               onDismissFreeSaleSuggestion: (_) async {},
@@ -53,7 +54,8 @@ void main() {
 
     expect(find.textContaining('Caja del'), findsWidgets);
     expect(find.text('Tu caja, clara'), findsOneWidget);
-    expect(find.text('Exportar Excel'), findsOneWidget);
+    expect(find.text('Exportar'), findsOneWidget);
+    expect(find.text('Compartir resumen'), findsOneWidget);
     expect(find.textContaining('Movimientos'), findsWidgets);
     expect(find.textContaining('Apertura'), findsWidgets);
   });

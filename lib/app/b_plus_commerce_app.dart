@@ -5,6 +5,7 @@ import 'services/barcode_lookup_service.dart';
 import 'services/commerce_store.dart';
 import 'services/license_service.dart';
 import 'widgets/barcode_lookup_scope.dart';
+import 'theme/bpc_colors.dart';
 import 'theme/bpc_theme.dart';
 import 'widgets/commerce_scope.dart';
 import 'widgets/license_scope.dart';
@@ -45,14 +46,8 @@ class BPlusCommerceApp extends StatelessWidget {
               Locale('en'),
             ],
             builder: (context, child) {
-              return DecoratedBox(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFFF8FAFD), Color(0xFFEEF2F7)],
-                  ),
-                ),
+              return ColoredBox(
+                color: BpcColors.paper,
                 child: child ?? const SizedBox.shrink(),
               );
             },
