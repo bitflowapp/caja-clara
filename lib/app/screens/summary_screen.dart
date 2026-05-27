@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/movement.dart';
@@ -212,11 +214,7 @@ class SummaryScreen extends StatelessWidget {
                                 : 'Cerrar caja',
                           ),
                         ),
-                        OutlinedButton.icon(
-                          onPressed: onShareDailySummary,
-                          icon: const Icon(Icons.ios_share_rounded),
-                          label: const Text('Compartir resumen'),
-                        ),
+                        _ShareSummaryButton(onPressed: onShareDailySummary),
                         OutlinedButton.icon(
                           onPressed: exportingExcel ? null : onExportExcel,
                           icon: exportingExcel
@@ -297,6 +295,77 @@ class SummaryScreen extends StatelessWidget {
       },
     );
   }
+}
+
+class _ShareSummaryButton extends StatefulWidget {
+  const _ShareSummaryButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  State<_ShareSummaryButton> createState() => _ShareSummaryButtonState();
+}
+
+class _ShareSummaryButtonState extends State<_ShareSummaryButton> {
+  Timer? _feedbackTimer;
+  bool _copied = false;
+
+  @override
+  void dispose() {
+    _feedbackTimer?.cancel();
+    super.dispose();
+  }
+
+  void _handlePressed() {
+    widget.onPressed();
+    _showShareSummaryFeedback(context);
+    setState(() => _copied = true);
+    _feedbackTimer?.cancel();
+    _feedbackTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() => _copied = false);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: _handlePressed,
+      icon: Icon(
+        _copied ? Icons.check_circle_rounded : Icons.ios_share_rounded,
+      ),
+      label: Text(_copied ? 'Resumen copiado' : 'Compartir resumen'),
+    );
+  }
+}
+
+void _showShareSummaryFeedback(BuildContext context) {
+  final messenger = ScaffoldMessenger.of(context);
+  messenger.hideCurrentSnackBar();
+  messenger.showSnackBar(
+    SnackBar(
+      duration: const Duration(seconds: 6),
+      backgroundColor: BpcColors.accentStrong,
+      behavior: SnackBarBehavior.floating,
+      content: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+          SizedBox(width: 10),
+          Flexible(
+            child: Text(
+              'Resumen copiado para WhatsApp.',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 Future<bool> _confirmEditClosedCash(BuildContext context) async {

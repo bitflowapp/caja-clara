@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/movement.dart';
@@ -422,7 +424,7 @@ class _ContextualActionPanel extends StatelessWidget {
       ),
       _CashStatusVariant.dayClosed => _PrimaryActionData(
         title: 'Abrir caja',
-        subtitle: 'Empezá un nuevo día con el saldo inicial.',
+        subtitle: 'Reabrí la caja de hoy; mantiene ventas y gastos.',
         icon: Icons.savings_rounded,
         onTap: onOpenCashRegister,
       ),
@@ -831,7 +833,11 @@ class _SecondaryActionsPanel extends StatelessWidget {
                 _SecondaryActionChip(
                   icon: Icons.ios_share_rounded,
                   label: 'Compartir resumen',
-                  onTap: onShareDailySummary,
+                  feedbackLabel: 'Resumen copiado',
+                  onTap: () {
+                    onShareDailySummary();
+                    _showShareSummaryFeedback(context);
+                  },
                 ),
                 _SecondaryActionChip(
                   icon: Icons.file_download_rounded,
@@ -848,31 +854,92 @@ class _SecondaryActionsPanel extends StatelessWidget {
   }
 }
 
-class _SecondaryActionChip extends StatelessWidget {
+void _showShareSummaryFeedback(BuildContext context) {
+  final messenger = ScaffoldMessenger.of(context);
+  messenger.hideCurrentSnackBar();
+  messenger.showSnackBar(
+    SnackBar(
+      duration: const Duration(seconds: 6),
+      backgroundColor: BpcColors.accentStrong,
+      behavior: SnackBarBehavior.floating,
+      content: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+          SizedBox(width: 10),
+          Flexible(
+            child: Text(
+              'Resumen copiado para WhatsApp.',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _SecondaryActionChip extends StatefulWidget {
   const _SecondaryActionChip({
     required this.icon,
     required this.label,
     required this.onTap,
+    this.feedbackLabel,
     this.busy = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
+  final String? feedbackLabel;
   final bool busy;
+
+  @override
+  State<_SecondaryActionChip> createState() => _SecondaryActionChipState();
+}
+
+class _SecondaryActionChipState extends State<_SecondaryActionChip> {
+  Timer? _feedbackTimer;
+  bool _showFeedback = false;
+
+  @override
+  void dispose() {
+    _feedbackTimer?.cancel();
+    super.dispose();
+  }
+
+  void _handlePressed() {
+    widget.onTap?.call();
+    if (widget.feedbackLabel == null) {
+      return;
+    }
+    setState(() => _showFeedback = true);
+    _feedbackTimer?.cancel();
+    _feedbackTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() => _showFeedback = false);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return OutlinedButton.icon(
-      onPressed: onTap,
-      icon: busy
+      onPressed: widget.onTap == null ? null : _handlePressed,
+      icon: widget.busy
           ? const SizedBox(
               width: 16,
               height: 16,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          : Icon(icon, size: 18),
-      label: Text(label),
+          : Icon(
+              _showFeedback ? Icons.check_circle_rounded : widget.icon,
+              size: 18,
+            ),
+      label: Text(_showFeedback ? widget.feedbackLabel! : widget.label),
     );
   }
 }

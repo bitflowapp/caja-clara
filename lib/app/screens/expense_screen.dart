@@ -133,11 +133,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                                 textController: controller,
                                 tooltip: 'Dictar concepto',
                               ),
-                        supportingBuilder: demoMode
-                            ? null
-                            : () => SpeechDictationHint(
-                                controller: _conceptDictation,
-                              ),
+                        supportingBuilder: null,
                       )
                     else ...[
                       EnsureVisibleWhenFocused(
@@ -172,8 +168,6 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                           },
                         ),
                       ),
-                      if (!demoMode)
-                        SpeechDictationHint(controller: _conceptDictation),
                     ],
                     const SizedBox(height: 12),
                     LayoutBuilder(
@@ -277,10 +271,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                                             textController: controller,
                                             tooltip: 'Dictar categoria',
                                           ),
-                                      supportingBuilder: () =>
-                                          SpeechDictationHint(
-                                            controller: _categoryDictation,
-                                          ),
+                                      supportingBuilder: null,
                                     )
                                   else ...[
                                     EnsureVisibleWhenFocused(
@@ -309,9 +300,6 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                                           _save(store);
                                         },
                                       ),
-                                    ),
-                                    SpeechDictationHint(
-                                      controller: _categoryDictation,
                                     ),
                                   ],
                                 ],

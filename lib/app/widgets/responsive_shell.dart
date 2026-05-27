@@ -70,8 +70,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     }
     final message = await Navigator.of(context).push<String>(
       MaterialPageRoute<String>(
-        builder: (_) =>
-            ExpenseScreen(onOpenCashRegister: _registerCashOpening),
+        builder: (_) => ExpenseScreen(onOpenCashRegister: _registerCashOpening),
       ),
     );
     if (!mounted || message == null) {
@@ -93,20 +92,9 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
   }
 
   Future<void> _shareDailySummary() async {
-    final messenger = ScaffoldMessenger.of(context);
     final store = CommerceScope.of(context);
     final report = buildDailySummary(store);
     await Clipboard.setData(ClipboardData(text: report.text));
-    if (!mounted) return;
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Resumen del día copiado. Pegalo en WhatsApp o donde quieras.',
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
   }
 
   void _showMovementSavedFeedback(String message) {
@@ -801,14 +789,26 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
 
     final messenger = ScaffoldMessenger.of(context);
     final store = CommerceScope.of(context);
+    final hasOpening = store.hasCashOpeningToday;
+    final hasClosing = store.hasCashClosingToday;
     final amount = await showAmountEntryDialog(
       context,
-      title: store.hasCashOpeningToday
-          ? 'Actualizar apertura'
-          : 'Apertura de caja',
+      title: !hasOpening
+          ? 'Apertura de caja'
+          : hasClosing
+          ? 'Reabrir caja de hoy'
+          : 'Editar apertura',
       label: 'Caja inicial',
-      confirmLabel: store.hasCashOpeningToday ? 'Actualizar' : 'Guardar',
-      helper: 'Ingresá el efectivo inicial del día.',
+      confirmLabel: !hasOpening
+          ? 'Guardar'
+          : hasClosing
+          ? 'Reabrir caja'
+          : 'Actualizar',
+      helper: !hasOpening
+          ? 'Ingresá el efectivo inicial del día.'
+          : hasClosing
+          ? 'La caja de hoy se reabre. Las ventas y gastos se mantienen.'
+          : 'Corregí el efectivo inicial del día.',
       initialValue: store.todayOpeningCashPesos,
     );
     if (amount == null) {
@@ -819,13 +819,14 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
     }
 
     var overwrite = false;
-    if (store.hasCashOpeningToday) {
+    if (hasOpening) {
       overwrite = await showDangerConfirmationDialog(
         context,
-        title: 'Reemplazar apertura',
-        message:
-            'Ya existe una apertura registrada hoy. Se reemplazará la apertura y se limpiará el cierre del día.',
-        confirmLabel: 'Reemplazar',
+        title: hasClosing ? 'Reabrir caja de hoy' : 'Reemplazar apertura',
+        message: hasClosing
+            ? 'Se va a quitar el cierre registrado. Las ventas y gastos de hoy se mantienen. Después podés cerrar de nuevo.'
+            : 'Ya existe una apertura registrada hoy. Se reemplazará por el nuevo valor.',
+        confirmLabel: hasClosing ? 'Reabrir caja' : 'Reemplazar',
       );
       if (!overwrite) {
         return;
