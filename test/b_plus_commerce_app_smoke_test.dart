@@ -283,6 +283,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(
+        find.text(
+          'La caja está cerrada. Reabrí la caja de hoy para registrar ventas.',
+        ),
+        findsOneWidget,
+      );
       expect(find.text('Abrir caja'), findsOneWidget);
       expect(find.text('Volver al inicio'), findsOneWidget);
     },
@@ -306,6 +312,30 @@ void main() {
       expect(find.text('Abrir caja'), findsNothing);
     },
   );
+
+  testWidgets('ExpenseScreen closed-register blocker uses reopen wording', (
+    tester,
+  ) async {
+    final store = CommerceStore.emptyForTest();
+    await store.registerCashOpening(openingBalancePesos: 5000);
+    await store.registerCashClosing(closingBalancePesos: 5000);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CommerceScope(store: store, child: const ExpenseScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'La caja está cerrada. Reabrí la caja de hoy para registrar gastos.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Volver al inicio'), findsOneWidget);
+    expect(find.text('Abrir caja'), findsNothing);
+  });
 
   testWidgets(
     'SummaryScreen shows confirmation dialog before editing on a closed-day register',

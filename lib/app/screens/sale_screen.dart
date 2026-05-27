@@ -98,7 +98,7 @@ class _SaleScreenState extends State<SaleScreen> {
           if (store.hasCashClosingToday) {
             return _ClosedRegisterBlocker(
               message:
-                  'La caja está cerrada. Abrí una nueva caja para registrar ventas.',
+                  'La caja está cerrada. Reabrí la caja de hoy para registrar ventas.',
               onGoBack: () => Navigator.of(context).maybePop(),
               onOpenCashRegister: widget.onOpenCashRegister,
             );
@@ -492,7 +492,7 @@ class _SaleScreenState extends State<SaleScreen> {
 
     if (store.hasCashClosingToday) {
       _showMessage(
-        'La caja está cerrada. Abrí una nueva caja para registrar ventas.',
+        'La caja está cerrada. Reabrí la caja de hoy para registrar ventas.',
       );
       return;
     }

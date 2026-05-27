@@ -433,7 +433,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
         ..showSnackBar(
           const SnackBar(
             content: Text(
-              'La caja está cerrada. Abrí una nueva caja para registrar gastos.',
+              'La caja está cerrada. Reabrí la caja de hoy para registrar gastos.',
             ),
           ),
         );
@@ -546,7 +546,7 @@ class _ClosedRegisterExpenseBlocker extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              'La caja está cerrada. Abrí una nueva caja para registrar gastos.',
+              'La caja está cerrada. Reabrí la caja de hoy para registrar gastos.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: BpcColors.mutedInk,
