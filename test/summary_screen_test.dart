@@ -33,6 +33,7 @@ void main() {
               onRegisterCashOpening: () {},
               onRegisterCashClosing: () {},
               savingCashEvent: false,
+              onShareDailySummary: () {},
               onCreateProductFromFreeSale: (_) async {},
               onCreateProductFromSuggestion: (_) async {},
               onDismissFreeSaleSuggestion: (_) async {},

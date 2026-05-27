@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/movement.dart';
 import '../services/commerce_store.dart';
+import '../theme/bpc_colors.dart';
 import '../utils/formatters.dart';
 import '../widgets/commerce_components.dart';
 import '../widgets/commerce_scope.dart';
@@ -20,6 +21,7 @@ class SummaryScreen extends StatelessWidget {
     required this.onRegisterCashOpening,
     required this.onRegisterCashClosing,
     required this.savingCashEvent,
+    required this.onShareDailySummary,
     required this.onCreateProductFromFreeSale,
     required this.onCreateProductFromSuggestion,
     required this.onDismissFreeSaleSuggestion,
@@ -36,6 +38,7 @@ class SummaryScreen extends StatelessWidget {
   final VoidCallback onRegisterCashOpening;
   final VoidCallback onRegisterCashClosing;
   final bool savingCashEvent;
+  final VoidCallback onShareDailySummary;
   final Future<void> Function(Movement movement) onCreateProductFromFreeSale;
   final Future<void> Function(FreeSaleSuggestion suggestion)
   onCreateProductFromSuggestion;
@@ -135,10 +138,8 @@ class SummaryScreen extends StatelessWidget {
                                 value: store.todayClosingCashPesos == null
                                     ? 'Sin cierre'
                                     : formatMoney(store.todayClosingCashPesos!),
-                                helper:
-                                    store.todayClosingDifferencePesos == null
-                                    ? 'Caja contada al cierre'
-                                    : 'Diferencia: ${formatMoney(store.todayClosingDifferencePesos!)}',
+                                valueColor: _closingValueColor(store),
+                                helper: _closingHelperText(store),
                               ),
                             ),
                           ],
@@ -148,6 +149,10 @@ class SummaryScreen extends StatelessWidget {
                     if (store.todayOpeningCashPesos != null) ...[
                       const SizedBox(height: 12),
                       _CashFormulaCard(store: store),
+                    ],
+                    if (store.todayClosingDifferencePesos != null) ...[
+                      const SizedBox(height: 12),
+                      _CashDifferenceBanner(store: store),
                     ],
                   ],
                 ),
@@ -187,6 +192,11 @@ class SummaryScreen extends StatelessWidget {
                     label: Text(
                       exportingExcel ? 'Exportando Excel' : 'Exportar Excel',
                     ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: onShareDailySummary,
+                    icon: const Icon(Icons.ios_share_rounded),
+                    label: const Text('Compartir resumen'),
                   ),
                   _CashMoreActionsMenu(
                     store: store,
@@ -248,6 +258,105 @@ class SummaryScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+Color? _closingValueColor(CommerceStore store) {
+  final diff = store.todayClosingDifferencePesos;
+  if (diff == null) return null;
+  if (diff == 0) return null;
+  return diff < 0 ? BpcColors.expense : BpcColors.income;
+}
+
+String _closingHelperText(CommerceStore store) {
+  final diff = store.todayClosingDifferencePesos;
+  if (diff == null) return 'Caja contada al cierre';
+  if (diff == 0) return 'Coincide exacto con lo esperado';
+  if (diff < 0) return 'Te faltan ${formatMoney(diff.abs())}';
+  return 'Sobran ${formatMoney(diff)}';
+}
+
+/// Banner destacado debajo de la grilla cuando ya se hizo cierre del día:
+/// muestra la diferencia con color (verde sobra/coincide, rojo falta).
+class _CashDifferenceBanner extends StatelessWidget {
+  const _CashDifferenceBanner({required this.store});
+
+  final CommerceStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final diff = store.todayClosingDifferencePesos;
+    final expected = store.todayExpectedCashPesos;
+    final closing = store.todayClosingCashPesos;
+    if (diff == null || expected == null || closing == null) {
+      return const SizedBox.shrink();
+    }
+
+    final isShort = diff < 0;
+    final isExact = diff == 0;
+    final color = isExact
+        ? BpcColors.mutedInk
+        : (isShort ? BpcColors.expense : BpcColors.income);
+    final icon = isExact
+        ? Icons.check_circle_rounded
+        : (isShort ? Icons.warning_amber_rounded : Icons.savings_rounded);
+    final headline = isExact
+        ? 'Caja coincide exacto'
+        : isShort
+        ? 'Te faltan ${formatMoney(diff.abs())}'
+        : 'Sobran ${formatMoney(diff)}';
+    final detail =
+        'Esperado ${formatMoney(expected)} · '
+        'contaste ${formatMoney(closing)}';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.30)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  headline,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  detail,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: BpcColors.subtleInk,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

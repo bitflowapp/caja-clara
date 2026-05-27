@@ -19,6 +19,8 @@ class HomeScreen extends StatelessWidget {
     required this.onOpenProducts,
     required this.onOpenCash,
     required this.onOpenCashRegister,
+    required this.onCloseCashRegister,
+    required this.onShareDailySummary,
     required this.onExportExcel,
     required this.exportingExcel,
     required this.onApplyStarterTemplate,
@@ -41,6 +43,8 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onOpenProducts;
   final VoidCallback onOpenCash;
   final VoidCallback onOpenCashRegister;
+  final VoidCallback onCloseCashRegister;
+  final VoidCallback onShareDailySummary;
   final VoidCallback onExportExcel;
   final bool exportingExcel;
   final VoidCallback onApplyStarterTemplate;
@@ -79,6 +83,8 @@ class HomeScreen extends StatelessWidget {
               _CashStatusBanner(
                 store: store,
                 onOpenCashRegister: onOpenCashRegister,
+                onCloseCashRegister: onCloseCashRegister,
+                onNewSale: onNewSale,
               ),
               if (demoControlsEnabled &&
                   (store.hasProducts || store.hasMovements)) ...[
@@ -127,7 +133,6 @@ class HomeScreen extends StatelessWidget {
               _HomeKpiGrid(
                 store: store,
                 onOpenCash: onOpenCash,
-                onOpenProducts: onOpenProducts,
               ),
               const SizedBox(height: 18),
               _PrimaryActions(onNewSale: onNewSale),
@@ -165,29 +170,37 @@ class HomeScreen extends StatelessWidget {
               if (recent.isEmpty)
                 EmptyCard(
                   icon: Icons.receipt_long_rounded,
-                  title: store.hasProducts
-                      ? 'Todavía no registraste ventas hoy'
-                      : 'Caja Clara está lista para empezar.',
-                  message: store.hasProducts
-                      ? 'Cuando registres una venta o un gasto, lo ves acá al instante.'
-                      : demoControlsEnabled
-                      ? 'Cargá productos, registrá ventas o probá una demo cuando quieras.'
-                      : 'Cargá productos o usá una plantilla para empezar a vender.',
+                  title: !store.hasProducts
+                      ? 'Caja Clara está lista para empezar.'
+                      : !store.hasCashOpeningToday
+                      ? 'Primero abrí la caja del día'
+                      : 'Todavía no registraste ventas hoy',
+                  message: !store.hasProducts
+                      ? (demoControlsEnabled
+                            ? 'Cargá productos, registrá ventas o probá una demo cuando quieras.'
+                            : 'Cargá productos o usá una plantilla para empezar a vender.')
+                      : !store.hasCashOpeningToday
+                      ? 'Anotá el efectivo inicial y vas a poder vender, gastar y ver tu caja del día al instante.'
+                      : 'Cuando registres una venta o un gasto, lo ves acá al instante.',
                   action: Wrap(
                     spacing: 10,
                     runSpacing: 10,
                     alignment: WrapAlignment.center,
                     children: [
                       FilledButton(
-                        onPressed: store.hasProducts
-                            ? onNewSale
-                            : onApplyStarterTemplate,
+                        onPressed: !store.hasProducts
+                            ? onApplyStarterTemplate
+                            : !store.hasCashOpeningToday
+                            ? onOpenCashRegister
+                            : onNewSale,
                         child: Text(
-                          store.hasProducts
-                              ? 'Registrar primera venta'
-                              : applyingStarterTemplate
-                              ? 'Cargando plantilla...'
-                              : 'Cargar plantilla kiosco',
+                          !store.hasProducts
+                              ? (applyingStarterTemplate
+                                    ? 'Cargando plantilla...'
+                                    : 'Cargar plantilla kiosco')
+                              : !store.hasCashOpeningToday
+                              ? 'Abrir caja'
+                              : 'Registrar primera venta',
                         ),
                       ),
                       TextButton(
@@ -304,48 +317,69 @@ class _HomeGreeting extends StatelessWidget {
               ],
             ),
           ),
-          if (MediaQuery.sizeOf(context).width >= 420) ...[
-            const SizedBox(width: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: BpcColors.accentSoft,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: BpcColors.accent.withValues(alpha: 0.18),
-                ),
-              ),
-              child: Text(
-                'Luna Systems',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: BpcColors.accentStrong,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
   }
 }
 
-/// Banner de estado de caja: guía a abrir la caja antes de vender.
+/// Banner de estado de caja con 3 estados claros:
+///   - cerrada (sin apertura hoy)  → CTA "Abrir caja".
+///   - abierta (apertura y aún sin cierre) → CTAs "Nueva venta" + "Cerrar caja".
+///   - día cerrado (apertura y cierre) → CTA "Editar cierre".
 class _CashStatusBanner extends StatelessWidget {
   const _CashStatusBanner({
     required this.store,
     required this.onOpenCashRegister,
+    required this.onCloseCashRegister,
+    required this.onNewSale,
   });
 
   final CommerceStore store;
   final VoidCallback onOpenCashRegister;
+  final VoidCallback onCloseCashRegister;
+  final VoidCallback onNewSale;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final open = store.hasCashOpeningToday;
-    final color = open ? BpcColors.income : BpcColors.accentStrong;
+    final hasOpening = store.hasCashOpeningToday;
+    final hasClosing = store.hasCashClosingToday;
     final opening = store.todayOpeningCashPesos;
+    final closing = store.todayClosingCashPesos;
+
+    final _CashStatusVariant variant;
+    if (!hasOpening) {
+      variant = _CashStatusVariant.closed;
+    } else if (!hasClosing) {
+      variant = _CashStatusVariant.open;
+    } else {
+      variant = _CashStatusVariant.dayClosed;
+    }
+
+    final color = switch (variant) {
+      _CashStatusVariant.closed => BpcColors.accentStrong,
+      _CashStatusVariant.open => BpcColors.income,
+      _CashStatusVariant.dayClosed => BpcColors.mutedInk,
+    };
+    final icon = switch (variant) {
+      _CashStatusVariant.closed => Icons.savings_rounded,
+      _CashStatusVariant.open => Icons.lock_open_rounded,
+      _CashStatusVariant.dayClosed => Icons.task_alt_rounded,
+    };
+    final title = switch (variant) {
+      _CashStatusVariant.closed => 'Caja cerrada',
+      _CashStatusVariant.open => 'Caja abierta',
+      _CashStatusVariant.dayClosed => 'Día cerrado',
+    };
+    final subtitle = switch (variant) {
+      _CashStatusVariant.closed =>
+        'Anotá el efectivo inicial para empezar a vender.',
+      _CashStatusVariant.open =>
+        'Apertura del día: ${formatMoney(opening ?? 0)}.',
+      _CashStatusVariant.dayClosed =>
+        'Cierre contado: ${formatMoney(closing ?? 0)}.',
+    };
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -363,10 +397,7 @@ class _CashStatusBanner extends StatelessWidget {
               color: color.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(
-              open ? Icons.lock_open_rounded : Icons.savings_rounded,
-              color: color,
-            ),
+            child: Icon(icon, color: color),
           ),
           const SizedBox(width: 13),
           Expanded(
@@ -375,7 +406,7 @@ class _CashStatusBanner extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  open ? 'Caja abierta' : 'Todavía no abriste la caja',
+                  title,
                   style: theme.textTheme.titleMedium?.copyWith(
                     color: BpcColors.ink,
                     fontWeight: FontWeight.w900,
@@ -383,9 +414,7 @@ class _CashStatusBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  open
-                      ? 'Apertura del día: ${formatMoney(opening ?? 0)}.'
-                      : 'Primero abrí la caja para empezar a vender.',
+                  subtitle,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: BpcColors.subtleInk,
                     fontWeight: FontWeight.w600,
@@ -395,19 +424,68 @@ class _CashStatusBanner extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          open
-              ? OutlinedButton(
-                  onPressed: onOpenCashRegister,
-                  child: const Text('Editar'),
-                )
-              : FilledButton.icon(
-                  onPressed: onOpenCashRegister,
-                  icon: const Icon(Icons.savings_rounded, size: 18),
-                  label: const Text('Abrir caja'),
-                ),
+          _CashStatusActions(
+            variant: variant,
+            onOpenCashRegister: onOpenCashRegister,
+            onCloseCashRegister: onCloseCashRegister,
+            onNewSale: onNewSale,
+          ),
         ],
       ),
     );
+  }
+}
+
+enum _CashStatusVariant { closed, open, dayClosed }
+
+class _CashStatusActions extends StatelessWidget {
+  const _CashStatusActions({
+    required this.variant,
+    required this.onOpenCashRegister,
+    required this.onCloseCashRegister,
+    required this.onNewSale,
+  });
+
+  final _CashStatusVariant variant;
+  final VoidCallback onOpenCashRegister;
+  final VoidCallback onCloseCashRegister;
+  final VoidCallback onNewSale;
+
+  @override
+  Widget build(BuildContext context) {
+    switch (variant) {
+      case _CashStatusVariant.closed:
+        return FilledButton.icon(
+          onPressed: onOpenCashRegister,
+          icon: const Icon(Icons.savings_rounded, size: 18),
+          label: const Text('Abrir caja'),
+        );
+      case _CashStatusVariant.open:
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: WrapAlignment.end,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            OutlinedButton.icon(
+              onPressed: onCloseCashRegister,
+              icon: const Icon(Icons.logout_rounded, size: 18),
+              label: const Text('Cerrar caja'),
+            ),
+            FilledButton.icon(
+              onPressed: onNewSale,
+              icon: const Icon(Icons.point_of_sale_rounded, size: 18),
+              label: const Text('Nueva venta'),
+            ),
+          ],
+        );
+      case _CashStatusVariant.dayClosed:
+        return OutlinedButton.icon(
+          onPressed: onCloseCashRegister,
+          icon: const Icon(Icons.edit_rounded, size: 18),
+          label: const Text('Editar cierre'),
+        );
+    }
   }
 }
 
@@ -416,16 +494,36 @@ class _HomeKpiGrid extends StatelessWidget {
   const _HomeKpiGrid({
     required this.store,
     required this.onOpenCash,
-    required this.onOpenProducts,
   });
 
   final CommerceStore store;
   final VoidCallback onOpenCash;
-  final VoidCallback onOpenProducts;
 
   @override
   Widget build(BuildContext context) {
-    final lowStock = store.lowStockCount;
+    final now = DateTime.now();
+    final hasSalesToday = store.todaySalesCount > 0;
+    final hasFreeSalesToday = store.movements.any(
+      (m) =>
+          m.isFreeSale &&
+          m.createdAt.year == now.year &&
+          m.createdAt.month == now.month &&
+          m.createdAt.day == now.day,
+    );
+    final profitValue = !hasSalesToday
+        ? '—'
+        : hasFreeSalesToday
+        ? '—'
+        : formatMoney(store.todayEstimatedProfitPesos);
+    final profitHelper = !hasSalesToday
+        ? 'Cuando registres ventas, vas a ver tu ganancia estimada del día.'
+        : hasFreeSalesToday
+        ? 'Sumá costo a tus productos del catálogo para verla bien.'
+        : 'Ventas con costo − gastos de hoy';
+    final profitAccent = !hasSalesToday || hasFreeSalesToday
+        ? BpcColors.mutedInk
+        : BpcColors.income;
+
     final cards = <Widget>[
       KpiCard(
         label: 'Ventas',
@@ -457,16 +555,11 @@ class _HomeKpiGrid extends StatelessWidget {
         onTap: onOpenCash,
       ),
       KpiCard(
-        label: 'Productos',
-        value: '${store.products.length}',
-        icon: Icons.inventory_2_rounded,
-        accent: lowStock == 0 ? BpcColors.accent : BpcColors.warning,
-        helper: lowStock == 0
-            ? 'Catálogo activo'
-            : lowStock == 1
-            ? '1 producto a reponer'
-            : '$lowStock productos a reponer',
-        onTap: onOpenProducts,
+        label: 'Ganancia hoy',
+        value: profitValue,
+        icon: Icons.payments_rounded,
+        accent: profitAccent,
+        helper: profitHelper,
       ),
     ];
 

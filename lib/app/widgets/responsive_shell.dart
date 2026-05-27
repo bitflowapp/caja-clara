@@ -10,6 +10,7 @@ import '../models/movement.dart';
 import '../services/commerce_store.dart';
 import '../services/backup_service.dart';
 import '../services/build_info.dart';
+import '../services/daily_summary_share.dart';
 import '../services/excel_export_service.dart';
 import '../services/license_service.dart';
 import '../theme/bpc_colors.dart';
@@ -84,6 +85,21 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
 
   Future<void> _openQuickHelp() async {
     await showQuickHelpDialog(context);
+  }
+
+  Future<void> _shareDailySummary() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final store = CommerceScope.of(context);
+    final report = buildDailySummary(store);
+    await Clipboard.setData(ClipboardData(text: report.text));
+    if (!mounted) return;
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('Resumen del día copiado. Pegalo en WhatsApp o donde quieras.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   void _showMovementSavedFeedback(String message) {
@@ -922,6 +938,8 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         onOpenProducts: _openProducts,
         onOpenCash: _openCash,
         onOpenCashRegister: _registerCashOpening,
+        onCloseCashRegister: _registerCashClosing,
+        onShareDailySummary: _shareDailySummary,
         onExportExcel: _exportExcel,
         exportingExcel: _exportingExcel,
         onApplyStarterTemplate: _applyStarterTemplate,
@@ -954,6 +972,7 @@ class _ResponsiveShellState extends State<ResponsiveShell> {
         onRegisterCashOpening: _registerCashOpening,
         onRegisterCashClosing: _registerCashClosing,
         savingCashEvent: _savingCashEvent,
+        onShareDailySummary: _shareDailySummary,
         onCreateProductFromFreeSale: _createProductFromFreeSale,
         onCreateProductFromSuggestion: _createProductFromSuggestion,
         onDismissFreeSaleSuggestion: _dismissFreeSaleSuggestion,
@@ -1277,30 +1296,15 @@ class _RailBrand extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Caja Clara',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: BpcColors.ink,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.35,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Luna Systems',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: BpcColors.accentStrong,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
+              child: Text(
+                'Caja Clara',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: BpcColors.ink,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.35,
+                ),
               ),
             ),
           ],

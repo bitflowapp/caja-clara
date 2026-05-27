@@ -329,6 +329,7 @@ class MetricCard extends StatelessWidget {
     required this.value,
     this.helper,
     this.accentColor,
+    this.valueColor,
     this.tight = false,
     this.framed = true,
   });
@@ -337,6 +338,7 @@ class MetricCard extends StatelessWidget {
   final String value;
   final String? helper;
   final Color? accentColor;
+  final Color? valueColor;
   final bool tight;
   final bool framed;
 
@@ -372,9 +374,10 @@ class MetricCard extends StatelessWidget {
           SizedBox(height: tight ? 8 : 10),
           Text(
             value,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineMedium?.copyWith(color: BpcColors.ink),
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              color: valueColor ?? BpcColors.ink,
+              fontWeight: valueColor != null ? FontWeight.w900 : null,
+            ),
           ),
           if (helper != null) ...[
             const SizedBox(height: 6),
