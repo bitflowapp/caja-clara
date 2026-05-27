@@ -79,4 +79,16 @@ void main() {
     expect(find.text(r'$ 2.500'), findsWidgets);
     expect(find.text(r'$ 12.500'), findsWidgets);
   });
+
+  testWidgets('summary share shows visible copy feedback', (tester) async {
+    final store = CommerceStore.seededForTest();
+
+    await pumpSummaryScreen(tester, store);
+
+    await tester.tap(find.text('Compartir resumen'));
+    await tester.pump();
+
+    expect(find.text('Resumen copiado'), findsOneWidget);
+    expect(find.text('Resumen copiado para WhatsApp.'), findsOneWidget);
+  });
 }

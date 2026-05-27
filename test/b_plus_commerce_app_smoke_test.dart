@@ -1,5 +1,6 @@
 import 'package:b_plus_commerce/app/b_plus_commerce_app.dart';
 import 'package:b_plus_commerce/app/models/product.dart';
+import 'package:b_plus_commerce/app/screens/expense_screen.dart';
 import 'package:b_plus_commerce/app/screens/sale_screen.dart';
 import 'package:b_plus_commerce/app/screens/summary_screen.dart';
 import 'package:b_plus_commerce/app/services/commerce_store.dart';
@@ -105,6 +106,10 @@ void main() {
       expect(find.text('Caja cerrada'), findsWidgets);
       // Primary CTA must be "Abrir caja"
       expect(find.text('Abrir caja'), findsWidgets);
+      expect(
+        find.text('Reabrí la caja de hoy; mantiene ventas y gastos.'),
+        findsOneWidget,
+      );
       // "Nueva venta" must not be the primary action button; the contextual
       // panel does not render it for dayClosed — only the quick-actions panel
       // shows it as disabled (subtitle = "Caja cerrada", onTap = null).
@@ -113,103 +118,118 @@ void main() {
     },
   );
 
-  testWidgets(
-    'Store blocks recordSale when register is closed',
-    (tester) async {
-      final store = CommerceStore.emptyForTest();
-      await store.registerCashOpening(openingBalancePesos: 10000);
-      await store.registerCashClosing(closingBalancePesos: 10000);
+  testWidgets('Expense screen avoids unsupported dictation warning bars', (
+    tester,
+  ) async {
+    final store = CommerceStore.emptyForTest();
+    await store.registerCashOpening(openingBalancePesos: 10000);
 
-      // Add a product so we can attempt a sale
-      await store.addProduct(
-        const Product(
-          id: 'p-test',
-          name: 'Producto test',
-          stockUnits: 10,
-          minStockUnits: 0,
-          costPesos: 0,
-          pricePesos: 1000,
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CommerceScope(store: store, child: const ExpenseScreen()),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.text('Nuevo gasto'), findsOneWidget);
+    expect(find.textContaining('dictado no está disponible'), findsNothing);
+    expect(find.textContaining('dictado no esta disponible'), findsNothing);
+  });
+
+  testWidgets('Store blocks recordSale when register is closed', (
+    tester,
+  ) async {
+    final store = CommerceStore.emptyForTest();
+    await store.registerCashOpening(openingBalancePesos: 10000);
+    await store.registerCashClosing(closingBalancePesos: 10000);
+
+    // Add a product so we can attempt a sale
+    await store.addProduct(
+      const Product(
+        id: 'p-test',
+        name: 'Producto test',
+        stockUnits: 10,
+        minStockUnits: 0,
+        costPesos: 0,
+        pricePesos: 1000,
+      ),
+    );
+
+    final movementsBeforeAttempt = store.movements.length;
+
+    await expectLater(
+      store.recordSale(
+        productId: 'p-test',
+        quantityUnits: 1,
+        paymentMethod: 'Efectivo',
+      ),
+      throwsA(
+        isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('La caja está cerrada'),
         ),
-      );
+      ),
+    );
 
-      final movementsBeforeAttempt = store.movements.length;
+    // No new movement must have been recorded
+    expect(store.movements.length, movementsBeforeAttempt);
+  });
 
-      await expectLater(
-        store.recordSale(
-          productId: 'p-test',
-          quantityUnits: 1,
-          paymentMethod: 'Efectivo',
+  testWidgets('Store blocks recordFreeSale when register is closed', (
+    tester,
+  ) async {
+    final store = CommerceStore.emptyForTest();
+    await store.registerCashOpening(openingBalancePesos: 10000);
+    await store.registerCashClosing(closingBalancePesos: 10000);
+
+    final movementsBeforeAttempt = store.movements.length;
+
+    await expectLater(
+      store.recordFreeSale(
+        description: 'Venta mostrador',
+        quantityUnits: 1,
+        unitPricePesos: 500,
+        paymentMethod: 'Efectivo',
+      ),
+      throwsA(
+        isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('La caja está cerrada'),
         ),
-        throwsA(
-          isA<StateError>().having(
-            (e) => e.message,
-            'message',
-            contains('La caja está cerrada'),
-          ),
+      ),
+    );
+
+    expect(store.movements.length, movementsBeforeAttempt);
+  });
+
+  testWidgets('Store blocks recordExpense when register is closed', (
+    tester,
+  ) async {
+    final store = CommerceStore.emptyForTest();
+    await store.registerCashOpening(openingBalancePesos: 10000);
+    await store.registerCashClosing(closingBalancePesos: 10000);
+
+    final movementsBeforeAttempt = store.movements.length;
+
+    await expectLater(
+      store.recordExpense(
+        concept: 'Bolsas',
+        amountPesos: 500,
+        category: 'Insumos',
+      ),
+      throwsA(
+        isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('La caja está cerrada'),
         ),
-      );
+      ),
+    );
 
-      // No new movement must have been recorded
-      expect(store.movements.length, movementsBeforeAttempt);
-    },
-  );
-
-  testWidgets(
-    'Store blocks recordFreeSale when register is closed',
-    (tester) async {
-      final store = CommerceStore.emptyForTest();
-      await store.registerCashOpening(openingBalancePesos: 10000);
-      await store.registerCashClosing(closingBalancePesos: 10000);
-
-      final movementsBeforeAttempt = store.movements.length;
-
-      await expectLater(
-        store.recordFreeSale(
-          description: 'Venta mostrador',
-          quantityUnits: 1,
-          unitPricePesos: 500,
-          paymentMethod: 'Efectivo',
-        ),
-        throwsA(
-          isA<StateError>().having(
-            (e) => e.message,
-            'message',
-            contains('La caja está cerrada'),
-          ),
-        ),
-      );
-
-      expect(store.movements.length, movementsBeforeAttempt);
-    },
-  );
-
-  testWidgets(
-    'Store blocks recordExpense when register is closed',
-    (tester) async {
-      final store = CommerceStore.emptyForTest();
-      await store.registerCashOpening(openingBalancePesos: 10000);
-      await store.registerCashClosing(closingBalancePesos: 10000);
-
-      final movementsBeforeAttempt = store.movements.length;
-
-      await expectLater(
-        store.recordExpense(
-          concept: 'Bolsas',
-          amountPesos: 500,
-          category: 'Insumos',
-        ),
-        throwsA(
-          isA<StateError>().having(
-            (e) => e.message,
-            'message',
-            contains('La caja está cerrada'),
-          ),
-        ),
-      );
-
-      expect(store.movements.length, movementsBeforeAttempt);
-    },
-  );
+    expect(store.movements.length, movementsBeforeAttempt);
+  });
 
   testWidgets(
     'Closing difference remains stable after attempted post-close sale',
@@ -277,10 +297,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: CommerceScope(
-            store: store,
-            child: const SaleScreen(),
-          ),
+          home: CommerceScope(store: store, child: const SaleScreen()),
         ),
       );
       await tester.pumpAndSettle();
@@ -335,28 +352,27 @@ void main() {
     },
   );
 
-  testWidgets(
-    'Low stock banner shows softened copy when count exceeds 10',
-    (tester) async {
-      final store = CommerceStore.emptyForTest();
-      for (var i = 0; i < 11; i++) {
-        await store.addProduct(
-          Product(
-            id: 'low-stock-$i',
-            name: 'Producto bajo $i',
-            stockUnits: 0,
-            minStockUnits: 1,
-            costPesos: 100,
-            pricePesos: 200,
-          ),
-        );
-      }
+  testWidgets('Low stock banner shows softened copy when count exceeds 10', (
+    tester,
+  ) async {
+    final store = CommerceStore.emptyForTest();
+    for (var i = 0; i < 11; i++) {
+      await store.addProduct(
+        Product(
+          id: 'low-stock-$i',
+          name: 'Producto bajo $i',
+          stockUnits: 0,
+          minStockUnits: 1,
+          costPesos: 100,
+          pricePesos: 200,
+        ),
+      );
+    }
 
-      await tester.pumpWidget(BPlusCommerceApp(store: store));
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(BPlusCommerceApp(store: store));
+    await tester.pumpAndSettle();
 
-      expect(find.text('Revisá el stock de tus productos.'), findsOneWidget);
-      expect(find.textContaining('Te faltan'), findsNothing);
-    },
-  );
+    expect(find.text('Revisá el stock de tus productos.'), findsOneWidget);
+    expect(find.textContaining('Te faltan'), findsNothing);
+  });
 }
