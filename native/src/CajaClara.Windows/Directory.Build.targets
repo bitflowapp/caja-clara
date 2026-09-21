@@ -1,0 +1,14 @@
+<Project>
+  <!-- Unpackaged MRT Core builds must publish the application resource index. -->
+  <Target Name="CajaClaraPublishResources" BeforeTargets="ComputeResolvedFilesToPublishList" DependsOnTargets="$(GenerateProjectPriFile)">
+    <ItemGroup>
+      <ResolvedFileToPublish Include="$(ProjectPriFullPath)" Condition="Exists('$(ProjectPriFullPath)')">
+        <RelativePath>$(ProjectPriFileName)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+  <Target Name="CajaClaraVerifyPublishedResources" AfterTargets="Publish">
+    <Error Condition="!Exists('$(PublishDir)$(ProjectPriFileName)')" Text="The application resource index was not published. Do not distribute this package." />
+  </Target>
+</Project>
