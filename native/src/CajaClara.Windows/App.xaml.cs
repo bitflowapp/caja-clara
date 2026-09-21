@@ -14,10 +14,7 @@ public partial class App : Application
         "LUNA", "CajaClaraNative", Environment.GetCommandLineArgs().Contains("--demo") ? "Demo" : "Business");
     public App()
     {
-        SafeLog("APP_CONSTRUCTOR");
-        AppDomain.CurrentDomain.UnhandledException += (_, e) => SafeLog("APP_DOMAIN_FATAL", e.ExceptionObject as Exception);
-        try { InitializeComponent(); SafeLog("XAML_RESOURCES_LOADED"); }
-        catch (Exception error) { SafeLog("XAML_INITIALIZATION_FAILED", error); throw; }
+        InitializeComponent();
         UnhandledException += (_, e) =>
         {
             SafeLog("UNHANDLED_UI", e.Exception);
@@ -29,7 +26,6 @@ public partial class App : Application
     {
         try
         {
-            SafeLog("ON_LAUNCHED");
             Directory.CreateDirectory(DataDirectory);
             instance = new Mutex(true, "Local\\LunaCajaClaraNative-" + Json.Hash(DataDirectory)[..20], out var created);
             if (!created) { MessageBoxW(0, "Caja Clara ya está abierta para este usuario.", "Caja Clara", 0); Exit(); return; }
@@ -39,7 +35,7 @@ public partial class App : Application
             collection.AddSingleton<MainViewModel>(); collection.AddSingleton<MainWindow>();
             services = collection.BuildServiceProvider(); window = services.GetRequiredService<MainWindow>();
             window.Closed += (_, _) => { services?.Dispose(); instance?.Dispose(); };
-            SafeLog("WINDOW_CREATED"); window.Activate(); SafeLog("WINDOW_ACTIVATED");
+            window.Activate();
         }
         catch (Exception e)
         {

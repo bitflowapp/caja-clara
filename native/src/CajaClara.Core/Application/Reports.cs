@@ -56,7 +56,7 @@ public sealed class Reports(Store store)
             sheet.Cell(row, 1).Value = sale.Number; sheet.Cell(row, 2).Value = sale.At.LocalDateTime;
             sheet.Cell(row, 3).Value = sale.UserName; sheet.Cell(row, 4).Value = sale.Customer?.Name ?? "Consumidor final";
             sheet.Cell(row, 5).Value = sale.TotalCents / 100m; sheet.Cell(row, 6).Value = sale.RefundedCents / 100m;
-            sheet.Cell(row, 7).Value = Labels.Fiscal(sale.FiscalState); sheet.Cell(row, 8).Value = sale.Id.ToString(); row++;
+            sheet.Cell(row, 7).Value = sale.FiscalState.ToString(); sheet.Cell(row, 8).Value = sale.Id.ToString(); row++;
         }
         sheet.Column(2).Style.DateFormat.Format = "dd/mm/yyyy hh:mm";
         sheet.Columns(5, 6).Style.NumberFormat.Format = "$ #,##0.00";
@@ -163,25 +163,7 @@ public sealed class Reports(Store store)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         var temporary = path + ".writing.xlsx";
-        try
-        {
-            book.SaveAs(temporary, new SaveOptions { EvaluateFormulasBeforeSaving = true });
-            using (var archive = System.IO.Compression.ZipFile.Open(temporary, System.IO.Compression.ZipArchiveMode.Update))
-            {
-                var entry = archive.GetEntry("xl/styles.xml") ?? throw new BusinessException("Faltan estilos del libro.");
-                System.Xml.Linq.XDocument styles;
-                using (var stream = entry.Open()) styles = System.Xml.Linq.XDocument.Load(stream);
-                System.Xml.Linq.XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-                foreach (var format in styles.Descendants(ns + "xf"))
-                {
-                    if ((string?)format.Attribute("fillId") is string fill && fill != "0") format.SetAttributeValue("applyFill", "1");
-                    if ((string?)format.Attribute("fontId") is string font && font != "0") format.SetAttributeValue("applyFont", "1");
-                }
-                entry.Delete();
-                using var target = archive.CreateEntry("xl/styles.xml").Open(); styles.Save(target);
-            }
-            File.Move(temporary, path, true);
-        }
+        try { book.SaveAs(temporary); File.Move(temporary, path, true); }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 }
@@ -207,11 +189,11 @@ public static class Receipt
             if (line.DiscountCents > 0) Add("Descuento: " + Money.Format(line.DiscountCents));
         }
         Add(new string('-', columns)); Add("TOTAL: " + Money.Format(sale.TotalCents));
-        foreach (var p in sale.Payments) Add($"{Labels.Payment(p.Method)}: {Money.Format(p.AppliedCents)}");
+        foreach (var p in sale.Payments) Add($"{p.Method}: {Money.Format(p.AppliedCents)}");
         if (sale.ChangeCents > 0) Add("Vuelto: " + Money.Format(sale.ChangeCents));
         if (sale.RefundedCents > 0) Add("DEVUELTO: " + Money.Format(sale.RefundedCents));
         Add("Este ticket no reemplaza una factura.");
-        Add("Estado fiscal: " + Labels.Fiscal(sale.FiscalState));
+        Add("Estado fiscal: " + sale.FiscalState);
         if (sale.Payments.Any(x => x.Method != PaymentMethod.Cash)) Add("Cobros electronicos registrados manualmente; verificar conciliacion.");
         if (sale.Notes.Length > 0) Add(sale.Notes);
         Add("ID: " + sale.Id); return result.ToArray();
@@ -237,7 +219,6 @@ public static class Receipt
         const double margin = 12; var font = widthMm == 58 ? 7d : 8d; var leading = font + 3;
         var cols = (int)((width - margin * 2) / (font * .6));
         var wrapped = lines.SelectMany(x => Wrap(x, cols)).ToArray();
-        if (widthMm != 210) height = Math.Clamp(wrapped.Length * leading + margin * 2 + 12, 100d, 1440d);
         var pageSize = (int)((height - margin * 2 - 12) / leading);
         var pages = wrapped.Chunk(pageSize).ToArray(); if (pages.Length == 0) pages = [Array.Empty<string>()];
         var objects = new List<byte[]>();

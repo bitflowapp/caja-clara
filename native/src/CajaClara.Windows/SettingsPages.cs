@@ -33,10 +33,7 @@ public sealed partial class MainWindow
             syncCancellation.Cancel(); if (syncTask is not null) { try { await syncTask; } catch (OperationCanceledException) { } }
             syncCancellation.Dispose(); syncHttp?.Dispose(); sync = null;
         }
-        RemoteSettings? settings;
-        try { settings = DeviceSecrets.Load(); }
-        catch (Exception error) when (error is CryptographicException or IOException or System.Text.Json.JsonException)
-        { App.SafeLog("DEVICE_CREDENTIALS_UNREADABLE", error); settings = null; }
+        var settings = DeviceSecrets.Load();
         if (settings is not null)
         {
             var address = new Uri(settings.Server); SyncClient.ValidateServer(address, true);
