@@ -1,0 +1,37 @@
+name: Caja Clara Native
+on:
+  push:
+    branches: ['work/caja-clara-native-20260921']
+    paths: ['native/**', '.github/workflows/caja-clara-native.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: caja-clara-native-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.401'
+      - name: Build core
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force native/artifacts | Out-Null
+          dotnet --info | Tee-Object native/artifacts/dotnet-info.txt
+          dotnet build native/src/CajaClara.Core/CajaClara.Core.csproj -c Release 2>&1 | Tee-Object native/artifacts/build.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload build evidence and source
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CajaClara-Native-source-and-evidence
+          path: |
+            native/
+            !native/**/obj/**
+            !native/**/bin/**
+          retention-days: 7
