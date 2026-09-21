@@ -28,7 +28,7 @@ public sealed class Reports(Store store)
             sales.Sum(s => s.Payments.Where(p => p.Method == x).Sum(p => p.AppliedCents)) -
             refunds.Sum(r => r.Payments.Where(p => p.Method == x).Sum(p => p.AppliedCents)));
         var gross = sales.Sum(x => x.TotalCents); var returned = refunds.Sum(x => x.TotalCents);
-        return new(from, to, sales.Length, gross, returned, gross - returned, margin,
+        return new SalesReport(from, to, sales.Length, gross, returned, gross - returned, margin,
             sales.Where(x => x.FiscalState == FiscalState.Authorized).Sum(x => x.TotalCents), payments, sales);
     });
     public void ExportSales(Actor actor, DateTimeOffset from, DateTimeOffset to, string path)
@@ -156,7 +156,7 @@ public sealed class Reports(Store store)
     private static void Finish(IXLWorksheet sheet)
     {
         sheet.Style.Font.FontName = "Calibri"; sheet.Style.Font.FontSize = 11;
-        sheet.ColumnsUsed().AdjustToContents(10, 42);
+        sheet.ColumnsUsed().AdjustToContents(10d, 42d);
         var range = sheet.RangeUsed(); if (range is not null && range.RowCount() > 1 && sheet.Name != "Resumen") range.SetAutoFilter();
     }
     private static void Save(XLWorkbook book, string path)
