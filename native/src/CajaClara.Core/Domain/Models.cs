@@ -33,7 +33,7 @@ public sealed record CashSession(Guid Id, long Version, Guid DeviceId, Guid User
     long? CountedCents, CashState State, string Notes) : IEntity
 {
     public long? DifferenceCents => CountedCents - ExpectedCents;
-    public string Display => $"{OpenedAt.ToLocalTime():dd/MM HH:mm} · {State} · {Money.Format(ExpectedCents)}";
+    public string Display => $"{OpenedAt.ToLocalTime():dd/MM HH:mm} · {Labels.Cash(State)} · {Money.Format(ExpectedCents)}";
 }
 public sealed record CashMovement(Guid Id, long Version, Guid SessionId, Guid UserId,
     long AmountCents, string Kind, string Reason, Guid? SaleId, DateTimeOffset At) : IEntity;
@@ -47,6 +47,7 @@ public sealed record Tender(PaymentMethod Method, long AppliedCents, long Receiv
 {
     public long ChangeCents => Method == PaymentMethod.Cash ? ReceivedCents - AppliedCents : 0;
     public string Verification => Method == PaymentMethod.Cash ? "CASH_RECEIVED" : "MANUAL_UNVERIFIED";
+    public override string ToString() => Labels.Payment(Method) + " · " + Money.Format(AppliedCents) + (ChangeCents > 0 ? " · Vuelto " + Money.Format(ChangeCents) : "");
 }
 public sealed record Sale(Guid Id, long Version, long Number, Guid SessionId, Guid DeviceId,
     Guid UserId, string UserName, Contact? Customer, DateTimeOffset At, SaleLine[] Lines,
