@@ -24,6 +24,8 @@ public sealed class Store
             if (version > 1) throw new BusinessException("La base pertenece a una versión más nueva. No se modificó.");
             if (version == 0)
             {
+                check.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'";
+                if (Convert.ToInt32(check.ExecuteScalar()) != 0) throw new BusinessException("La base existente no pertenece a Caja Clara Native. No se modificó.");
                 var assembly = Assembly.GetExecutingAssembly();
                 var resource = assembly.GetManifestResourceNames().Single(x => x.EndsWith("schema.sql", StringComparison.Ordinal));
                 using var stream = assembly.GetManifestResourceStream(resource)

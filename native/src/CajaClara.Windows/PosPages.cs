@@ -156,13 +156,13 @@ public sealed partial class MainWindow
         panel.Children.Add(Row(Button("Abrir caja", async () =>
         {
             var amount = Input("Efectivo inicial", "0,00"); var notes = Input("Observaciones");
-            if (await FormAsync("Apertura de caja", Column(amount, notes), async () => { await Task.Run(() => vm.Pos.OpenRegister(vm.User, Amount(amount), notes.Text)); })) await Navigate("cash");
+            if (await FormAsync("Apertura de caja", Column(amount, notes), async () => { var value = Amount(amount); var note = notes.Text; await Task.Run(() => vm.Pos.OpenRegister(vm.User, value, note)); })) await Navigate("cash");
         }, cash is null), Button("Cerrar turno", async () =>
         {
             if (vm.Snapshot?.Cash is not CashSession current) throw new BusinessException("La caja ya está cerrada.");
             var amount = Input("Efectivo contado"); var notes = Input("Observaciones del cierre"); CashSession? closed = null;
             if (await FormAsync("Cierre de caja", Column(Body("Contá el efectivo físico. El cierre no se puede editar posteriormente."), amount, notes), async () =>
-            { closed = await Task.Run(() => vm.Pos.CloseRegister(vm.User, Amount(amount), notes.Text)); }, "Cerrar caja"))
+            { var counted = Amount(amount); var note = notes.Text; closed = await Task.Run(() => vm.Pos.CloseRegister(vm.User, counted, note)); }, "Cerrar caja"))
             { await Navigate("cash"); Notify("Cierre guardado. Diferencia: " + Money.Format(closed?.DifferenceCents ?? 0)); }
         })));
         panel.Children.Add(Row(Button("Ingreso / gasto / retiro", async () =>
@@ -170,7 +170,7 @@ public sealed partial class MainWindow
             var kind = new ComboBox { Header = "Tipo", ItemsSource = new[] { "INCOME", "EXPENSE", "WITHDRAWAL" }, SelectedIndex = 1, MinWidth = 240 };
             var amount = Input("Importe"); var reason = Input("Motivo obligatorio");
             if (await FormAsync("Movimiento de efectivo", Column(kind, amount, reason), async () =>
-            { await Task.Run(() => vm.Pos.RecordCashMovement(vm.User, Amount(amount, false), kind.SelectedItem.ToString() ?? "", reason.Text)); })) await Navigate("cash");
+            { var value = Amount(amount, false); var type = kind.SelectedItem?.ToString() ?? ""; var detail = reason.Text; await Task.Run(() => vm.Pos.RecordCashMovement(vm.User, value, type, detail)); })) await Navigate("cash");
         })));
         if (vm.CanManage)
         {
@@ -216,7 +216,7 @@ public sealed partial class MainWindow
             if (await FormAsync("Devolver venta #" + sale.Number, Column(Body("Se devolverá el stock y se registrará la salida de efectivo. Los reembolsos bancarios deben realizarse fuera de Caja Clara. La factura original, si existe, requiere su tratamiento fiscal separado."), reason, consent), async () =>
             {
                 if (consent.IsChecked != true) throw new BusinessException("Confirmá la devolución de mercadería y dinero.");
-                await Task.Run(() => vm.Pos.RefundSale(vm.User, request, sale.Id, reason.Text));
+                var detail = reason.Text; await Task.Run(() => vm.Pos.RefundSale(vm.User, request, sale.Id, detail));
             }, "Registrar devolución")) { await Navigate("sales"); Notify("Devolución registrada con auditoría."); }
         }));
         return panel;

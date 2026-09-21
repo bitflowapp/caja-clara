@@ -50,7 +50,7 @@ public sealed partial class MainWindow
         panel.Children.Add(Card(Column(Heading("Tu cuenta", 20), Body(vm.User.Name + " · " + vm.User.Role), Row(Button("Configurar PIN", async () =>
         {
             var pin = new PasswordBox { Header = "PIN de seis dígitos", MaxLength = 6 };
-            await FormAsync("Bloqueo rápido", Column(pin, Body("El PIN se guarda protegido por hash. Cinco errores bloquean temporalmente el acceso.")), async () => { await Task.Run(() => vm.Auth.SetPin(vm.User, pin.Password)); pin.Password = ""; });
+            await FormAsync("Bloqueo rápido", Column(pin, Body("El PIN se guarda protegido por hash. Cinco errores bloquean temporalmente el acceso.")), async () => { var value = pin.Password; await Task.Run(() => vm.Auth.SetPin(vm.User, value)); pin.Password = ""; });
         }), Button("Bloquear", LockAsync), Button("Cerrar sesión", async () =>
         {
             if (vm.Cart.Count > 0 && !await ConfirmAsync("Cerrar sesión", "Se descartará el carrito sin confirmar.", "Cerrar sesión")) return;
@@ -61,7 +61,7 @@ public sealed partial class MainWindow
             panel.Children.Add(Card(Column(Heading("Comercio", 20), Body($"{business.Name}\nCUIT: {(business.TaxId.Length == 0 ? "Sin configurar" : business.TaxId)}\n{business.Address}\n{business.TaxCondition}"), Button("Editar datos", async () =>
             {
                 var name = Input("Nombre", business.Name); var tax = Input("CUIT", business.TaxId); var address = Input("Domicilio", business.Address); var condition = Input("Condición fiscal", business.TaxCondition);
-                if (await FormAsync("Datos del comercio", Column(name, tax, address, condition), async () => { await Task.Run(() => vm.Pos.Configure(vm.User, name.Text, tax.Text, address.Text, condition.Text)); })) await Navigate("settings");
+                if (await FormAsync("Datos del comercio", Column(name, tax, address, condition), async () => { var businessName = name.Text; var taxId = tax.Text; var location = address.Text; var taxCondition = condition.Text; await Task.Run(() => vm.Pos.Configure(vm.User, businessName, taxId, location, taxCondition)); })) await Navigate("settings");
             }))));
             panel.Children.Add(Card(Column(Heading("Panel remoto del dueño", 20), Body(sync is null ? "No vinculado. La caja funciona localmente. El panel requiere un servidor Caja Clara Backend con HTTPS." : $"Estado: {sync.Health.Status}\nÚltima confirmación: {sync.Health.LastSuccess?.ToLocalTime().ToString("g") ?? "Todavía no sincronizado"}"),
                 Row(Button("Vincular dispositivo", async () =>
@@ -137,7 +137,7 @@ public sealed partial class MainWindow
             else
             {
                 if (role.SelectedItem is not Role selectedRole) throw new BusinessException("Elegí un rol.");
-                await Task.Run(() => vm.Auth.AddUser(vm.User, username.Text, name.Text, selectedRole, password.Password)); password.Password = "";
+                var login = username.Text; var displayName = name.Text; var secret = password.Password; await Task.Run(() => vm.Auth.AddUser(vm.User, login, displayName, selectedRole, secret)); password.Password = "";
             }
         });
     }
@@ -150,7 +150,7 @@ public sealed partial class MainWindow
         dialog.PrimaryButtonClick += async (_, e) =>
         {
             var deferral = e.GetDeferral();
-            try { authorized = await Task.Run(() => vm.Auth.Unlock(actor, pin.Password)); if (!authorized) { e.Cancel = true; error.Text = "PIN inválido, sin configurar o temporalmente bloqueado."; } }
+            try { var secret = pin.Password; authorized = await Task.Run(() => vm.Auth.Unlock(actor, secret)); if (!authorized) { e.Cancel = true; error.Text = "PIN inválido, sin configurar o temporalmente bloqueado."; } }
             catch (Exception ex) { e.Cancel = true; error.Text = ex is BusinessException ? ex.Message : "No se pudo validar el PIN."; }
             finally { pin.Password = ""; deferral.Complete(); }
         };

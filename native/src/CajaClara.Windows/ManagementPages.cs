@@ -22,7 +22,7 @@ public sealed partial class MainWindow
             {
                 if (!decimal.TryParse(quantity.Text, System.Globalization.NumberStyles.Number, Money.Culture, out var value) || value == 0) throw new BusinessException("Cantidad inválida.");
                 var delta = Money.Quantity(Math.Abs(value)) * Math.Sign(value);
-                await Task.Run(() => vm.Pos.AdjustStock(vm.User, new(p.Id, p.Version, delta, reason.Text)));
+                var adjustment = new StockAdjustment(p.Id, p.Version, delta, reason.Text); await Task.Run(() => vm.Pos.AdjustStock(vm.User, adjustment));
             })) await Navigate("products");
         })));
         panel.Children.Add(Row(Button("Exportar catálogo XLSX", async () =>
@@ -78,7 +78,7 @@ public sealed partial class MainWindow
         if (await FormAsync("Datos del contacto", Column(name, tax, phone, email, address, supplier, condition), async () =>
         {
             if (!int.TryParse(condition.Text, out var code)) throw new BusinessException("Condición IVA inválida.");
-            await Task.Run(() => vm.Pos.SaveContact(vm.User, new Contact(id, (old?.Version ?? 0) + 1, name.Text, tax.Text, phone.Text, email.Text, address.Text, supplier.IsChecked == true, code), old?.Version ?? 0));
+            var contact = new Contact(id, (old?.Version ?? 0) + 1, name.Text, tax.Text, phone.Text, email.Text, address.Text, supplier.IsChecked == true, code); await Task.Run(() => vm.Pos.SaveContact(vm.User, contact, old?.Version ?? 0));
         })) await Navigate("contacts");
     }
     private UIElement BuildPurchases()
@@ -119,7 +119,7 @@ public sealed partial class MainWindow
         {
             if (supplier.SelectedItem is not Contact selected) throw new BusinessException("Seleccioná un proveedor.");
             if (string.IsNullOrWhiteSpace(reference.Text)) throw new BusinessException("Indicá una referencia de la compra.");
-            await Task.Run(() => vm.Pos.ReceivePurchase(vm.User, id, selected.Id, lines.ToArray(), Amount(paid), reference.Text));
+            var items = lines.ToArray(); var amount = Amount(paid); var detail = reference.Text; await Task.Run(() => vm.Pos.ReceivePurchase(vm.User, id, selected.Id, items, amount, detail));
         }, "Recibir y guardar")) { await Navigate("purchases"); Notify("Compra recibida y stock actualizado."); }
     }
     private UIElement BuildReports()

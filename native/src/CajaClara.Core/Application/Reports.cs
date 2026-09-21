@@ -162,7 +162,7 @@ public sealed class Reports(Store store)
     private static void Save(XLWorkbook book, string path)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
-        var temporary = path + ".writing";
+        var temporary = path + ".writing.xlsx";
         try { book.SaveAs(temporary); File.Move(temporary, path, true); }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }

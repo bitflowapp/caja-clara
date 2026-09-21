@@ -54,9 +54,11 @@ public sealed class MainViewModel(Store store, AuthService auth, PosService pos,
         if (!CanSell) throw new BusinessException("Tu usuario no puede registrar ventas.");
         if (!product.Active) throw new BusinessException("Producto pausado.");
         var current = Cart.SingleOrDefault(x => x.Product.Id == product.Id);
-        var quantity = (current?.QuantityMilli ?? 0) + 1000;
+        var step = product.Unit == "un" ? 1000 : Math.Min(1000, product.StockMilli);
+        if (step <= 0) throw new BusinessException("Producto sin stock.");
+        var quantity = (current?.QuantityMilli ?? 0) + step;
         if (quantity > product.StockMilli) throw new BusinessException("Stock insuficiente. Para productos fraccionados editá la cantidad.");
-        if (current is null) Cart.Add(new CartItem(product, 1000)); else current.Change(quantity, current.DiscountCents, current.OverridePriceCents);
+        if (current is null) Cart.Add(new CartItem(product, step)); else current.Change(quantity, current.DiscountCents, current.OverridePriceCents);
         CartChanged();
     }
     public void Remove(CartItem item) { Cart.Remove(item); CartChanged(); }

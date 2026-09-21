@@ -17,7 +17,7 @@ public sealed class PosService(Store store)
         return new Snapshot(business, tx.All<Product>(),
             tx.All<CashSession>().SingleOrDefault(x => x.DeviceId == business.DeviceId && x.State != CashState.Closed),
             tx.All<Sale>(), tx.All<Contact>(), tx.All<Notification>(), tx.All<FiscalDocument>(),
-            Convert.ToInt32(tx.Scalar("SELECT COUNT(*) FROM outbox WHERE sent_at IS NULL")), "ok");
+            Convert.ToInt32(tx.Scalar("SELECT COUNT(*) FROM outbox WHERE sent_at IS NULL")), "not_checked");
     });
     public Business Configure(Actor actor, string name, string taxId, string address, string condition) => store.Write(tx =>
     {
