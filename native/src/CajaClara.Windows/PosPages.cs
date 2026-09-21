@@ -17,7 +17,8 @@ public sealed partial class MainWindow
         var left = Column(); searchBox = Input("Buscar por nombre, código o lector de barras");
         var categories = new ComboBox { Header = "Categoría", HorizontalAlignment = HorizontalAlignment.Stretch };
         categories.Items.Add("Todas"); foreach (var category in state.Products.Select(x => x.Category).Distinct().Order()) categories.Items.Add(category); categories.SelectedIndex = 0;
-        var products = new ListView { Height = 410, SelectionMode = ListViewSelectionMode.Single, DisplayMemberPath = "Display", IsItemClickEnabled = true };
+        var products = new ListView { Height = Math.Clamp(root.ActualHeight - 480, 160, 360), SelectionMode = ListViewSelectionMode.Single, DisplayMemberPath = "Display", IsItemClickEnabled = true };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(products, "pos-products");
         void Filter()
         {
             var query = searchBox.Text.Trim(); var category = categories.SelectedItem?.ToString();
@@ -40,23 +41,24 @@ public sealed partial class MainWindow
         products.DoubleTapped += async (_, _) => await Run(() => { if (products.SelectedItem is Product p) vm.Add(p); return Task.CompletedTask; });
         left.Children.Add(searchBox); left.Children.Add(categories); left.Children.Add(products);
         left.Children.Add(Button("Agregar seleccionado", () => { if (products.SelectedItem is not Product p) throw new BusinessException("Seleccioná un producto."); vm.Add(p); return Task.CompletedTask; }, true));
-        var right = Column(); right.Children.Add(Heading("Venta actual", 22));
+        var right = Column(7); right.Children.Add(Heading("Venta actual", 22));
         customerBox = new ComboBox { Header = "Cliente · F2", ItemsSource = state.Contacts.Where(x => !x.Supplier).OrderBy(x => x.Name).ToArray(), DisplayMemberPath = "Display", HorizontalAlignment = HorizontalAlignment.Stretch };
-        cartList = new ListView { ItemsSource = vm.Cart, DisplayMemberPath = "Display", Height = 290, SelectionMode = ListViewSelectionMode.Single };
-        var total = Heading(vm.TotalText, 36); total.SetBinding(TextBlock.TextProperty, new Binding { Source = vm, Path = new PropertyPath(nameof(MainViewModel.TotalText)), Mode = BindingMode.OneWay });
+        cartList = new ListView { ItemsSource = vm.Cart, DisplayMemberPath = "Display", Height = Math.Clamp(root.ActualHeight - 590, 100, 260), SelectionMode = ListViewSelectionMode.Single };
+        var total = Heading(vm.TotalText, 32); total.SetBinding(TextBlock.TextProperty, new Binding { Source = vm, Path = new PropertyPath(nameof(MainViewModel.TotalText)), Mode = BindingMode.OneWay });
         var caption = Body(vm.CartCaption); caption.SetBinding(TextBlock.TextProperty, new Binding { Source = vm, Path = new PropertyPath(nameof(MainViewModel.CartCaption)), Mode = BindingMode.OneWay });
         saleNotes = Input("Nota de la venta (opcional)"); fiscalPending = new CheckBox { Content = "Registrar facturación pendiente (no emite factura)" };
         right.Children.Add(customerBox); right.Children.Add(cartList);
-        right.Children.Add(Row(Button("Cantidad / descuento · F6", EditCartAsync), Button("Quitar", () => { if (cartList.SelectedItem is CartItem item) vm.Remove(item); return Task.CompletedTask; })));
-        right.Children.Add(saleNotes); right.Children.Add(fiscalPending); right.Children.Add(caption); right.Children.Add(total);
+        right.Children.Add(Row(Button("Editar · F6 / F7", EditCartAsync), Button("Quitar", () => { if (cartList.SelectedItem is CartItem item) vm.Remove(item); return Task.CompletedTask; })));
+        right.Children.Add(new Expander { Header = "Datos adicionales de la venta", HorizontalAlignment = HorizontalAlignment.Stretch, Content = Column(saleNotes, fiscalPending) });
+        right.Children.Add(caption); right.Children.Add(total);
         right.Children.Add(Row(Button("Cobrar · F4", PayAsync, true), Button("Nueva · F8", NewSaleAsync)));
         var columns = new Grid { ColumnSpacing = 18, RowSpacing = 18 };
         columns.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); columns.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
         columns.RowDefinitions.Add(new() { Height = GridLength.Auto }); columns.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        var leftCard = Card(left); var rightCard = Card(right); columns.Children.Add(leftCard); columns.Children.Add(rightCard); Grid.SetColumn(rightCard, 1);
+        var leftCard = Card(left); var rightCard = Card(right); leftCard.Padding = new Thickness(14); rightCard.Padding = new Thickness(14); columns.Children.Add(leftCard); columns.Children.Add(rightCard); Grid.SetColumn(rightCard, 1);
         columns.SizeChanged += (_, e) =>
         {
-            var narrow = e.NewSize.Width < 930; Grid.SetColumn(rightCard, narrow ? 0 : 1); Grid.SetRow(rightCard, narrow ? 1 : 0);
+            var narrow = e.NewSize.Width < 660; Grid.SetColumn(rightCard, narrow ? 0 : 1); Grid.SetRow(rightCard, narrow ? 1 : 0);
             columns.ColumnDefinitions[1].Width = narrow ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
         };
         panel.Children.Add(columns); Filter(); return panel;
@@ -87,7 +89,7 @@ public sealed partial class MainWindow
         if (!vm.CanSell || vm.Cart.Count == 0) throw new BusinessException("Agregá productos para cobrar.");
         if (vm.Snapshot?.Cash is null) throw new BusinessException("La caja está cerrada.");
         var total = vm.TotalCents; var payments = new ObservableCollection<Tender>();
-        var method = new ComboBox { Header = "Medio de pago", ItemsSource = Enum.GetValues<PaymentMethod>(), SelectedIndex = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
+        var method = new ComboBox { Header = "Medio de pago", ItemsSource = PaymentChoice.All, DisplayMemberPath = "Label", SelectedIndex = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
         var applied = Input("Importe aplicado a la venta", DecimalText(total)); var received = Input("Importe recibido", DecimalText(total)); var reference = Input("Referencia del banco / comprobante");
         var manual = new CheckBox { Content = "Verifiqué el cobro electrónico fuera de Caja Clara" };
         var paymentList = new ListView { ItemsSource = payments, Height = 120 };
@@ -97,7 +99,8 @@ public sealed partial class MainWindow
         {
             try
             {
-                if (method.SelectedItem is not PaymentMethod selected) throw new BusinessException("Elegí un medio.");
+                if (method.SelectedItem is not PaymentChoice choice) throw new BusinessException("Elegí un medio.");
+                var selected = choice.Value;
                 var value = Amount(applied, false); var taken = Amount(received, false);
                 if (selected != PaymentMethod.Cash && manual.IsChecked != true) throw new BusinessException("Confirmá que verificaste el cobro en el banco o terminal.");
                 var tender = new Tender(selected, value, taken, reference.Text.Trim());

@@ -7,14 +7,15 @@ import subprocess
 import sys
 import time
 import traceback
+import shutil
 from pathlib import Path
-from pywinauto import Application
+from pywinauto import Application, Desktop
 from PIL import ImageGrab
 
 root = Path(__file__).resolve().parents[1]
 output = root / 'artifacts'
 output.mkdir(exist_ok=True)
-exe = output / 'package/app/CajaClara.exe'
+exe = Path(os.environ.get('CAJACLARA_UI_EXE', str(output / 'package/app/CajaClara.exe')))
 results = []
 process = None
 window = None
@@ -26,7 +27,10 @@ def passed(name):
     print('PASS', name, flush=True)
 
 def capture(name):
-    ImageGrab.grab(all_screens=True).save(output / name)
+    if window is not None and window.exists():
+        window.wrapper_object().capture_as_image().save(output / name)
+    else:
+        ImageGrab.grab(all_screens=True).save(output / name)
 
 def edit(identifier, value):
     control = window.child_window(auto_id=identifier, control_type='Edit')
@@ -65,6 +69,7 @@ try:
     app = Application(backend='uia').connect(process=process.pid, timeout=30)
     window = app.window(title_re='Caja Clara.*')
     window.wait('exists visible', timeout=30)
+    window.wrapper_object().maximize()
     time.sleep(3)
     capture('windows-01-onboarding.png')
     passed('native_executable_started')
@@ -134,6 +139,19 @@ except Exception as error:
     except Exception:
         pass
 finally:
+    try:
+        diagnostics = {'process_id': process.pid if process else None, 'exit_code': process.poll() if process else None,
+                       'files': [p.name for p in exe.parent.glob('*.pri')],
+                       'windows': [{'title': x.window_text(), 'pid': x.process_id(), 'visible': x.is_visible()} for x in Desktop(backend='uia').windows()]}
+        (output / 'windows-startup-diagnostics.json').write_text(json.dumps(diagnostics, ensure_ascii=False, indent=2), encoding='utf-8')
+        logs = data / 'logs'
+        if logs.exists():
+            for source in logs.glob('*.jsonl'):
+                shutil.copy2(source, output / ('windows-app-' + source.name))
+        events = subprocess.run(['powershell', '-NoProfile', '-Command', "Get-WinEvent -FilterHashtable @{LogName='Application';StartTime=(Get-Date).AddMinutes(-8)} -ErrorAction SilentlyContinue | Where-Object {$_.ProviderName -match 'Application Error|.NET Runtime|Windows App Runtime'} | Select-Object TimeCreated,ProviderName,Id,Message | ConvertTo-Json -Depth 4"], capture_output=True, text=True, timeout=20)
+        (output / 'windows-event-log.json').write_text(events.stdout, encoding='utf-8')
+    except Exception as diagnostic_error:
+        print('Diagnostic collection:', str(diagnostic_error), flush=True)
     if process:
         process.terminate()
         try:
