@@ -5,26 +5,52 @@ on:
     paths: ['native/**', '.github/workflows/caja-clara-native.yml']
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: caja-clara-native-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   windows:
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.401'
-      - name: Build core
+      - name: Apply source hardening once
+        shell: pwsh
+        run: |
+          python native/tools/harden_sources.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (git status --porcelain native/src) {
+            git config user.name 'Caja Clara build validation'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add native/src
+            git commit -m 'Harden UI thread boundaries, XLSX temporary paths and database ownership'
+            git push origin HEAD:work/caja-clara-native-20260921
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Build core and execute tests
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force native/artifacts | Out-Null
+          git rev-parse HEAD | Set-Content native/artifacts/source-commit.txt
           dotnet --info | Tee-Object native/artifacts/dotnet-info.txt
-          dotnet build native/src/CajaClara.Core/CajaClara.Core.csproj -c Release 2>&1 | Tee-Object native/artifacts/build.txt
+          dotnet build native/src/CajaClara.Core/CajaClara.Core.csproj -c Release 2>&1 | Tee-Object native/artifacts/build-core.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project native/tests/CajaClara.Tests/CajaClara.Tests.csproj -c Release -- native/artifacts 2>&1 | Tee-Object native/artifacts/tests.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Publish native Windows application
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force native/artifacts/package/app | Out-Null
+          dotnet publish native/src/CajaClara.Windows/CajaClara.Windows.csproj -c Release -r win-x64 --self-contained true -o native/artifacts/package/app 2>&1 | Tee-Object native/artifacts/build-windows.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item native/scripts/Install.ps1 native/artifacts/package/
+          Copy-Item 'native/scripts/Instalar Caja Clara.cmd' native/artifacts/package/
+          Copy-Item native/scripts/Uninstall.ps1 native/artifacts/package/
       - name: Upload build evidence and source
         if: always()
         uses: actions/upload-artifact@v4
@@ -34,4 +60,13 @@ jobs:
             native/
             !native/**/obj/**
             !native/**/bin/**
+            !native/artifacts/package/**
+          retention-days: 7
+      - name: Upload Windows package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CajaClara-Native-Windows-x64
+          path: native/artifacts/package/
+          if-no-files-found: ignore
           retention-days: 7
