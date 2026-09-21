@@ -1,0 +1,13 @@
+CREATE TABLE IF NOT EXISTS tenants(id TEXT PRIMARY KEY,name TEXT NOT NULL,business_id TEXT UNIQUE,created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS owners(id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL REFERENCES tenants(id),login TEXT NOT NULL UNIQUE COLLATE NOCASE,name TEXT NOT NULL,password_hash TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('Owner','Viewer')),active INTEGER NOT NULL DEFAULT 1,session_version INTEGER NOT NULL DEFAULT 1,failed INTEGER NOT NULL DEFAULT 0,locked_until TEXT);
+CREATE TABLE IF NOT EXISTS devices(id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL REFERENCES tenants(id),business_id TEXT NOT NULL,name TEXT NOT NULL,token_hash TEXT NOT NULL UNIQUE,active INTEGER NOT NULL,expires_at TEXT NOT NULL,last_seen TEXT);
+CREATE INDEX IF NOT EXISTS device_tenant ON devices(tenant_id,active);
+CREATE TABLE IF NOT EXISTS pair_codes(code_hash TEXT PRIMARY KEY,tenant_id TEXT NOT NULL REFERENCES tenants(id),expires_at TEXT NOT NULL,used_at TEXT);
+CREATE TABLE IF NOT EXISTS events(tenant_id TEXT NOT NULL,device_id TEXT NOT NULL,event_id TEXT NOT NULL,sequence INTEGER NOT NULL,kind TEXT NOT NULL,entity_id TEXT NOT NULL,version INTEGER NOT NULL,payload_hash TEXT NOT NULL,received_at TEXT NOT NULL,PRIMARY KEY(tenant_id,event_id),UNIQUE(device_id,sequence));
+CREATE TABLE IF NOT EXISTS projections(tenant_id TEXT NOT NULL,kind TEXT NOT NULL,entity_id TEXT NOT NULL,version INTEGER NOT NULL,body TEXT NOT NULL CHECK(json_valid(body)),payload_hash TEXT NOT NULL,updated_at TEXT NOT NULL,PRIMARY KEY(tenant_id,kind,entity_id));
+CREATE INDEX IF NOT EXISTS projection_kind ON projections(tenant_id,kind,updated_at);
+CREATE TABLE IF NOT EXISTS commands(id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL,device_id TEXT NOT NULL,request_hash TEXT NOT NULL,body TEXT NOT NULL CHECK(json_valid(body)),status TEXT NOT NULL,requested_at TEXT NOT NULL,expires_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS command_delivery ON commands(tenant_id,device_id,status);
+CREATE TABLE IF NOT EXISTS server_audit(id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL,actor_id TEXT NOT NULL,action TEXT NOT NULL,subject_id TEXT NOT NULL,at TEXT NOT NULL);
+PRAGMA application_id=1128481610;
+PRAGMA user_version=1;
