@@ -158,7 +158,7 @@ public sealed partial class MainWindow : Window
     private static StackPanel Column(double spacing = 12) => new() { Spacing = spacing };
     private static StackPanel Column(params UIElement[] elements) { var panel = Column(); foreach (var e in elements) panel.Children.Add(e); return panel; }
     private static StackPanel Row(params UIElement[] elements) { var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 }; foreach (var e in elements) panel.Children.Add(e); return panel; }
-    private static TextBlock Heading(string text, double size = 26) => new() { Text = text, FontSize = size, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
+    private static TextBlock Heading(string text, double size = 26) => new() { Text = text, FontSize = size, FontWeight = global::Windows.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
     private static TextBlock Body(string text) => new() { Text = text, TextWrapping = TextWrapping.Wrap, FontSize = 14, LineHeight = 21 };
     private static TextBox Input(string label, string value = "") => new() { Header = label, Text = value, MinWidth = 240, MaxLength = 1000 };
     private static long Amount(TextBox input, bool zero = true)

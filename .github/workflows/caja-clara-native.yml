@@ -36,6 +36,7 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
       - name: Build core and execute tests
+        id: core
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force native/artifacts | Out-Null
@@ -46,6 +47,7 @@ jobs:
           dotnet run --project native/tests/CajaClara.Tests/CajaClara.Tests.csproj -c Release -- native/artifacts 2>&1 | Tee-Object native/artifacts/tests.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Publish native Windows application
+        id: windows
         if: always()
         shell: pwsh
         run: |
@@ -55,18 +57,42 @@ jobs:
           Copy-Item native/scripts/Install.ps1 native/artifacts/package/
           Copy-Item 'native/scripts/Instalar Caja Clara.cmd' native/artifacts/package/
           Copy-Item native/scripts/Uninstall.ps1 native/artifacts/package/
-      - name: Build backend and terminal when present
+      - name: Build cloud, terminal and integration tests
+        id: backend
         if: always()
         shell: pwsh
         run: |
-          if (Test-Path native/src/CajaClara.Backend/CajaClara.Backend.csproj) {
-            dotnet build native/src/CajaClara.Backend/CajaClara.Backend.csproj -c Release 2>&1 | Tee-Object native/artifacts/build-backend.txt
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
-          if (Test-Path native/src/CajaClara.Cli/CajaClara.Cli.csproj) {
-            dotnet publish native/src/CajaClara.Cli/CajaClara.Cli.csproj -c Release -r win-x64 --self-contained true -o native/artifacts/package/terminal 2>&1 | Tee-Object native/artifacts/build-cli.txt
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
+          dotnet build native/src/CajaClara.Backend/CajaClara.Backend.csproj -c Release 2>&1 | Tee-Object native/artifacts/build-backend.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet publish native/src/CajaClara.Cli/CajaClara.Cli.csproj -c Release -r win-x64 --self-contained true -o native/artifacts/package/terminal 2>&1 | Tee-Object native/artifacts/build-cli.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project native/tests/CajaClara.CloudTests/CajaClara.CloudTests.csproj -c Release -- native/artifacts 2>&1 | Tee-Object native/artifacts/cloud-tests.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet publish native/src/CajaClara.Backend/CajaClara.Backend.csproj -c Release -r win-x64 --self-contained true -o native/artifacts/package/server 2>&1 | Tee-Object native/artifacts/publish-backend.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install UI test dependencies
+        id: testdeps
+        if: always()
+        shell: pwsh
+        run: |
+          python -m pip install playwright pywinauto Pillow
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m playwright install chromium
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run real native UI flow
+        if: always() && steps.windows.outcome == 'success' && steps.testdeps.outcome == 'success'
+        timeout-minutes: 6
+        shell: pwsh
+        run: |
+          python native/tests/ui_smoke.py 2>&1 | Tee-Object native/artifacts/ui-tests.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run mobile browser and HTTP end to end
+        if: always() && steps.backend.outcome == 'success' && steps.testdeps.outcome == 'success'
+        timeout-minutes: 6
+        shell: pwsh
+        run: |
+          python native/tests/browser_e2e.py 2>&1 | Tee-Object native/artifacts/browser-tests.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload source and evidence
         if: always()
         uses: actions/upload-artifact@v4
