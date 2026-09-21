@@ -18,16 +18,20 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.401'
-      - name: Apply source hardening once
+      - name: Apply verified source corrections
         shell: pwsh
         run: |
           python native/tools/harden_sources.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-ChildItem native/tools/fix_*.py | Sort-Object Name | ForEach-Object {
+            python $_.FullName
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
           if (git status --porcelain native/src) {
             git config user.name 'Caja Clara build validation'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
             git add native/src
-            git commit -m 'Harden UI thread boundaries, XLSX temporary paths and database ownership'
+            git commit -m 'Apply validated source corrections'
             git push origin HEAD:work/caja-clara-native-20260921
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
@@ -51,7 +55,19 @@ jobs:
           Copy-Item native/scripts/Install.ps1 native/artifacts/package/
           Copy-Item 'native/scripts/Instalar Caja Clara.cmd' native/artifacts/package/
           Copy-Item native/scripts/Uninstall.ps1 native/artifacts/package/
-      - name: Upload build evidence and source
+      - name: Build backend and terminal when present
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path native/src/CajaClara.Backend/CajaClara.Backend.csproj) {
+            dotnet build native/src/CajaClara.Backend/CajaClara.Backend.csproj -c Release 2>&1 | Tee-Object native/artifacts/build-backend.txt
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          if (Test-Path native/src/CajaClara.Cli/CajaClara.Cli.csproj) {
+            dotnet publish native/src/CajaClara.Cli/CajaClara.Cli.csproj -c Release -r win-x64 --self-contained true -o native/artifacts/package/terminal 2>&1 | Tee-Object native/artifacts/build-cli.txt
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Upload source and evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -61,6 +77,7 @@ jobs:
             !native/**/obj/**
             !native/**/bin/**
             !native/artifacts/package/**
+            !native/**/.data/**
           retention-days: 7
       - name: Upload Windows package
         if: always()
