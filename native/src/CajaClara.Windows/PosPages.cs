@@ -18,6 +18,7 @@ public sealed partial class MainWindow
         var categories = new ComboBox { Header = "Categoría", HorizontalAlignment = HorizontalAlignment.Stretch };
         categories.Items.Add("Todas"); foreach (var category in state.Products.Select(x => x.Category).Distinct().Order()) categories.Items.Add(category); categories.SelectedIndex = 0;
         var products = new ListView { Height = 410, SelectionMode = ListViewSelectionMode.Single, DisplayMemberPath = "Display", IsItemClickEnabled = true };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(products, "pos-products");
         void Filter()
         {
             var query = searchBox.Text.Trim(); var category = categories.SelectedItem?.ToString();
@@ -43,6 +44,7 @@ public sealed partial class MainWindow
         var right = Column(); right.Children.Add(Heading("Venta actual", 22));
         customerBox = new ComboBox { Header = "Cliente · F2", ItemsSource = state.Contacts.Where(x => !x.Supplier).OrderBy(x => x.Name).ToArray(), DisplayMemberPath = "Display", HorizontalAlignment = HorizontalAlignment.Stretch };
         cartList = new ListView { ItemsSource = vm.Cart, DisplayMemberPath = "Display", Height = 290, SelectionMode = ListViewSelectionMode.Single };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(cartList, "pos-cart");
         var total = Heading(vm.TotalText, 36); total.SetBinding(TextBlock.TextProperty, new Binding { Source = vm, Path = new PropertyPath(nameof(MainViewModel.TotalText)), Mode = BindingMode.OneWay });
         var caption = Body(vm.CartCaption); caption.SetBinding(TextBlock.TextProperty, new Binding { Source = vm, Path = new PropertyPath(nameof(MainViewModel.CartCaption)), Mode = BindingMode.OneWay });
         saleNotes = Input("Nota de la venta (opcional)"); fiscalPending = new CheckBox { Content = "Registrar facturación pendiente (no emite factura)" };

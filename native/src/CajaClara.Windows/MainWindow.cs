@@ -54,7 +54,7 @@ public sealed partial class MainWindow : Window
         timer.Tick += async (_, _) =>
         {
             if (busy || dialogOpen || vm.Actor is null) return;
-            await Run(async () => { await vm.RefreshAsync(); UpdateStatus(); });
+            await Run(async () => { await vm.RefreshAsync(); UpdateStatus(); await Task.Run(() => AutoBackup.Run(vm.Store, Path.Combine(App.DataDirectory, "backups", "automatic"))); });
         };
         Closed += (_, _) => { timer.Stop(); lifetime.Cancel(); syncHttp?.Dispose(); lifetime.Dispose(); };
     }
@@ -97,6 +97,7 @@ public sealed partial class MainWindow : Window
     {
         var business = Input("Nombre del comercio"); var name = Input("Tu nombre"); var user = Input("Usuario");
         var password = new PasswordBox { Header = "Contraseña (mínimo 12 caracteres)", MaxLength = 256 };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(password, "login-password");
         var form = Column(); if (setup) { form.Children.Add(business); form.Children.Add(name); } form.Children.Add(user); form.Children.Add(password);
         form.Children.Add(Body(setup ? "Creá una contraseña propia. No existen usuarios ni contraseñas predeterminadas." : "Ingresá con el usuario de este comercio."));
         await FormAsync(setup ? "Bienvenido a Caja Clara" : "Iniciar sesión", form, async () =>
@@ -158,9 +159,15 @@ public sealed partial class MainWindow : Window
     private static StackPanel Column(double spacing = 12) => new() { Spacing = spacing };
     private static StackPanel Column(params UIElement[] elements) { var panel = Column(); foreach (var e in elements) panel.Children.Add(e); return panel; }
     private static StackPanel Row(params UIElement[] elements) { var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 }; foreach (var e in elements) panel.Children.Add(e); return panel; }
-    private static TextBlock Heading(string text, double size = 26) => new() { Text = text, FontSize = size, FontWeight = global::Windows.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
+    private static TextBlock Heading(string text, double size = 26) => new() { Text = text, FontSize = size, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
     private static TextBlock Body(string text) => new() { Text = text, TextWrapping = TextWrapping.Wrap, FontSize = 14, LineHeight = 21 };
-    private static TextBox Input(string label, string value = "") => new() { Header = label, Text = value, MinWidth = 240, MaxLength = 1000 };
+    private static TextBox Input(string label, string value = "")
+    {
+        var field = new TextBox { Header = label, Text = value, MinWidth = 240, MaxLength = 1000 };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(field, label);
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(field, label);
+        return field;
+    }
     private static long Amount(TextBox input, bool zero = true)
     {
         if (!decimal.TryParse(input.Text, System.Globalization.NumberStyles.Number, Money.Culture, out var amount)) throw new BusinessException("Ingresá un importe válido en " + input.Header + ".");
@@ -170,6 +177,7 @@ public sealed partial class MainWindow : Window
     private Button Button(string label, Func<Task> action, bool accent = false)
     {
         var button = new Button { Content = label, Padding = new Thickness(16, 10, 16, 10) };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(button, label);
         if (accent) button.Style = (Style)Application.Current.Resources["AccentButtonStyle"];
         button.Click += async (_, _) => await Run(action); return button;
     }
