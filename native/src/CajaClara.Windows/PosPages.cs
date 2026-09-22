@@ -52,6 +52,7 @@ public sealed partial class MainWindow
         right.Children.Add(new Expander { Header = "Datos adicionales de la venta", HorizontalAlignment = HorizontalAlignment.Stretch, Content = Column(saleNotes, fiscalPending) });
         right.Children.Add(caption); right.Children.Add(total);
         right.Children.Add(Row(Button("Cobrar · F4", PayAsync, true), Button("Nueva · F8", NewSaleAsync)));
+        right.Children.Add(Button("Cobrar total con Mercado Pago QR", PayMercadoPagoAsync));
         var columns = new Grid { ColumnSpacing = 18, RowSpacing = 18 };
         columns.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); columns.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
         columns.RowDefinitions.Add(new() { Height = GridLength.Auto }); columns.RowDefinitions.Add(new() { Height = GridLength.Auto });
@@ -65,6 +66,12 @@ public sealed partial class MainWindow
     }
     private async Task NewSaleAsync()
     {
+        var payment = await Task.Run(() => vm.Pos.MercadoPagoIntent(vm.User, vm.SaleRequestId));
+        if (payment is { StockReleased: false })
+        {
+            if (payment.ConfirmedPaid) { await FinalizeMercadoPagoAsync(payment); return; }
+            throw new BusinessException("Hay un cobro Mercado Pago pendiente con stock reservado. Usá “Cobrar total con Mercado Pago QR” para recuperarlo o cancelarlo de forma segura.");
+        }
         if (vm.Cart.Count == 0 || await ConfirmAsync("Descartar carrito", "Los productos del carrito no se vendieron. ¿Iniciar una venta nueva?", "Descartar"))
         { vm.NewSale(); if (saleNotes is not null) saleNotes.Text = ""; if (customerBox is not null) customerBox.SelectedIndex = -1; }
     }
@@ -84,8 +91,142 @@ public sealed partial class MainWindow
             line.Change(amount, rebate, custom); vm.CartChanged(); return Task.CompletedTask;
         });
     }
+    private async Task PayMercadoPagoAsync()
+    {
+        if (!vm.CanSell || vm.Cart.Count == 0) throw new BusinessException("Agregá productos para cobrar.");
+        if (vm.Snapshot?.Cash is null) throw new BusinessException("La caja está cerrada.");
+        if (!mercadoPago.DeviceLinked) throw new BusinessException("Vinculá esta caja con Caja Clara Control antes de usar Mercado Pago integrado.");
+
+        var existing = await Task.Run(() => vm.Pos.MercadoPagoIntent(vm.User, vm.SaleRequestId));
+        PaymentIntent intent;
+        if (existing is not null)
+        {
+            if (existing.StockReleased) throw new BusinessException("Ese intento ya fue cancelado. Iniciá una venta nueva.");
+            intent = existing;
+        }
+        else
+        {
+            var request = new CheckoutRequest(vm.SaleRequestId, (customerBox?.SelectedItem as Contact)?.Id,
+                vm.Cart.Select(x => x.Input).ToArray(), [], saleNotes?.Text ?? "", fiscalPending?.IsChecked == true);
+            intent = await Task.Run(() => vm.Pos.BeginMercadoPagoIntent(vm.User, request));
+            await vm.RefreshAsync();
+        }
+
+        if (intent.ConfirmedPaid) { await FinalizeMercadoPagoAsync(intent); return; }
+
+        try { intent = await mercadoPago.CreateAsync(vm.User, intent, lifetime.Token); }
+        catch (Exception error) when (error is BusinessException or HttpRequestException or TaskCanceledException)
+        {
+            App.SafeLog("MP_CREATE_UNCERTAIN", error);
+            throw new BusinessException("No pude confirmar la creación del QR. El stock quedó reservado y el mismo botón reintentará con la misma clave, sin duplicar el cobro. " + error.Message);
+        }
+
+        if (intent.ConfirmedPaid) { await FinalizeMercadoPagoAsync(intent); return; }
+        if (string.IsNullOrWhiteSpace(intent.QrData)) throw new BusinessException("Mercado Pago creó la order pero no devolvió datos QR. El intento quedó preservado para recuperación.");
+
+        var qr = await MercadoPagoQrImage.BuildAsync(intent.QrData);
+        var status = Body("Esperando acreditación de Mercado Pago…");
+        var dialog = new ContentDialog
+        {
+            XamlRoot = root.XamlRoot,
+            Title = "Mercado Pago QR · " + Money.Format(intent.AmountCents),
+            Content = Column(Body("Pedile al cliente que escanee este QR. Caja Clara no cerrará la venta hasta que Mercado Pago confirme el importe."), qr, status),
+            CloseButtonText = "Cancelar cobro",
+            DefaultButton = ContentDialogButton.None
+        };
+
+        using var pollCancellation = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
+        PaymentIntent latest = intent;
+        var poll = PollMercadoPagoAsync(dialog, status, latest, pollCancellation.Token, value => latest = value);
+        await dialog.ShowAsync();
+        pollCancellation.Cancel();
+        try { await poll; } catch (OperationCanceledException) { }
+
+        latest = await Task.Run(() => vm.Pos.MercadoPagoIntent(vm.User, intent.Id) ?? latest);
+        if (latest.ConfirmedPaid) { await FinalizeMercadoPagoAsync(latest); return; }
+
+        try
+        {
+            latest = await mercadoPago.RefreshAsync(vm.User, latest, lifetime.Token);
+            if (latest.ConfirmedPaid) { await FinalizeMercadoPagoAsync(latest); return; }
+
+            if (!ProviderTerminalWithoutPayment(latest.ProviderStatus))
+                latest = await mercadoPago.CancelAsync(vm.User, latest, Guid.NewGuid(), lifetime.Token);
+
+            if (latest.ConfirmedPaid) { await FinalizeMercadoPagoAsync(latest); return; }
+            if (!ProviderTerminalWithoutPayment(latest.ProviderStatus))
+                throw new BusinessException("Mercado Pago todavía no confirmó la cancelación.");
+
+            await Task.Run(() => vm.Pos.CancelMercadoPagoIntent(vm.User, latest.Id, "Order de Mercado Pago cancelada o vencida sin acreditación."));
+            vm.NewSale();
+            await vm.RefreshAsync();
+            await Navigate("pos");
+            Notify("Cobro QR cancelado sin acreditación. El stock reservado fue liberado.", InfoBarSeverity.Warning);
+        }
+        catch (Exception error) when (error is BusinessException or HttpRequestException or TaskCanceledException)
+        {
+            App.SafeLog("MP_CANCEL_UNCERTAIN", error);
+            throw new BusinessException("No pude demostrar que el cobro esté cancelado. Por seguridad el stock sigue reservado. Reabrí el mismo cobro para reconciliarlo. " + error.Message);
+        }
+    }
+
+    private async Task PollMercadoPagoAsync(ContentDialog dialog, TextBlock status, PaymentIntent initial, CancellationToken cancellationToken, Action<PaymentIntent> changed)
+    {
+        var current = initial;
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+            current = await mercadoPago.RefreshAsync(vm.User, current, cancellationToken);
+            changed(current);
+            status.Text = current.ConfirmedPaid ? "Pago acreditado. Cerrando venta…" : "Estado: " + current.ProviderStatus;
+            if (current.ConfirmedPaid || ProviderTerminalWithoutPayment(current.ProviderStatus))
+            {
+                dialog.Hide();
+                return;
+            }
+        }
+    }
+
+    private async Task FinalizeMercadoPagoAsync(PaymentIntent intent)
+    {
+        var sale = await Task.Run(() => vm.Pos.FinalizeMercadoPagoSale(vm.User, intent.Id));
+        vm.NewSale();
+        await vm.RefreshAsync();
+
+        var notice = $"Venta #{sale.Number:000000} guardada con Mercado Pago confirmado · {Money.Format(sale.TotalCents)}.";
+        if (sale.FiscalState == FiscalState.Pending)
+        {
+            if (!fiscal.Configured) notice += " Facturación pendiente: configurá ARCA.";
+            else
+            {
+                try
+                {
+                    var document = await fiscal.ProcessSaleAsync(vm.User, sale.Id, lifetime.Token);
+                    notice += document.State == FiscalState.Authorized
+                        ? $" Factura autorizada · PV {document.PointOfSale} · Nº {document.VoucherNumber} · CAE {document.Cae}."
+                        : " La solicitud fiscal quedó pendiente de revisión.";
+                }
+                catch (Exception error) when (error is BusinessException or HttpRequestException or TaskCanceledException)
+                {
+                    App.SafeLog("FISCAL_AFTER_MP_SALE_PENDING", error);
+                    notice += " La venta quedó confirmada; la factura sigue pendiente: " + error.Message;
+                }
+            }
+        }
+        await Navigate("pos");
+        Notify(notice, sale.FiscalState == FiscalState.Pending ? InfoBarSeverity.Warning : InfoBarSeverity.Success);
+    }
+
+    private static bool ProviderTerminalWithoutPayment(string status) =>
+        status.Equals("canceled", StringComparison.OrdinalIgnoreCase) ||
+        status.Equals("refunded", StringComparison.OrdinalIgnoreCase) ||
+        status.Equals("expired", StringComparison.OrdinalIgnoreCase) ||
+        status.Equals("failed", StringComparison.OrdinalIgnoreCase);
+
     private async Task PayAsync()
     {
+        if (await Task.Run(() => vm.Pos.MercadoPagoIntent(vm.User, vm.SaleRequestId)) is { StockReleased: false })
+            throw new BusinessException("Esta venta tiene un cobro Mercado Pago pendiente. Recuperalo desde el botón QR antes de usar otro medio.");
         if (!vm.CanSell || vm.Cart.Count == 0) throw new BusinessException("Agregá productos para cobrar.");
         if (vm.Snapshot?.Cash is null) throw new BusinessException("La caja está cerrada.");
         var total = vm.TotalCents; var payments = new ObservableCollection<Tender>();
