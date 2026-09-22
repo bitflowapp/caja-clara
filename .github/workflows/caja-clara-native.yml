@@ -1,7 +1,7 @@
 name: Caja Clara Native
 on:
   push:
-    branches: ['work/caja-clara-native-20260921']
+    branches: ['work/caja-clara-native-20260921', 'feat/caja-clara-integrations-v03']
     paths: ['native/**', '.github/workflows/caja-clara-native.yml']
   workflow_dispatch:
 permissions:
@@ -28,6 +28,18 @@ jobs:
           dotnet build native/src/CajaClara.Core/CajaClara.Core.csproj -c Release 2>&1 | Tee-Object native/artifacts/build-core.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet run --project native/tests/CajaClara.Tests/CajaClara.Tests.csproj -c Release -- native/artifacts 2>&1 | Tee-Object native/artifacts/tests.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build and test fiscal and payment providers
+        id: integrations
+        shell: pwsh
+        run: |
+          dotnet build native/src/CajaClara.Fiscal/CajaClara.Fiscal.csproj -c Release 2>&1 | Tee-Object native/artifacts/build-fiscal.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project native/tests/CajaClara.FiscalTests/CajaClara.FiscalTests.csproj -c Release -- native/artifacts 2>&1 | Tee-Object native/artifacts/fiscal-tests.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build native/src/CajaClara.Payments/CajaClara.Payments.csproj -c Release 2>&1 | Tee-Object native/artifacts/build-payments.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project native/tests/CajaClara.PaymentTests/CajaClara.PaymentTests.csproj -c Release -- native/artifacts 2>&1 | Tee-Object native/artifacts/payment-tests.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Publish native Windows application
         id: windows
