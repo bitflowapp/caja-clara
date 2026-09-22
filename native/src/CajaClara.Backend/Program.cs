@@ -38,6 +38,14 @@ if (management)
 var development = builder.Environment.IsDevelopment();
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 4_000_000);
 builder.Services.AddSingleton(store);
+builder.Services.AddSingleton(new PaymentCloudStore(Path.Combine(data, "payments.sqlite")));
+builder.Services.AddSingleton(new HttpClient(new SocketsHttpHandler
+{
+    AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
+    AllowAutoRedirect = false,
+    PooledConnectionLifetime = TimeSpan.FromMinutes(10)
+}) { Timeout = TimeSpan.FromSeconds(30) });
+builder.Services.AddSingleton<MercadoPagoGateway>();
 builder.Services.ConfigureHttpJsonOptions(options => { foreach (var converter in Json.Options.Converters) options.SerializerOptions.Converters.Add(converter); });
 var protection = builder.Services.AddDataProtection().SetApplicationName("LUNA.CajaClara.Cloud.v1").PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(data, "keys")));
 if (OperatingSystem.IsWindows()) protection.ProtectKeysWithDpapi();
@@ -76,6 +84,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     if (!string.IsNullOrWhiteSpace(trusted) && IPAddress.TryParse(trusted, out var address)) options.KnownProxies.Add(address);
 });
 var app = builder.Build();
+var mercadoPago = app.Services.GetRequiredService<MercadoPagoGateway>();
 app.UseForwardedHeaders();
 if (!development) app.UseHsts();
 app.Use(async (context, next) =>
@@ -135,8 +144,42 @@ var devices = app.MapGroup("/api/device").RequireRateLimiting("device");
 devices.MapPost("/events", (HttpContext context, EventBatch input) => Results.Ok(store.Accept(Device(context), input)));
 devices.MapGet("/commands", (HttpContext context) => Results.Ok(store.Pending(Device(context))));
 devices.MapPost("/commands/result", (HttpContext context, CommandResult input) => { store.Acknowledge(Device(context), input); return Results.NoContent(); });
+devices.MapPost("/payments/mercadopago/orders", async (HttpContext context, MercadoPagoPaymentRequest input, CancellationToken cancellationToken)
+    => Results.Ok(await mercadoPago.CreateAsync(Device(context), input, cancellationToken)));
+devices.MapGet("/payments/mercadopago/orders/{id:guid}", async (HttpContext context, Guid id, CancellationToken cancellationToken)
+    => Results.Ok(await mercadoPago.RefreshAsync(Device(context), id, cancellationToken)));
+devices.MapPost("/payments/mercadopago/orders/{id:guid}/cancel/{idempotencyKey:guid}", async (HttpContext context, Guid id, Guid idempotencyKey, CancellationToken cancellationToken)
+    => Results.Ok(await mercadoPago.CancelAsync(Device(context), id, idempotencyKey, cancellationToken)));
+
+app.MapGet("/api/integrations/mercadopago/callback", async (string? code, string? state, string? error, CancellationToken cancellationToken) =>
+{
+    if (!string.IsNullOrWhiteSpace(error)) return Results.Redirect("/?mercadopago=denied");
+    if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(state)) return Results.Redirect("/?mercadopago=invalid");
+    await mercadoPago.CompleteAsync(code, state, cancellationToken);
+    return Results.Redirect("/?mercadopago=connected");
+});
+app.MapPost("/api/integrations/mercadopago/webhook", async (HttpContext context, CancellationToken cancellationToken) =>
+{
+    var signature = context.Request.Headers["x-signature"].ToString();
+    var requestId = context.Request.Headers["x-request-id"].ToString();
+    var providerId = context.Request.Query["data.id"].ToString();
+    if (string.IsNullOrWhiteSpace(providerId) && context.Request.ContentLength is > 0 and <= 100000)
+    {
+        using var document = await System.Text.Json.JsonDocument.ParseAsync(context.Request.Body, cancellationToken: cancellationToken);
+        if (document.RootElement.TryGetProperty("data", out var payload) && payload.ValueKind == System.Text.Json.JsonValueKind.Object &&
+            payload.TryGetProperty("id", out var id)) providerId = id.ValueKind == System.Text.Json.JsonValueKind.String ? id.GetString() ?? "" : id.GetRawText();
+    }
+    if (!mercadoPago.VerifyWebhook(signature, requestId, providerId)) return Results.Unauthorized();
+    await mercadoPago.ProcessWebhookAsync(providerId, cancellationToken);
+    return Results.NoContent();
+}).RequireRateLimiting("device");
+
 var ownerApi = app.MapGroup("/api/owner").RequireAuthorization();
 ownerApi.MapGet("/dashboard", (HttpContext context, DateTimeOffset from, DateTimeOffset to) => Results.Ok(store.Dashboard(Owner(context), from, to)));
+ownerApi.MapGet("/integrations/mercadopago", (HttpContext context) => Results.Ok(mercadoPago.Status(Owner(context))));
+ownerApi.MapPost("/integrations/mercadopago/connect", (HttpContext context) =>
+    Results.Ok(new { authorizationUrl = mercadoPago.Start(Owner(context)).ToString() }));
+ownerApi.MapDelete("/integrations/mercadopago", (HttpContext context) => { mercadoPago.Disconnect(Owner(context)); return Results.NoContent(); });
 ownerApi.MapPost("/pair-code", (HttpContext context) => Results.Ok(new { code = store.CreatePairCode(Owner(context)), expiresInSeconds = 300 }));
 ownerApi.MapPost("/commands", (HttpContext context, CreateCommand command) => Results.Ok(store.Enqueue(Owner(context), command)));
 ownerApi.MapPost("/devices/{id:guid}/revoke", (HttpContext context, Guid id) => { store.Revoke(Owner(context), id); return Results.NoContent(); });
