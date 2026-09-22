@@ -70,9 +70,10 @@ public sealed record PurchaseLine(Guid ProductId, long QuantityMilli, long UnitC
 public sealed record Purchase(Guid Id, long Version, Guid SupplierId, Guid UserId,
     DateTimeOffset At, PurchaseLine[] Lines, long TotalCents, long PaidCents,
     string Reference) : IEntity;
-public sealed record PaymentIntent(Guid Id, long Version, Guid DeviceId, Guid UserId,
-    long AmountCents, string ExternalReference, string Provider, string? ProviderOrderId,
-    string ProviderStatus, bool ConfirmedPaid, string Detail, string? QrData,
+public sealed record PaymentIntent(Guid Id, long Version, Guid DeviceId, Guid UserId, Guid SessionId,
+    Contact? Customer, SaleLine[] Lines, long AmountCents, string Notes, bool RequestInvoice,
+    string ExternalReference, string Provider, string? ProviderOrderId,
+    string ProviderStatus, bool ConfirmedPaid, bool StockReleased, string Detail, string? QrData,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt) : IEntity;
 public sealed record AuditEntry(Guid Id, long Version, Guid UserId, Guid DeviceId,
     DateTimeOffset At, string Action, string EntityId, string Before, string After) : IEntity;
