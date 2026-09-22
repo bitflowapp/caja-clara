@@ -43,9 +43,14 @@ public sealed record MercadoPagoQrOrder(
     string? QrData,
     string RawJson)
 {
-    public bool IsPaid => Status.Equals("accredited", StringComparison.OrdinalIgnoreCase) ||
-                          Status.Equals("processed", StringComparison.OrdinalIgnoreCase);
-    public bool IsTerminal => IsPaid || Status is "canceled" or "refunded" or "expired" or "failed";
+    public bool IsPaid => Status.Equals("processed", StringComparison.OrdinalIgnoreCase) &&
+        (StatusDetail.Equals("processed", StringComparison.OrdinalIgnoreCase) ||
+         StatusDetail.Equals("accredited", StringComparison.OrdinalIgnoreCase));
+    public bool IsTerminal => IsPaid ||
+        Status.Equals("canceled", StringComparison.OrdinalIgnoreCase) ||
+        Status.Equals("refunded", StringComparison.OrdinalIgnoreCase) ||
+        Status.Equals("expired", StringComparison.OrdinalIgnoreCase) ||
+        Status.Equals("failed", StringComparison.OrdinalIgnoreCase);
 }
 public sealed record MercadoPagoCreateQr(
     Guid IdempotencyKey,
