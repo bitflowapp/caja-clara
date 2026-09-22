@@ -185,10 +185,19 @@ public sealed class ArcaWsfeClient(HttpClient http)
             ? number : throw new BusinessException("ARCA no devolvió el último comprobante autorizado.");
     }
 
+    public async Task<long> NextNumberAsync(ArcaSettings settings, ArcaAccessTicket ticket, int voucherType, CancellationToken cancellationToken = default)
+        => checked(await LastAuthorizedAsync(settings, ticket, voucherType, cancellationToken) + 1);
+
     public async Task<ArcaAuthorization> AuthorizeAsync(ArcaSettings settings, ArcaAccessTicket ticket, ArcaInvoiceRequest invoice, CancellationToken cancellationToken = default)
     {
+        var number = await NextNumberAsync(settings, ticket, invoice.VoucherType, cancellationToken);
+        return await AuthorizeExactAsync(settings, ticket, invoice, number, cancellationToken);
+    }
+
+    public async Task<ArcaAuthorization> AuthorizeExactAsync(ArcaSettings settings, ArcaAccessTicket ticket, ArcaInvoiceRequest invoice, long number, CancellationToken cancellationToken = default)
+    {
         settings.Validate(); invoice.Validate();
-        var number = checked(await LastAuthorizedAsync(settings, ticket, invoice.VoucherType, cancellationToken) + 1);
+        if (number <= 0) throw new BusinessException("Número fiscal inválido.");
         var operation = BuildAuthorization(settings, ticket, invoice, number);
         XDocument doc;
         try { doc = await SendAsync(settings, "FECAESolicitar", operation, cancellationToken); }
@@ -321,10 +330,22 @@ public sealed class ArcaFiscalAuthorizationProvider(HttpClient http, TimeProvide
     private string? cachedCertificate;
     private ArcaEnvironment? cachedEnvironment;
 
+    public async Task<long> NextNumberAsync(ArcaSettings settings, X509Certificate2 certificate, int voucherType, CancellationToken cancellationToken = default)
+    {
+        var ticket = await TicketAsync(settings, certificate, cancellationToken);
+        return await wsfe.NextNumberAsync(settings, ticket, voucherType, cancellationToken);
+    }
+
     public async Task<ArcaAuthorization> AuthorizeAsync(ArcaSettings settings, X509Certificate2 certificate, ArcaInvoiceRequest invoice, CancellationToken cancellationToken = default)
     {
         var ticket = await TicketAsync(settings, certificate, cancellationToken);
         return await wsfe.AuthorizeAsync(settings, ticket, invoice, cancellationToken);
+    }
+
+    public async Task<ArcaAuthorization> AuthorizeExactAsync(ArcaSettings settings, X509Certificate2 certificate, ArcaInvoiceRequest invoice, long number, CancellationToken cancellationToken = default)
+    {
+        var ticket = await TicketAsync(settings, certificate, cancellationToken);
+        return await wsfe.AuthorizeExactAsync(settings, ticket, invoice, number, cancellationToken);
     }
 
     public async Task<ArcaAuthorization?> ConsultAsync(ArcaSettings settings, X509Certificate2 certificate, int voucherType, long number, CancellationToken cancellationToken = default)
