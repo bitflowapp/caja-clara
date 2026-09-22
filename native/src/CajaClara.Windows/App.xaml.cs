@@ -36,6 +36,8 @@ public partial class App : Application
             var collection = new ServiceCollection();
             collection.AddSingleton(new Store(Path.Combine(DataDirectory, "caja.sqlite")));
             collection.AddSingleton<AuthService>(); collection.AddSingleton<PosService>(); collection.AddSingleton<Reports>();
+            collection.AddSingleton(new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(35) });
+            collection.AddSingleton<FiscalCoordinator>();
             collection.AddSingleton<MainViewModel>(); collection.AddSingleton<MainWindow>();
             services = collection.BuildServiceProvider(); window = services.GetRequiredService<MainWindow>();
             window.Closed += (_, _) => { services?.Dispose(); instance?.Dispose(); };
