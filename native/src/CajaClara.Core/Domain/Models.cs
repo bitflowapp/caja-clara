@@ -71,7 +71,7 @@ public sealed record Purchase(Guid Id, long Version, Guid SupplierId, Guid UserI
     DateTimeOffset At, PurchaseLine[] Lines, long TotalCents, long PaidCents,
     string Reference) : IEntity;
 public sealed record PaymentIntent(Guid Id, long Version, Guid DeviceId, Guid UserId, Guid SessionId,
-    Contact? Customer, SaleLine[] Lines, long AmountCents, string Notes, bool RequestInvoice,
+    string RequestHash, Contact? Customer, SaleLine[] Lines, long AmountCents, string Notes, bool RequestInvoice,
     string ExternalReference, string Provider, string? ProviderOrderId,
     string ProviderStatus, bool ConfirmedPaid, bool StockReleased, string Detail, string? QrData,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt) : IEntity;
