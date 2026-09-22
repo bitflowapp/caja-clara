@@ -205,6 +205,55 @@ public sealed class PosService(Store store)
         tx.Put(purchase, 0); tx.Audit(user, business.DeviceId, "PURCHASE_RECEIVED", purchase.Id, null, purchase);
         tx.Remember(requestId, hash, purchase); return purchase;
     });
+    public FiscalContext FiscalForSale(Actor actor, Guid saleId) => store.Read(tx =>
+    {
+        AuthService.Require(tx, actor, Operators);
+        var business = BusinessOf(tx);
+        var sale = tx.Required<Sale>(saleId);
+        var document = tx.All<FiscalDocument>().SingleOrDefault(x => x.SaleId == saleId)
+            ?? throw new BusinessException("La venta no tiene una solicitud fiscal.");
+        return new FiscalContext(business, sale, document);
+    });
+
+    public FiscalDocument ApplyFiscalOutcome(Actor actor, Guid documentId, long expectedVersion, FiscalOutcome outcome) => store.Write(tx =>
+    {
+        var user = AuthService.Require(tx, actor, Operators);
+        var business = BusinessOf(tx);
+        var document = tx.Required<FiscalDocument>(documentId);
+        if (document.Version != expectedVersion) throw new BusinessException("El estado fiscal cambió; actualizá antes de continuar.");
+        if (document.State == FiscalState.Authorized) throw new BusinessException("El comprobante ya fue autorizado y no puede reescribirse.");
+        if (outcome.Environment is not ("HOMOLOGACION" or "PRODUCCION") || outcome.PointOfSale is < 1 or > 99998 || outcome.VoucherType <= 0)
+            throw new BusinessException("Configuración fiscal inválida.");
+        if (outcome.Detail.Length > 2000) throw new BusinessException("Detalle fiscal demasiado largo.");
+        if (outcome.State is not (FiscalState.Authorized or FiscalState.Rejected or FiscalState.Unknown))
+            throw new BusinessException("Resultado fiscal inválido.");
+        if (outcome.State == FiscalState.Authorized &&
+            (outcome.VoucherNumber is null or <= 0 || string.IsNullOrWhiteSpace(outcome.Cae) || string.IsNullOrWhiteSpace(outcome.CaeExpiry)))
+            throw new BusinessException("Una autorización fiscal debe incluir número, CAE y vencimiento reales.");
+        if (outcome.State == FiscalState.Rejected && !string.IsNullOrWhiteSpace(outcome.Cae))
+            throw new BusinessException("Un comprobante rechazado no puede tener CAE.");
+        var sale = tx.Required<Sale>(document.SaleId);
+        var nextDocument = document with
+        {
+            Version = document.Version + 1,
+            Environment = outcome.Environment,
+            PointOfSale = outcome.PointOfSale,
+            VoucherType = outcome.VoucherType,
+            VoucherNumber = outcome.VoucherNumber,
+            State = outcome.State,
+            Cae = string.IsNullOrWhiteSpace(outcome.Cae) ? null : outcome.Cae.Trim(),
+            CaeExpiry = string.IsNullOrWhiteSpace(outcome.CaeExpiry) ? null : outcome.CaeExpiry.Trim(),
+            Detail = outcome.Detail.Trim()
+        };
+        var nextSale = sale with { Version = sale.Version + 1, FiscalState = outcome.State };
+        tx.Put(nextDocument, document.Version);
+        tx.Put(nextSale, sale.Version);
+        tx.Audit(user, business.DeviceId, "FISCAL_STATE_CHANGED", document.Id,
+            new { document.State, document.VoucherNumber },
+            new { nextDocument.State, nextDocument.VoucherNumber, nextDocument.Cae });
+        return nextDocument;
+    });
+
     public void MarkNotificationRead(Actor actor, Guid id) => store.Write(tx =>
     {
         AuthService.Require(tx, actor); var old = tx.Required<Notification>(id);
