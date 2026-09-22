@@ -8,7 +8,7 @@ namespace CajaClara.Core;
 
 public interface IEntity { Guid Id { get; } long Version { get; } }
 public enum Role { Owner, Admin, Cashier, Employee, Viewer }
-public enum PaymentMethod { Cash, Transfer, Debit, Credit, MercadoPagoManual }
+public enum PaymentMethod { Cash, Transfer, Debit, Credit, MercadoPagoManual, MercadoPagoQr }
 public enum FiscalState { NotIssued, Pending, Authorized, Rejected, Unknown }
 public enum CashState { Open, ClosingRequested, Closed }
 public enum RemoteStatus { Pending, Received, Executing, Completed, Failed, Expired, Rejected }
@@ -46,7 +46,12 @@ public sealed record SaleLine(Guid ProductId, string Code, string Name, long Qua
 public sealed record Tender(PaymentMethod Method, long AppliedCents, long ReceivedCents, string Reference)
 {
     public long ChangeCents => Method == PaymentMethod.Cash ? ReceivedCents - AppliedCents : 0;
-    public string Verification => Method == PaymentMethod.Cash ? "CASH_RECEIVED" : "MANUAL_UNVERIFIED";
+    public string Verification => Method switch
+    {
+        PaymentMethod.Cash => "CASH_RECEIVED",
+        PaymentMethod.MercadoPagoQr => "PROVIDER_CONFIRMED",
+        _ => "MANUAL_UNVERIFIED"
+    };
     public override string ToString() => Labels.Payment(Method) + " · " + Money.Format(AppliedCents) + (ChangeCents > 0 ? " · Vuelto " + Money.Format(ChangeCents) : "");
 }
 public sealed record Sale(Guid Id, long Version, long Number, Guid SessionId, Guid DeviceId,
@@ -65,6 +70,10 @@ public sealed record PurchaseLine(Guid ProductId, long QuantityMilli, long UnitC
 public sealed record Purchase(Guid Id, long Version, Guid SupplierId, Guid UserId,
     DateTimeOffset At, PurchaseLine[] Lines, long TotalCents, long PaidCents,
     string Reference) : IEntity;
+public sealed record PaymentIntent(Guid Id, long Version, Guid DeviceId, Guid UserId,
+    long AmountCents, string ExternalReference, string Provider, string? ProviderOrderId,
+    string ProviderStatus, bool ConfirmedPaid, string Detail, string? QrData,
+    DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt) : IEntity;
 public sealed record AuditEntry(Guid Id, long Version, Guid UserId, Guid DeviceId,
     DateTimeOffset At, string Action, string EntityId, string Before, string After) : IEntity;
 public sealed record Notification(Guid Id, long Version, string Title, string Detail,
