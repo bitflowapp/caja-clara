@@ -24,7 +24,8 @@ public sealed record MercadoPagoBackendConfig(MercadoPagoAppOptions? App, string
     }
 }
 
-public sealed record MercadoPagoConnectionStatus(bool BackendConfigured, bool Connected, long? ProviderUserId, DateTimeOffset? UpdatedAt);
+public sealed record MercadoPagoConnectionStatus(bool BackendConfigured, bool Connected, long? ProviderUserId, DateTimeOffset? UpdatedAt, PaymentPosBinding[] PosBindings);
+public sealed record MercadoPagoPosBindingRequest(string ExternalPosId);
 public sealed record MercadoPagoPaymentRequest(Guid PaymentIntentId, string ExternalReference, long AmountCents, string Description);
 public sealed record MercadoPagoPaymentView(Guid PaymentIntentId, string ProviderOrderId, string ExternalReference, long AmountCents, string Status, string StatusDetail, string? QrData, DateTimeOffset UpdatedAt)
 {
@@ -58,7 +59,7 @@ public sealed class MercadoPagoGateway
     public MercadoPagoConnectionStatus Status(CloudOwner owner)
     {
         var current = store.Connection(owner.TenantId);
-        return new(config.Configured, current is not null, current?.ProviderUserId, current?.UpdatedAt);
+        return new(config.Configured, current is not null, current?.ProviderUserId, current?.UpdatedAt, store.PosBindings(owner.TenantId));
     }
 
     public Uri Start(CloudOwner owner)
@@ -85,6 +86,12 @@ public sealed class MercadoPagoGateway
 
     public void Disconnect(CloudOwner owner) => store.RemoveConnection(owner);
 
+    public PaymentPosBinding BindPos(CloudOwner owner, CloudDevice device, MercadoPagoPosBindingRequest input)
+    {
+        if (device.TenantId != owner.TenantId) throw new CloudUnauthorizedException();
+        return store.SavePosBinding(owner, device.Id, input.ExternalPosId);
+    }
+
     public async Task<MercadoPagoPaymentView> CreateAsync(CloudDevice device, MercadoPagoPaymentRequest input, CancellationToken cancellationToken = default)
     {
         Validate(input);
@@ -99,7 +106,7 @@ public sealed class MercadoPagoGateway
         var provider = await orders.CreateQrAsync(token.AccessToken, new(
             input.PaymentIntentId,
             input.ExternalReference,
-            "CC-" + device.Id.ToString("N")[..20],
+            (store.PosBinding(device.TenantId, device.Id) ?? throw new BusinessException("Configurá el external_pos_id de Mercado Pago para esta caja desde Caja Clara Control.")).ExternalPosId,
             input.AmountCents,
             input.Description), cancellationToken);
         var saved = store.SaveOrder(device, input.PaymentIntentId, input.PaymentIntentId, input.ExternalReference, input.AmountCents,
