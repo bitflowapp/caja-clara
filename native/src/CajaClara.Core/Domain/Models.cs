@@ -72,6 +72,9 @@ public sealed record Notification(Guid Id, long Version, string Title, string De
 public sealed record FiscalDocument(Guid Id, long Version, Guid SaleId, string Environment,
     int PointOfSale, int VoucherType, long? VoucherNumber, FiscalState State, string? Cae,
     string? CaeExpiry, string Detail, DateTimeOffset At) : IEntity;
+public sealed record FiscalContext(Business Business, Sale Sale, FiscalDocument Document);
+public sealed record FiscalOutcome(string Environment, int PointOfSale, int VoucherType, long? VoucherNumber,
+    FiscalState State, string? Cae, string? CaeExpiry, string Detail);
 public sealed record SaleInput(Guid ProductId, long ProductVersion, long QuantityMilli,
     long DiscountCents = 0, long? OverridePriceCents = null);
 public sealed record CheckoutRequest(Guid Id, Guid? CustomerId, SaleInput[] Items,
