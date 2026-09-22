@@ -103,6 +103,7 @@ public sealed partial class MainWindow : Window
         var password = new PasswordBox { Header = "Contraseña (mínimo 12 caracteres)", MaxLength = 256 };
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(password, "login-password");
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(password, "login-password");
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(password, "login-password");
         var form = Column(); if (setup) { form.Children.Add(business); form.Children.Add(name); } form.Children.Add(user); form.Children.Add(password);
         form.Children.Add(Body(setup ? "Creá una contraseña propia. No existen usuarios ni contraseñas predeterminadas." : "Ingresá con el usuario de este comercio."));
         await FormAsync(setup ? "Bienvenido a Caja Clara" : "Iniciar sesión", form, async () =>

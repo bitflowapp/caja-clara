@@ -55,7 +55,7 @@ public sealed partial class MainWindow
         var columns = new Grid { ColumnSpacing = 18, RowSpacing = 18 };
         columns.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); columns.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
         columns.RowDefinitions.Add(new() { Height = GridLength.Auto }); columns.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        var leftCard = Card(left); var rightCard = Card(right); leftCard.Padding = new Thickness(14); rightCard.Padding = new Thickness(14); leftCard.Padding = new Thickness(14); rightCard.Padding = new Thickness(14); columns.Children.Add(leftCard); columns.Children.Add(rightCard); Grid.SetColumn(rightCard, 1);
+        var leftCard = Card(left); var rightCard = Card(right); leftCard.Padding = new Thickness(14); rightCard.Padding = new Thickness(14); leftCard.Padding = new Thickness(14); rightCard.Padding = new Thickness(14); leftCard.Padding = new Thickness(14); rightCard.Padding = new Thickness(14); columns.Children.Add(leftCard); columns.Children.Add(rightCard); Grid.SetColumn(rightCard, 1);
         columns.SizeChanged += (_, e) =>
         {
             var narrow = e.NewSize.Width < 660; Grid.SetColumn(rightCard, narrow ? 0 : 1); Grid.SetRow(rightCard, narrow ? 1 : 0);
