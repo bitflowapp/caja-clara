@@ -192,7 +192,6 @@ public sealed class MercadoPagoOrdersClient(HttpClient http)
         if (!ValidId(orderId)) throw new BusinessException("ID de order de Mercado Pago inválido.");
         using var request = Authorized(HttpMethod.Post, new Uri(Orders + "/" + Uri.EscapeDataString(orderId) + "/cancel"), accessToken);
         request.Headers.TryAddWithoutValidation("X-Idempotency-Key", idempotencyKey.ToString());
-        request.Content = JsonContent.Create(new { }, options: Json.Options);
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         return await ParseOrder(response, expectedReference, expectedAmountCents, cancellationToken);
     }
