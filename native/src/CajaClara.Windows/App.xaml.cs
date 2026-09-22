@@ -38,6 +38,7 @@ public partial class App : Application
             collection.AddSingleton<AuthService>(); collection.AddSingleton<PosService>(); collection.AddSingleton<Reports>();
             collection.AddSingleton(new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(35) });
             collection.AddSingleton<FiscalCoordinator>();
+            collection.AddSingleton<MercadoPagoRemoteClient>();
             collection.AddSingleton<MainViewModel>(); collection.AddSingleton<MainWindow>();
             services = collection.BuildServiceProvider(); window = services.GetRequiredService<MainWindow>();
             window.Closed += (_, _) => { services?.Dispose(); instance?.Dispose(); };
