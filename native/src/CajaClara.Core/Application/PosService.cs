@@ -205,26 +205,38 @@ public sealed class PosService(Store store)
         tx.Put(purchase, 0); tx.Audit(user, business.DeviceId, "PURCHASE_RECEIVED", purchase.Id, null, purchase);
         tx.Remember(requestId, hash, purchase); return purchase;
     });
-    public PaymentIntent BeginMercadoPagoIntent(Actor actor, Guid id, long amountCents) => store.Write(tx =>
+    public PaymentIntent BeginMercadoPagoIntent(Actor actor, CheckoutRequest request) => store.Write(tx =>
     {
         var user = AuthService.Require(tx, actor, Operators);
         var business = BusinessOf(tx);
-        _ = OpenCash(tx, business);
-        if (id == Guid.Empty) throw new BusinessException("Intento de pago inválido.");
-        Money.Valid(amountCents, false);
-        var existing = tx.Get<PaymentIntent>(id);
-        if (existing is not null)
+        var cash = OpenCash(tx, business);
+        if (request.Id == Guid.Empty || request.Items.Length is < 1 or > 200 || request.Notes.Length > 1000)
+            throw new BusinessException("El intento de pago tiene datos inválidos.");
+        var existing = tx.Get<PaymentIntent>(request.Id);
+        if (existing is not null) return existing;
+        if (request.Items.GroupBy(x => x.ProductId).Any(g => g.Count() > 1)) throw new BusinessException("Unificá las cantidades del mismo producto.");
+        var lines = request.Items.Select(item => SaleMath.Line(tx.Required<Product>(item.ProductId), item, user.Role is Role.Owner or Role.Admin)).ToArray();
+        var total = lines.Sum(x => x.TotalCents);
+        Money.Valid(total, false);
+        Contact? customer = request.CustomerId is Guid customerId ? tx.Required<Contact>(customerId) : null;
+        if (customer?.Supplier == true) throw new BusinessException("Seleccioná un cliente, no un proveedor.");
+
+        foreach (var line in lines)
         {
-            if (existing.DeviceId != business.DeviceId || existing.AmountCents != amountCents || existing.Provider != "MERCADOPAGO")
-                throw new BusinessException("El intento de pago ya existe con otros datos.");
-            return existing;
+            var product = tx.Required<Product>(line.ProductId);
+            var stock = checked(product.StockMilli - line.QuantityMilli);
+            if (stock < 0) throw new BusinessException($"Stock insuficiente: {product.Name}.");
+            tx.Put(product with { Version = product.Version + 1, StockMilli = stock }, product.Version);
+            tx.Put(new StockMovement(Guid.NewGuid(), 1, product.Id, user.Id, product.StockMilli, -line.QuantityMilli, stock,
+                "PAYMENT_RESERVE", "Reserva para cobro Mercado Pago QR", request.Id, tx.Now), 0);
         }
-        var value = new PaymentIntent(id, 1, business.DeviceId, user.Id, amountCents,
-            "CC_" + id.ToString("N"), "MERCADOPAGO", null, "LOCAL_CREATED", false,
-            "Intento persistido localmente; todavía no existe confirmación del proveedor.", null, tx.Now, tx.Now);
+
+        var value = new PaymentIntent(request.Id, 1, business.DeviceId, user.Id, cash.Id, customer, lines, total,
+            request.Notes.Trim(), request.RequestInvoice, "CC_" + request.Id.ToString("N"), "MERCADOPAGO", null,
+            "LOCAL_CREATED", false, false, "Stock reservado localmente; todavía no existe confirmación del proveedor.", null, tx.Now, tx.Now);
         tx.Put(value, 0);
         tx.Audit(user, business.DeviceId, "PAYMENT_INTENT_CREATED", value.Id, null,
-            new { value.Provider, value.ExternalReference, value.AmountCents });
+            new { value.Provider, value.ExternalReference, value.AmountCents, Lines = value.Lines.Length });
         return value;
     });
 
@@ -236,6 +248,7 @@ public sealed class PosService(Store store)
         var old = tx.Required<PaymentIntent>(id);
         if (old.Version != expectedVersion) throw new BusinessException("El intento de pago cambió; actualizá antes de continuar.");
         if (old.DeviceId != business.DeviceId || old.Provider != "MERCADOPAGO") throw new BusinessException("Intento de pago inválido para este equipo.");
+        if (old.StockReleased) throw new BusinessException("El intento de pago ya fue cancelado localmente.");
         if (providerOrderId.Length is < 3 or > 120 || providerStatus.Length is < 1 or > 80 || detail.Length > 1000 || (qrData?.Length ?? 0) > 10000)
             throw new BusinessException("Respuesta de pago inválida.");
         if (old.ProviderOrderId is not null && old.ProviderOrderId != providerOrderId)
@@ -258,17 +271,55 @@ public sealed class PosService(Store store)
         return next;
     });
 
-    public Tender MercadoPagoTender(Actor actor, Guid paymentIntentId, long expectedAmountCents) => store.Read(tx =>
+    public PaymentIntent CancelMercadoPagoIntent(Actor actor, Guid id, string reason) => store.Write(tx =>
     {
-        AuthService.Require(tx, actor, Operators);
+        var user = AuthService.Require(tx, actor, Operators);
         var business = BusinessOf(tx);
-        var value = tx.Required<PaymentIntent>(paymentIntentId);
-        if (value.DeviceId != business.DeviceId || value.Provider != "MERCADOPAGO")
-            throw new BusinessException("El intento de pago no pertenece a esta caja.");
-        if (value.AmountCents != expectedAmountCents) throw new BusinessException("El pago confirmado no coincide con el importe de la venta.");
-        if (!value.ConfirmedPaid || string.IsNullOrWhiteSpace(value.ProviderOrderId))
+        var old = tx.Required<PaymentIntent>(id);
+        if (old.DeviceId != business.DeviceId || old.Provider != "MERCADOPAGO") throw new BusinessException("Intento de pago inválido para este equipo.");
+        if (old.ConfirmedPaid) throw new BusinessException("El cobro ya fue confirmado; no se puede liberar el stock como si no hubiera existido.");
+        if (old.StockReleased) return old;
+        if (string.IsNullOrWhiteSpace(reason) || reason.Length > 240) throw new BusinessException("Indicá por qué se canceló el cobro.");
+        foreach (var line in old.Lines)
+        {
+            var product = tx.Required<Product>(line.ProductId);
+            var stock = checked(product.StockMilli + line.QuantityMilli);
+            if (stock > 1_000_000_000) throw new BusinessException("La liberación de stock excede el máximo permitido.");
+            tx.Put(product with { Version = product.Version + 1, StockMilli = stock }, product.Version);
+            tx.Put(new StockMovement(Guid.NewGuid(), 1, product.Id, user.Id, product.StockMilli, line.QuantityMilli, stock,
+                "PAYMENT_RESERVE_RELEASE", reason.Trim(), old.Id, tx.Now), 0);
+        }
+        var next = old with { Version = old.Version + 1, ProviderStatus = "CANCELED_LOCAL", StockReleased = true, Detail = reason.Trim(), UpdatedAt = tx.Now };
+        tx.Put(next, old.Version);
+        tx.Audit(user, business.DeviceId, "PAYMENT_INTENT_CANCELED", old.Id, new { old.ProviderStatus }, new { next.ProviderStatus });
+        return next;
+    });
+
+    public Sale FinalizeMercadoPagoSale(Actor actor, Guid paymentIntentId) => store.Write(tx =>
+    {
+        var user = AuthService.Require(tx, actor, Operators);
+        var business = BusinessOf(tx);
+        var intent = tx.Required<PaymentIntent>(paymentIntentId);
+        var previousSale = tx.Get<Sale>(paymentIntentId);
+        if (previousSale is not null) return previousSale;
+        if (intent.DeviceId != business.DeviceId || intent.Provider != "MERCADOPAGO" || intent.StockReleased)
+            throw new BusinessException("El intento de pago no puede convertirse en venta.");
+        if (!intent.ConfirmedPaid || string.IsNullOrWhiteSpace(intent.ProviderOrderId))
             throw new BusinessException("Mercado Pago todavía no confirmó el cobro.");
-        return new Tender(PaymentMethod.MercadoPagoQr, value.AmountCents, value.AmountCents, value.ProviderOrderId);
+        var cash = OpenCash(tx, business);
+        if (cash.Id != intent.SessionId) throw new BusinessException("El turno cambió mientras se esperaba el pago. Requiere revisión antes de cerrar la venta.");
+        var total = intent.Lines.Sum(x => x.TotalCents);
+        if (total != intent.AmountCents) throw new BusinessException("El snapshot comercial del pago no reconcilia.");
+        var tender = new Tender(PaymentMethod.MercadoPagoQr, total, total, intent.ProviderOrderId);
+        var sale = new Sale(intent.Id, 1, tx.NextNumber("sale"), cash.Id, business.DeviceId, user.Id, user.Name, intent.Customer,
+            tx.Now, intent.Lines, [tender], total, 0, intent.RequestInvoice ? FiscalState.Pending : FiscalState.NotIssued, intent.Notes);
+        tx.Put(sale, 0);
+        if (intent.RequestInvoice)
+            tx.Put(new FiscalDocument(Guid.NewGuid(), 1, sale.Id, "HOMOLOGACION", 0, 0, null, FiscalState.Pending, null, null,
+                "Pendiente de autorización fiscal. No constituye factura hasta obtener CAE.", tx.Now), 0);
+        tx.Audit(user, business.DeviceId, "SALE_CONFIRMED_FROM_PROVIDER_PAYMENT", sale.Id, null,
+            new { sale.Number, sale.TotalCents, Provider = intent.Provider, intent.ProviderOrderId });
+        return sale;
     });
 
     public FiscalContext FiscalForSale(Actor actor, Guid saleId) => store.Read(tx =>
