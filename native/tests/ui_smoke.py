@@ -9,7 +9,7 @@ import time
 import traceback
 import shutil
 from pathlib import Path
-from pywinauto import Application, Desktop
+from pywinauto import Application, Desktop, Desktop
 from PIL import ImageGrab
 
 root = Path(__file__).resolve().parents[1]
@@ -28,6 +28,9 @@ def passed(name):
 
 def capture(name):
     if window is not None and window.exists():
+        window.wrapper_object().capture_as_image().save(output / name)
+    else:
+        if window is not None and window.exists():
         window.wrapper_object().capture_as_image().save(output / name)
     else:
         ImageGrab.grab(all_screens=True).save(output / name)
@@ -69,6 +72,7 @@ try:
     app = Application(backend='uia').connect(process=process.pid, timeout=30)
     window = app.window(title_re='Caja Clara.*')
     window.wait('exists visible', timeout=30)
+    window.wrapper_object().maximize()
     window.wrapper_object().maximize()
     time.sleep(3)
     capture('windows-01-onboarding.png')
