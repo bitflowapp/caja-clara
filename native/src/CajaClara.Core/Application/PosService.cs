@@ -212,8 +212,13 @@ public sealed class PosService(Store store)
         var cash = OpenCash(tx, business);
         if (request.Id == Guid.Empty || request.Items.Length is < 1 or > 200 || request.Notes.Length > 1000)
             throw new BusinessException("El intento de pago tiene datos inválidos.");
+        var requestHash = Json.Hash(Json.Write(new { request.CustomerId, request.Items, request.Notes, request.RequestInvoice }));
         var existing = tx.Get<PaymentIntent>(request.Id);
-        if (existing is not null) return existing;
+        if (existing is not null)
+        {
+            if (existing.RequestHash != requestHash) throw new BusinessException("La venta cambió mientras existía un intento de pago. Recuperá o cancelá el cobro anterior.");
+            return existing;
+        }
         if (request.Items.GroupBy(x => x.ProductId).Any(g => g.Count() > 1)) throw new BusinessException("Unificá las cantidades del mismo producto.");
         var lines = request.Items.Select(item => SaleMath.Line(tx.Required<Product>(item.ProductId), item, user.Role is Role.Owner or Role.Admin)).ToArray();
         var total = lines.Sum(x => x.TotalCents);
@@ -231,12 +236,21 @@ public sealed class PosService(Store store)
                 "PAYMENT_RESERVE", "Reserva para cobro Mercado Pago QR", request.Id, tx.Now), 0);
         }
 
-        var value = new PaymentIntent(request.Id, 1, business.DeviceId, user.Id, cash.Id, customer, lines, total,
+        var value = new PaymentIntent(request.Id, 1, business.DeviceId, user.Id, cash.Id, requestHash, customer, lines, total,
             request.Notes.Trim(), request.RequestInvoice, "CC_" + request.Id.ToString("N"), "MERCADOPAGO", null,
             "LOCAL_CREATED", false, false, "Stock reservado localmente; todavía no existe confirmación del proveedor.", null, tx.Now, tx.Now);
         tx.Put(value, 0);
         tx.Audit(user, business.DeviceId, "PAYMENT_INTENT_CREATED", value.Id, null,
             new { value.Provider, value.ExternalReference, value.AmountCents, Lines = value.Lines.Length });
+        return value;
+    });
+
+    public PaymentIntent? MercadoPagoIntent(Actor actor, Guid id) => store.Read(tx =>
+    {
+        AuthService.Require(tx, actor, Operators);
+        var business = BusinessOf(tx);
+        var value = tx.Get<PaymentIntent>(id);
+        if (value is not null && value.DeviceId != business.DeviceId) throw new BusinessException("El intento de pago pertenece a otro equipo.");
         return value;
     });
 
