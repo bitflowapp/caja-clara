@@ -5,7 +5,7 @@ on:
     paths: ['native/**', '.github/workflows/caja-clara-native.yml']
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 concurrency:
   group: caja-clara-native-${{ github.ref }}
   cancel-in-progress: true
@@ -18,23 +18,6 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.401'
-      - name: Apply verified source corrections
-        shell: pwsh
-        run: |
-          python native/tools/harden_sources.py
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Get-ChildItem native/tools/fix_*.py | Sort-Object Name | ForEach-Object {
-            python $_.FullName
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
-          git config user.name 'Caja Clara build validation'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          if (git status --porcelain native/src native/tests) {
-            git add native/src native/tests
-            git commit -m 'Apply verified source and UI test corrections'
-            git push origin HEAD:work/caja-clara-native-20260921
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
       - name: Build core and execute tests
         id: core
         shell: pwsh
@@ -105,11 +88,6 @@ jobs:
         shell: pwsh
         run: |
           python native/tests/browser_e2e.py 2>&1 | Tee-Object native/artifacts/browser-tests.txt
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Finalize isolated development branch
-        shell: pwsh
-        run: |
-          python native/tools/finalize_release.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Collect package documentation
         if: always()
