@@ -5,6 +5,7 @@ namespace CajaClara.Backend;
 
 public sealed record PaymentOauthContext(Guid TenantId, Guid OwnerId, string ProtectedVerifier, DateTimeOffset ExpiresAt);
 public sealed record PaymentProviderConnection(Guid TenantId, long ProviderUserId, string ProtectedToken, DateTimeOffset UpdatedAt);
+public sealed record PaymentPosBinding(Guid TenantId, Guid DeviceId, string ExternalPosId, DateTimeOffset UpdatedAt);
 public sealed record CloudPaymentOrder(
     Guid Id,
     Guid TenantId,
@@ -33,7 +34,7 @@ public sealed class PaymentCloudStore
             using var command = connection.CreateCommand();
             command.CommandText = "PRAGMA user_version";
             var version = Convert.ToInt32(command.ExecuteScalar());
-            if (version > 1) throw new BusinessException("Base de pagos pertenece a una versión más nueva.");
+            if (version > 2) throw new BusinessException("Base de pagos pertenece a una versión más nueva.");
             if (version == 0)
             {
                 command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'";
@@ -44,9 +45,29 @@ public sealed class PaymentCloudStore
                 command.ExecuteNonQuery();
                 transaction.Commit();
                 command.Transaction = null;
+                version = 2;
             }
             command.CommandText = "PRAGMA application_id";
             if (Convert.ToInt32(command.ExecuteScalar()) != 1128481611) throw new BusinessException("Base de pagos incompatible.");
+            if (version == 1)
+            {
+                using var transaction = connection.BeginTransaction(deferred: false);
+                command.Transaction = transaction;
+                command.CommandText = """
+CREATE TABLE payment_pos_bindings(
+    tenant_id TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    external_pos_id TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(tenant_id,device_id),
+    UNIQUE(tenant_id,external_pos_id)
+);
+PRAGMA user_version=2;
+""";
+                command.ExecuteNonQuery();
+                transaction.Commit();
+                command.Transaction = null;
+            }
         }
     }
 
@@ -161,6 +182,45 @@ public sealed class PaymentCloudStore
         return reader.Read() ? new(tenantId, reader.GetInt64(0), reader.GetString(1), DateTimeOffset.Parse(reader.GetString(2))) : null;
     });
 
+    public PaymentPosBinding SavePosBinding(CloudOwner owner, Guid deviceId, string externalPosId)
+    {
+        if (deviceId == Guid.Empty) throw new BusinessException("Equipo inválido.");
+        externalPosId = externalPosId.Trim();
+        if (externalPosId.Length is < 1 or > 40 ||
+            externalPosId.Any(ch => !char.IsAsciiLetterOrDigit(ch) && ch is not '-' and not '_'))
+            throw new BusinessException("external_pos_id inválido. Usá el identificador exacto del POS creado en Mercado Pago.");
+        return Tx((connection, transaction) =>
+        {
+            var at = DateTimeOffset.UtcNow;
+            Execute(connection, transaction,
+                "INSERT INTO payment_pos_bindings(tenant_id,device_id,external_pos_id,updated_at) VALUES($tenant,$device,$external,$at) " +
+                "ON CONFLICT(tenant_id,device_id) DO UPDATE SET external_pos_id=excluded.external_pos_id,updated_at=excluded.updated_at",
+                ("$tenant", owner.TenantId.ToString()), ("$device", deviceId.ToString()), ("$external", externalPosId), ("$at", at.ToString("O")));
+            Audit(connection, transaction, owner.TenantId, owner.Id, "MP_POS_BOUND", deviceId + ":" + externalPosId);
+            return new PaymentPosBinding(owner.TenantId, deviceId, externalPosId, at);
+        });
+    }
+
+    public PaymentPosBinding? PosBinding(Guid tenantId, Guid deviceId) => Tx<PaymentPosBinding?>((connection, transaction) =>
+    {
+        using var command = Command(connection, transaction,
+            "SELECT external_pos_id,updated_at FROM payment_pos_bindings WHERE tenant_id=$tenant AND device_id=$device",
+            ("$tenant", tenantId.ToString()), ("$device", deviceId.ToString()));
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? new(tenantId, deviceId, reader.GetString(0), DateTimeOffset.Parse(reader.GetString(1))) : null;
+    });
+
+    public PaymentPosBinding[] PosBindings(Guid tenantId) => Tx((connection, transaction) =>
+    {
+        using var command = Command(connection, transaction,
+            "SELECT device_id,external_pos_id,updated_at FROM payment_pos_bindings WHERE tenant_id=$tenant ORDER BY updated_at DESC",
+            ("$tenant", tenantId.ToString()));
+        using var reader = command.ExecuteReader();
+        var values = new List<PaymentPosBinding>();
+        while (reader.Read()) values.Add(new(tenantId, Guid.Parse(reader.GetString(0)), reader.GetString(1), DateTimeOffset.Parse(reader.GetString(2))));
+        return values.ToArray();
+    });
+
     public void RemoveConnection(CloudOwner owner)
     {
         Tx((connection, transaction) =>
@@ -269,6 +329,14 @@ CREATE TABLE payment_connections(
     protected_token TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+CREATE TABLE payment_pos_bindings(
+    tenant_id TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    external_pos_id TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(tenant_id,device_id),
+    UNIQUE(tenant_id,external_pos_id)
+);
 CREATE TABLE payment_orders(
     id TEXT NOT NULL,
     tenant_id TEXT NOT NULL,
@@ -294,6 +362,6 @@ CREATE TABLE payment_audit(
     at TEXT NOT NULL
 );
 PRAGMA application_id=1128481611;
-PRAGMA user_version=1;
+PRAGMA user_version=2;
 """;
 }
