@@ -6,7 +6,8 @@ public static class Labels
     {
         PaymentMethod.Cash => "Efectivo", PaymentMethod.Transfer => "Transferencia",
         PaymentMethod.Debit => "Débito", PaymentMethod.Credit => "Crédito",
-        PaymentMethod.MercadoPagoManual => "Mercado Pago (manual)", _ => "No reconocido"
+        PaymentMethod.MercadoPagoManual => "Mercado Pago (manual)",
+        PaymentMethod.MercadoPagoQr => "Mercado Pago QR integrado", _ => "No reconocido"
     };
     public static string Fiscal(FiscalState value) => value switch
     {
