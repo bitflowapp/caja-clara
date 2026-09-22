@@ -12,8 +12,13 @@ public sealed partial class MainWindow
         var panel = Column(18); var search = Input("Filtrar productos");
         var list = new ListView { ItemsSource = vm.Snapshot?.Products.OrderBy(x => x.Name).ToArray(), DisplayMemberPath = "Display", Height = 460 };
         search.TextChanged += (_, _) => list.ItemsSource = vm.Snapshot?.Products.Where(x => x.Name.Contains(search.Text, StringComparison.OrdinalIgnoreCase) || x.Code.Contains(search.Text, StringComparison.OrdinalIgnoreCase) || x.Barcode.Contains(search.Text, StringComparison.Ordinal)).OrderBy(x => x.Name).ToArray();
-        panel.Children.Add(search); panel.Children.Add(list);
-        if (!vm.CanManage) { panel.Children.Add(Body("Catálogo en modo consulta.")); return panel; }
+        panel.Children.Add(search);
+        if (!vm.CanManage)
+        {
+            panel.Children.Add(list);
+            panel.Children.Add(Body("Catálogo en modo consulta."));
+            return panel;
+        }
         Product Selected() => list.SelectedItem as Product ?? throw new BusinessException("Seleccioná un producto.");
         panel.Children.Add(Row(Button("Nuevo producto", () => ProductFormAsync(null), true), Button("Editar", () => ProductFormAsync(Selected())), Button("Ajustar stock", async () =>
         {
@@ -25,6 +30,8 @@ public sealed partial class MainWindow
                 var adjustment = new StockAdjustment(p.Id, p.Version, delta, reason.Text); await Task.Run(() => vm.Pos.AdjustStock(vm.User, adjustment));
             })) await Navigate("products");
         })));
+        })));
+        panel.Children.Add(list);
         panel.Children.Add(Row(Button("Exportar catálogo XLSX", async () =>
         {
             var path = await SavePathAsync("Productos-CajaClara", ".xlsx"); if (path is null) return;
