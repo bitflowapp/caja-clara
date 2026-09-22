@@ -14,6 +14,7 @@ public sealed partial class MainWindow : Window
 {
     private readonly MainViewModel vm;
     private readonly FiscalCoordinator fiscal;
+    private readonly MercadoPagoRemoteClient mercadoPago;
     private readonly Grid root = new();
     private readonly NavigationView nav = new() { IsSettingsVisible = false, IsBackButtonVisible = NavigationViewBackButtonVisible.Collapsed, PaneDisplayMode = NavigationViewPaneDisplayMode.Auto, OpenPaneLength = 218 };
     private readonly InfoBar message = new() { IsClosable = true, Margin = new Thickness(20, 8, 20, 8) };
@@ -34,9 +35,9 @@ public sealed partial class MainWindow : Window
     private ComboBox? customerBox;
     private TextBox? saleNotes;
     private CheckBox? fiscalPending;
-    public MainWindow(MainViewModel vm, FiscalCoordinator fiscal)
+    public MainWindow(MainViewModel vm, FiscalCoordinator fiscal, MercadoPagoRemoteClient mercadoPago)
     {
-        this.vm = vm; this.fiscal = fiscal; Title = "Caja Clara · Tu negocio, claro.";
+        this.vm = vm; this.fiscal = fiscal; this.mercadoPago = mercadoPago; Title = "Caja Clara · Tu negocio, claro.";
         var display = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(AppWindow.Id, Microsoft.UI.Windowing.DisplayAreaFallback.Primary);
         var work = display.WorkArea;
         var width = Math.Min(1360, Math.Max(640, work.Width - 32));
