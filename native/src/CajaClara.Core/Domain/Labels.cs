@@ -22,5 +22,7 @@ public static class Labels
 }
 public sealed record PaymentChoice(PaymentMethod Value, string Label)
 {
-    public static PaymentChoice[] All => Enum.GetValues<PaymentMethod>().Select(x => new PaymentChoice(x, Labels.Payment(x))).ToArray();
+    public static PaymentChoice[] All => Enum.GetValues<PaymentMethod>()
+        .Where(x => x != PaymentMethod.MercadoPagoQr)
+        .Select(x => new PaymentChoice(x, Labels.Payment(x))).ToArray();
 }
