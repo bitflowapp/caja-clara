@@ -205,6 +205,72 @@ public sealed class PosService(Store store)
         tx.Put(purchase, 0); tx.Audit(user, business.DeviceId, "PURCHASE_RECEIVED", purchase.Id, null, purchase);
         tx.Remember(requestId, hash, purchase); return purchase;
     });
+    public PaymentIntent BeginMercadoPagoIntent(Actor actor, Guid id, long amountCents) => store.Write(tx =>
+    {
+        var user = AuthService.Require(tx, actor, Operators);
+        var business = BusinessOf(tx);
+        _ = OpenCash(tx, business);
+        if (id == Guid.Empty) throw new BusinessException("Intento de pago inválido.");
+        Money.Valid(amountCents, false);
+        var existing = tx.Get<PaymentIntent>(id);
+        if (existing is not null)
+        {
+            if (existing.DeviceId != business.DeviceId || existing.AmountCents != amountCents || existing.Provider != "MERCADOPAGO")
+                throw new BusinessException("El intento de pago ya existe con otros datos.");
+            return existing;
+        }
+        var value = new PaymentIntent(id, 1, business.DeviceId, user.Id, amountCents,
+            "CC_" + id.ToString("N"), "MERCADOPAGO", null, "LOCAL_CREATED", false,
+            "Intento persistido localmente; todavía no existe confirmación del proveedor.", null, tx.Now, tx.Now);
+        tx.Put(value, 0);
+        tx.Audit(user, business.DeviceId, "PAYMENT_INTENT_CREATED", value.Id, null,
+            new { value.Provider, value.ExternalReference, value.AmountCents });
+        return value;
+    });
+
+    public PaymentIntent UpdateMercadoPagoIntent(Actor actor, Guid id, long expectedVersion, string providerOrderId,
+        string providerStatus, bool confirmedPaid, string detail, string? qrData) => store.Write(tx =>
+    {
+        var user = AuthService.Require(tx, actor, Operators);
+        var business = BusinessOf(tx);
+        var old = tx.Required<PaymentIntent>(id);
+        if (old.Version != expectedVersion) throw new BusinessException("El intento de pago cambió; actualizá antes de continuar.");
+        if (old.DeviceId != business.DeviceId || old.Provider != "MERCADOPAGO") throw new BusinessException("Intento de pago inválido para este equipo.");
+        if (providerOrderId.Length is < 3 or > 120 || providerStatus.Length is < 1 or > 80 || detail.Length > 1000 || (qrData?.Length ?? 0) > 10000)
+            throw new BusinessException("Respuesta de pago inválida.");
+        if (old.ProviderOrderId is not null && old.ProviderOrderId != providerOrderId)
+            throw new BusinessException("El proveedor cambió el identificador de una order existente.");
+        if (old.ConfirmedPaid && !confirmedPaid)
+            throw new BusinessException("Un pago confirmado no puede volver a estado pendiente.");
+        var next = old with
+        {
+            Version = old.Version + 1,
+            ProviderOrderId = providerOrderId,
+            ProviderStatus = providerStatus,
+            ConfirmedPaid = old.ConfirmedPaid || confirmedPaid,
+            Detail = detail.Trim(),
+            QrData = qrData ?? old.QrData,
+            UpdatedAt = tx.Now
+        };
+        tx.Put(next, old.Version);
+        tx.Audit(user, business.DeviceId, confirmedPaid && !old.ConfirmedPaid ? "PAYMENT_CONFIRMED" : "PAYMENT_STATE_CHANGED", old.Id,
+            new { old.ProviderStatus, old.ConfirmedPaid }, new { next.ProviderStatus, next.ConfirmedPaid, next.ProviderOrderId });
+        return next;
+    });
+
+    public Tender MercadoPagoTender(Actor actor, Guid paymentIntentId, long expectedAmountCents) => store.Read(tx =>
+    {
+        AuthService.Require(tx, actor, Operators);
+        var business = BusinessOf(tx);
+        var value = tx.Required<PaymentIntent>(paymentIntentId);
+        if (value.DeviceId != business.DeviceId || value.Provider != "MERCADOPAGO")
+            throw new BusinessException("El intento de pago no pertenece a esta caja.");
+        if (value.AmountCents != expectedAmountCents) throw new BusinessException("El pago confirmado no coincide con el importe de la venta.");
+        if (!value.ConfirmedPaid || string.IsNullOrWhiteSpace(value.ProviderOrderId))
+            throw new BusinessException("Mercado Pago todavía no confirmó el cobro.");
+        return new Tender(PaymentMethod.MercadoPagoQr, value.AmountCents, value.AmountCents, value.ProviderOrderId);
+    });
+
     public FiscalContext FiscalForSale(Actor actor, Guid saleId) => store.Read(tx =>
     {
         AuthService.Require(tx, actor, Operators);
