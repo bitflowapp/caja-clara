@@ -30,7 +30,6 @@ public sealed partial class MainWindow
                 var adjustment = new StockAdjustment(p.Id, p.Version, delta, reason.Text); await Task.Run(() => vm.Pos.AdjustStock(vm.User, adjustment));
             })) await Navigate("products");
         })));
-        })));
         panel.Children.Add(list);
         panel.Children.Add(Row(Button("Exportar catálogo XLSX", async () =>
         {
