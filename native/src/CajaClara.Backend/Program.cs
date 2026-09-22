@@ -179,6 +179,12 @@ ownerApi.MapGet("/dashboard", (HttpContext context, DateTimeOffset from, DateTim
 ownerApi.MapGet("/integrations/mercadopago", (HttpContext context) => Results.Ok(mercadoPago.Status(Owner(context))));
 ownerApi.MapPost("/integrations/mercadopago/connect", (HttpContext context) =>
     Results.Ok(new { authorizationUrl = mercadoPago.Start(Owner(context)).ToString() }));
+ownerApi.MapPut("/integrations/mercadopago/pos/{deviceId:guid}", (HttpContext context, Guid deviceId, MercadoPagoPosBindingRequest input) =>
+{
+    var owner = Owner(context);
+    var device = store.DeviceForOwner(owner, deviceId);
+    return Results.Ok(mercadoPago.BindPos(owner, device, input));
+});
 ownerApi.MapDelete("/integrations/mercadopago", (HttpContext context) => { mercadoPago.Disconnect(Owner(context)); return Results.NoContent(); });
 ownerApi.MapPost("/pair-code", (HttpContext context) => Results.Ok(new { code = store.CreatePairCode(Owner(context)), expiresInSeconds = 300 }));
 ownerApi.MapPost("/commands", (HttpContext context, CreateCommand command) => Results.Ok(store.Enqueue(Owner(context), command)));
