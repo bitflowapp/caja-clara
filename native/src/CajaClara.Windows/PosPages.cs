@@ -116,14 +116,38 @@ public sealed partial class MainWindow
         remove.Click += (_, _) => { if (paymentList.SelectedItem is Tender tender) payments.Remove(tender); var remaining = total - payments.Sum(x => x.AppliedCents); applied.Text = DecimalText(remaining); received.Text = DecimalText(remaining); info.Text = "Pendiente: " + Money.Format(remaining); };
         var form = Column(Heading(Money.Format(total), 34), Body("Los medios electrónicos se registran manualmente. Caja Clara no confirma ni debita fondos en esta pantalla."), method, applied, received, reference, manual, Row(add, remove), paymentList, info, localError);
         Sale? confirmed = null;
+        var requestedInvoice = false;
         var success = await FormAsync("Cobrar venta", form, async () =>
         {
             if (payments.Count == 0) throw new BusinessException("Agregá al menos un medio de pago.");
-            confirmed = await vm.CheckoutAsync((customerBox?.SelectedItem as Contact)?.Id, payments.ToArray(), saleNotes?.Text ?? "", fiscalPending?.IsChecked == true);
+            requestedInvoice = fiscalPending?.IsChecked == true;
+            confirmed = await vm.CheckoutAsync((customerBox?.SelectedItem as Contact)?.Id, payments.ToArray(), saleNotes?.Text ?? "", requestedInvoice);
         }, "Confirmar venta");
         if (success && confirmed is not null)
         {
-            await Navigate("pos"); Notify($"Venta #{confirmed.Number:000000} guardada. Vuelto: {Money.Format(confirmed.ChangeCents)}. El comprobante está en Ventas.");
+            var notice = $"Venta #{confirmed.Number:000000} guardada. Vuelto: {Money.Format(confirmed.ChangeCents)}.";
+            if (requestedInvoice)
+            {
+                if (!fiscal.Configured) notice += " Facturación pendiente: configurá ARCA.";
+                else
+                {
+                    try
+                    {
+                        var document = await fiscal.ProcessSaleAsync(vm.User, confirmed.Id, lifetime.Token);
+                        notice += document.State == FiscalState.Authorized
+                            ? $" Factura autorizada · PV {document.PointOfSale} · Nº {document.VoucherNumber} · CAE {document.Cae}."
+                            : " La solicitud fiscal quedó preservada para revisión.";
+                    }
+                    catch (Exception error) when (error is BusinessException or HttpRequestException or TaskCanceledException)
+                    {
+                        App.SafeLog("FISCAL_AFTER_SALE_PENDING", error);
+                        notice += " Venta confirmada; facturación pendiente: " + error.Message;
+                    }
+                }
+            }
+            await Navigate("pos");
+            Notify(notice, requestedInvoice && (vm.Snapshot?.Invoices.FirstOrDefault(x => x.SaleId == confirmed.Id)?.State != FiscalState.Authorized)
+                ? InfoBarSeverity.Warning : InfoBarSeverity.Success);
         }
     }
     private UIElement BuildDashboard()
