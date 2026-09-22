@@ -151,6 +151,22 @@ public sealed class CloudStore
         using var command = Command(c, t, "SELECT id,tenant_id,business_id,name,active,expires_at,last_seen FROM devices WHERE tenant_id=$tenant ORDER BY name", ("$tenant", tenant.ToString()));
         using var reader = command.ExecuteReader(); var result = new List<CloudDevice>(); while (reader.Read()) result.Add(DeviceRow(reader)); return result.ToArray();
     }
+    public CloudDevice DeviceForOwner(CloudOwner owner, Guid deviceId)
+    {
+        RequireOwner(owner);
+        return Tx((c, t) =>
+        {
+            using var command = Command(c, t,
+                "SELECT id,tenant_id,business_id,name,active,expires_at,last_seen FROM devices WHERE tenant_id=$tenant AND id=$id",
+                ("$tenant", owner.TenantId.ToString()), ("$id", deviceId.ToString()));
+            using var reader = command.ExecuteReader();
+            if (!reader.Read()) throw new BusinessException("Equipo inexistente.");
+            var device = DeviceRow(reader);
+            if (!device.Active || device.ExpiresAt <= DateTimeOffset.UtcNow) throw new BusinessException("El equipo no está autorizado.");
+            return device;
+        });
+    }
+
     public void Revoke(CloudOwner owner, Guid deviceId)
     {
         RequireOwner(owner); Tx((c, t) =>
