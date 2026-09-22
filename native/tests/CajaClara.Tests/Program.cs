@@ -62,6 +62,43 @@ Test("remote_expired_not_executed", () => { using var f = new Fixture(); var com
 Test("remote_arbitrary_command_rejected", () => { using var f = new Fixture(); Equal(new RemoteExecutor(f.Store).ExecuteSafely(f.Command("RUN_SHELL", "{}" )).Status, RemoteStatus.Rejected); });
 Test("remote_stale_command_rejected", () => { using var f = new Fixture(); var p = f.Pos.SaveProduct(f.Owner, Product(), 0); var command = f.Command("UPDATE_PRODUCT_PRICE", Json.Write(new PriceCommand(p.Id, 99, 15000))); Equal(new RemoteExecutor(f.Store).ExecuteSafely(command).Status, RemoteStatus.Rejected); Equal(f.Pos.Snapshot(f.Owner).Products.Single().PriceCents, 12100L); });
 Test("remote_closing_does_not_close_cash", () => { using var f = new Fixture(); f.Pos.OpenRegister(f.Owner, 0); Equal(new RemoteExecutor(f.Store).ExecuteSafely(f.Command("REQUEST_CASH_CLOSING", "{}" )).Status, RemoteStatus.Completed); Equal(f.Pos.Snapshot(f.Owner).Cash?.State, CashState.ClosingRequested); });
+Test("mp_intent_reserves_stock_before_provider", () =>
+{
+    using var f = new Fixture(); var p = f.Pos.SaveProduct(f.Owner, Product(), 0); f.Pos.OpenRegister(f.Owner, 0);
+    var id = Guid.NewGuid(); var request = new CheckoutRequest(id, null, [new(p.Id, p.Version, 1000)], [], "QR", false);
+    var intent = f.Pos.BeginMercadoPagoIntent(f.Owner, request);
+    Equal(intent.AmountCents, 12100L); Equal(f.Pos.Snapshot(f.Owner).Products.Single().StockMilli, 19000L);
+    Equal(f.Pos.History<StockMovement>(f.Owner).Count(x => x.Kind == "PAYMENT_RESERVE"), 1);
+});
+Test("mp_cancel_releases_reserved_stock_once", () =>
+{
+    using var f = new Fixture(); var p = f.Pos.SaveProduct(f.Owner, Product(), 0); f.Pos.OpenRegister(f.Owner, 0);
+    var id = Guid.NewGuid(); var request = new CheckoutRequest(id, null, [new(p.Id, p.Version, 1000)], [], "QR", false);
+    var intent = f.Pos.BeginMercadoPagoIntent(f.Owner, request);
+    var canceled = f.Pos.CancelMercadoPagoIntent(f.Owner, intent.Id, "Order cancelada sin pago");
+    Equal(canceled.StockReleased, true); Equal(f.Pos.Snapshot(f.Owner).Products.Single().StockMilli, 20000L);
+    Equal(f.Pos.CancelMercadoPagoIntent(f.Owner, intent.Id, "Segundo intento").Version, canceled.Version);
+});
+Test("mp_paid_intent_finalizes_snapshot_without_double_stock", () =>
+{
+    using var f = new Fixture(); var p = f.Pos.SaveProduct(f.Owner, Product(), 0); f.Pos.OpenRegister(f.Owner, 0);
+    var id = Guid.NewGuid(); var request = new CheckoutRequest(id, null, [new(p.Id, p.Version, 1000)], [], "QR", true);
+    var intent = f.Pos.BeginMercadoPagoIntent(f.Owner, request);
+    intent = f.Pos.UpdateMercadoPagoIntent(f.Owner, intent.Id, intent.Version, "ORDER-123", "processed", true, "accredited", "qr");
+    var sale = f.Pos.FinalizeMercadoPagoSale(f.Owner, intent.Id);
+    Equal(sale.Id, id); Equal(sale.TotalCents, 12100L); Equal(sale.Payments.Single().Method, PaymentMethod.MercadoPagoQr);
+    Equal(sale.Payments.Single().Verification, "PROVIDER_CONFIRMED");
+    Equal(f.Pos.Snapshot(f.Owner).Products.Single().StockMilli, 19000L);
+    Equal(f.Pos.Snapshot(f.Owner).Invoices.Single().SaleId, sale.Id);
+    Equal(f.Pos.FinalizeMercadoPagoSale(f.Owner, intent.Id).Number, sale.Number);
+});
+Test("mp_retry_rejects_changed_checkout_snapshot", () =>
+{
+    using var f = new Fixture(); var p = f.Pos.SaveProduct(f.Owner, Product(), 0); f.Pos.OpenRegister(f.Owner, 0);
+    var id = Guid.NewGuid(); var request = new CheckoutRequest(id, null, [new(p.Id, p.Version, 1000)], [], "original", false);
+    f.Pos.BeginMercadoPagoIntent(f.Owner, request);
+    Reject(() => f.Pos.BeginMercadoPagoIntent(f.Owner, request with { Notes = "cambiado" }));
+});
 Test("backup_integrity_and_manifest", () => { using var f = new Fixture(); var backup = f.Store.Backup(Path.Combine(f.Directory, "backup")); var manifest = Store.ValidateBackup(backup); Equal(manifest.BusinessId, f.Pos.Snapshot(f.Owner).Business?.Id); });
 Test("tampered_backup_rejected", () => { using var f = new Fixture(); var backup = f.Store.Backup(Path.Combine(f.Directory, "backup")); File.AppendAllText(backup, "changed"); Reject(() => Store.ValidateBackup(backup)); });
 Test("pdf_is_real_and_non_fiscal", () => { using var f = new Fixture(); var p = f.Pos.SaveProduct(f.Owner, Product(), 0); f.Pos.OpenRegister(f.Owner, 0); var sale = f.Pos.Checkout(f.Owner, Request(p)); var lines = Receipt.Lines(f.Pos.Snapshot(f.Owner).Business!, sale); if (!lines.Any(x => x.Contains("NO FISCAL"))) throw new Exception("Missing disclaimer"); var path = Path.Combine(output, "test-receipt.pdf"); Receipt.Pdf(path, lines); Equal(System.Text.Encoding.ASCII.GetString(File.ReadAllBytes(path)[..8]), "%PDF-1.4"); });
