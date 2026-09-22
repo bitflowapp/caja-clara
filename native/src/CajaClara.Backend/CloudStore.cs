@@ -22,7 +22,7 @@ public sealed class CloudStore
     private readonly object gate = new();
     private readonly string path;
     private static readonly string DummyHash = Passwords.Hash(Convert.ToHexString(RandomNumberGenerator.GetBytes(20)));
-    private static readonly HashSet<string> Kinds = [nameof(Business), nameof(Product), nameof(Contact), nameof(CashSession), nameof(CashMovement), nameof(StockMovement), nameof(Sale), nameof(Refund), nameof(Purchase), nameof(AuditEntry), nameof(Notification), nameof(FiscalDocument)];
+    private static readonly HashSet<string> Kinds = [nameof(Business), nameof(Product), nameof(Contact), nameof(CashSession), nameof(CashMovement), nameof(StockMovement), nameof(Sale), nameof(Refund), nameof(Purchase), nameof(AuditEntry), nameof(Notification), nameof(FiscalDocument), nameof(PaymentIntent)];
     public CloudStore(string path)
     {
         this.path = Path.GetFullPath(path); Directory.CreateDirectory(Path.GetDirectoryName(this.path)!);
