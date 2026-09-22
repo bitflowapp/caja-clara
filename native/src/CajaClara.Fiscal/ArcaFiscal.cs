@@ -89,7 +89,7 @@ public static class ArcaCertificate
         var certificate = X509CertificateLoader.LoadPkcs12(pkcs12, password,
             X509KeyStorageFlags.EphemeralKeySet | X509KeyStorageFlags.Exportable);
         if (!certificate.HasPrivateKey) { certificate.Dispose(); throw new BusinessException("El certificado ARCA no contiene clave privada."); }
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTime.UtcNow;
         if (certificate.NotBefore.ToUniversalTime() > now || certificate.NotAfter.ToUniversalTime() <= now)
         { certificate.Dispose(); throw new BusinessException("El certificado ARCA está fuera de vigencia."); }
         return certificate;
