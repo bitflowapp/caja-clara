@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup><AssemblyName>CajaClara.Backend</AssemblyName></PropertyGroup>
-  <ItemGroup><ProjectReference Include="../CajaClara.Core/CajaClara.Core.csproj" /></ItemGroup>
+  <ItemGroup>\n    <ProjectReference Include="../CajaClara.Core/CajaClara.Core.csproj" />\n    <ProjectReference Include="../CajaClara.Payments/CajaClara.Payments.csproj" />\n  </ItemGroup>
   <ItemGroup><EmbeddedResource Include="schema.sql" /></ItemGroup>
 </Project>
