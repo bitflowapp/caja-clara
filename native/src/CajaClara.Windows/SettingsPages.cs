@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using CajaClara.Core;
+using CajaClara.Fiscal;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -94,13 +95,17 @@ public sealed partial class MainWindow
                 var width = new ComboBox { Header = "Ancho en milímetros", ItemsSource = new[] { 58, 80, 210 }, SelectedItem = current.WidthMm, MinWidth = 240 };
                 await FormAsync("Impresión", Column(selected, width), () => { new PrinterPreferences(selected.SelectedItem?.ToString() ?? "", (int)(width.SelectedItem ?? 80)).Save(); return Task.CompletedTask; });
             }))));
-            panel.Children.Add(Card(Column(Heading("Facturación y pagos integrados", 20), Body("Los cobros electrónicos de esta edición son registros manuales. La cola fiscal conserva solicitudes pendientes sin generar CAE ni numeración ficticia. La emisión ARCA y la conciliación Mercado Pago no están habilitadas para producción."),
-                Button("Ver documentos pendientes", async () =>
+            panel.Children.Add(Card(Column(Heading("Facturación electrónica ARCA", 20),
+                Body(FiscalSummaryText()),
+                Row(Button("Configurar ARCA", ConfigureFiscalAsync, true), Button("Procesar cola fiscal", ProcessFiscalQueueAsync)),
+                Button("Ver documentos fiscales", async () =>
                 {
-                    var documents = vm.Snapshot?.Invoices ?? [];
-                    var detail = documents.Length == 0 ? "No hay solicitudes fiscales pendientes." : string.Join("\n\n", documents.Select(x => $"{x.At.ToLocalTime():g} · {x.State}\nVenta {x.SaleId}\n{x.Detail}"));
-                    await FormAsync("Cola fiscal", Column(Body(detail)), () => Task.CompletedTask, "Cerrar");
-                }))));
+                    var documents = vm.Snapshot?.Invoices.OrderByDescending(x => x.At).ToArray() ?? [];
+                    var detail = documents.Length == 0 ? "No hay solicitudes fiscales." : string.Join("\n\n", documents.Select(x =>
+                        $"{x.At.ToLocalTime():g} · {Labels.Fiscal(x.State)}\nPV {x.PointOfSale} · Tipo {x.VoucherType} · Nº {x.VoucherNumber?.ToString() ?? "—"}\nCAE: {x.Cae ?? "—"}\n{x.Detail}"));
+                    await FormAsync("Documentos fiscales", Column(Body(detail)), () => Task.CompletedTask, "Cerrar");
+                }),
+                Body("Una venta se guarda primero en SQLite. Si pedís factura y ARCA está configurado, Caja Clara intenta autorizarla después; un error de red nunca borra la venta ni inventa un CAE."))));
             panel.Children.Add(Card(Column(Heading("Copias de seguridad", 20), Body("Respaldo SQLite consistente, verificación SHA-256 y rotación automática. Los datos están separados de los archivos del programa."),
                 Row(Button("Crear respaldo", async () =>
                 {
@@ -117,11 +122,117 @@ public sealed partial class MainWindow
         panel.Children.Add(Card(Column(Heading("Diagnóstico", 20), Body("Las comprobaciones distinguen componentes instalados de servicios realmente verificados."), Button("Ejecutar comprobaciones", async () =>
         {
             var integrity = await Task.Run(vm.Store.Integrity); var settings = PrinterPreferences.Load(); var names = WindowsPrinter.Names();
-            var text = $"Base local: {integrity}\nEventos pendientes: {vm.Snapshot?.PendingSync}\nServidor: {sync?.Health.Status ?? "SIN CONFIGURAR"}\nÚltima sincronización confirmada: {sync?.Health.LastSuccess?.ToLocalTime().ToString("g") ?? "NINGUNA"}\nImpresora: {(names.Contains(settings.PrinterName) ? "CONTROLADOR INSTALADO; SALIDA FÍSICA NO VERIFICADA" : "SIN CONFIGURAR")}\nARCA: NO HABILITADO\nMercado Pago integrado: NO HABILITADO\nDatos: {App.DataDirectory}";
+            var text = $"Base local: {integrity}\nEventos pendientes: {vm.Snapshot?.PendingSync}\nServidor: {sync?.Health.Status ?? "SIN CONFIGURAR"}\nÚltima sincronización confirmada: {sync?.Health.LastSuccess?.ToLocalTime().ToString("g") ?? "NINGUNA"}\nImpresora: {(names.Contains(settings.PrinterName) ? "CONTROLADOR INSTALADO; SALIDA FÍSICA NO VERIFICADA" : "SIN CONFIGURAR")}\nARCA: {(fiscal.Configured ? "CONFIGURADO; validar homologación/producción y certificado" : "SIN CONFIGURAR")}\nMercado Pago integrado: {(sync is null ? "PANEL REMOTO NO VINCULADO" : "PROVEEDOR SERVER-SIDE DISPONIBLE; estado de cuenta se valida en el panel")}\nDatos: {App.DataDirectory}";
             await FormAsync("Diagnóstico de Caja Clara", Column(Body(text)), () => Task.CompletedTask, "Cerrar");
         }))));
         return panel;
     }
+    private string FiscalSummaryText()
+    {
+        try
+        {
+            var value = FiscalSecrets.Summary();
+            if (value is null) return "ARCA sin configurar. Las ventas que pidan factura quedarán pendientes hasta importar el certificado y definir punto de venta.";
+            var voucher = value.VoucherType switch { 1 => "Factura A", 6 => "Factura B", 11 => "Factura C", _ => "Tipo " + value.VoucherType };
+            return $"ARCA {value.Environment} · CUIT {value.Cuit} · Punto de venta {value.PointOfSale} · {voucher}. El certificado y su contraseña se guardan cifrados para este usuario de Windows.";
+        }
+        catch (BusinessException error) { return "Configuración fiscal bloqueada: " + error.Message; }
+    }
+
+    private async Task ConfigureFiscalAsync()
+    {
+        FiscalDeviceSettings? current = null;
+        try { current = FiscalSecrets.Load(); } catch (BusinessException) { }
+        var business = vm.Snapshot?.Business ?? throw new BusinessException("Sin comercio.");
+        var cuit = Input("CUIT emisor", current?.Cuit.ToString() ?? business.TaxId);
+        var point = Input("Punto de venta electrónico", current?.PointOfSale.ToString() ?? "");
+        var environment = new ComboBox
+        {
+            Header = "Ambiente",
+            ItemsSource = Enum.GetValues<ArcaEnvironment>(),
+            SelectedItem = current?.Environment ?? ArcaEnvironment.Homologacion,
+            MinWidth = 260
+        };
+        var voucher = new ComboBox
+        {
+            Header = "Comprobante por defecto",
+            ItemsSource = new[] { "Factura A · 1", "Factura B · 6", "Factura C · 11" },
+            SelectedIndex = current?.DefaultVoucherType switch { 1 => 0, 6 => 1, 11 => 2, _ => 1 },
+            MinWidth = 260
+        };
+        var certificateState = Body(current is null ? "Certificado: no importado." : "Certificado: ya guardado y protegido. Elegí otro archivo solo para reemplazarlo.");
+        string? certificatePath = null;
+        var choose = Button("Elegir certificado .pfx", async () =>
+        {
+            certificatePath = await OpenPathAsync(".pfx");
+            certificateState.Text = certificatePath is null ? certificateState.Text : "Certificado seleccionado: " + Path.GetFileName(certificatePath);
+        });
+        var password = new PasswordBox { Header = current is null ? "Contraseña del certificado" : "Contraseña nueva (vacío conserva la actual)", MaxLength = 256 };
+        var production = new CheckBox { Content = "Entiendo que PRODUCCIÓN puede emitir comprobantes fiscales reales" };
+        var saved = await FormAsync("Facturación electrónica ARCA",
+            Column(Body("Usá HOMOLOGACIÓN hasta completar pruebas con tu CUIT y punto de venta. Caja Clara nunca convierte un ticket en factura sin respuesta de ARCA."),
+                cuit, point, environment, voucher, certificateState, choose, password, production),
+            async () =>
+            {
+                var digits = new string(cuit.Text.Where(char.IsAsciiDigit).ToArray());
+                if (!long.TryParse(digits, out var parsedCuit) || digits.Length != 11 || !PosService.ValidCuit(digits))
+                    throw new BusinessException("CUIT emisor inválido.");
+                if (!int.TryParse(point.Text, out var parsedPoint)) throw new BusinessException("Punto de venta inválido.");
+                var selectedEnvironment = environment.SelectedItem is ArcaEnvironment env ? env : ArcaEnvironment.Homologacion;
+                if (selectedEnvironment == ArcaEnvironment.Produccion && production.IsChecked != true)
+                    throw new BusinessException("Confirmá explícitamente el uso del ambiente PRODUCCIÓN.");
+                var voucherType = voucher.SelectedIndex switch { 0 => 1, 1 => 6, 2 => 11, _ => throw new BusinessException("Elegí el tipo de factura.") };
+                var certificate = current?.CertificateBase64 ?? "";
+                var certificatePassword = current?.CertificatePassword ?? "";
+                if (certificatePath is not null)
+                {
+                    certificate = Convert.ToBase64String(await File.ReadAllBytesAsync(certificatePath));
+                    if (string.IsNullOrEmpty(password.Password)) throw new BusinessException("Ingresá la contraseña del certificado nuevo.");
+                    certificatePassword = password.Password;
+                }
+                else if (!string.IsNullOrEmpty(password.Password)) certificatePassword = password.Password;
+                var next = new FiscalDeviceSettings(parsedCuit, parsedPoint, voucherType, selectedEnvironment, certificate, certificatePassword);
+                await Task.Run(() => FiscalSecrets.Save(next));
+                password.Password = "";
+            }, "Guardar configuración");
+        if (saved) { await Navigate("settings"); Notify("Configuración fiscal guardada de forma protegida."); }
+    }
+
+    private async Task ProcessFiscalQueueAsync()
+    {
+        if (!fiscal.Configured) throw new BusinessException("Configurá ARCA antes de procesar la cola.");
+        await vm.RefreshAsync();
+        var documents = vm.Snapshot?.Invoices.Where(x => x.State is FiscalState.Pending or FiscalState.Unknown).OrderBy(x => x.At).Take(20).ToArray() ?? [];
+        if (documents.Length == 0) { Notify("No hay documentos fiscales pendientes."); return; }
+        var completed = 0;
+        foreach (var document in documents)
+        {
+            try
+            {
+                var result = await fiscal.ProcessSaleAsync(vm.User, document.SaleId, lifetime.Token);
+                if (result.State == FiscalState.Authorized) completed++;
+                else if (result.State == FiscalState.Rejected)
+                {
+                    Notify($"ARCA rechazó un comprobante. Venta {document.SaleId}: {result.Detail}", InfoBarSeverity.Warning);
+                    break;
+                }
+                else
+                {
+                    Notify($"Resultado fiscal todavía no confirmado. Venta {document.SaleId}: {result.Detail}", InfoBarSeverity.Warning);
+                    break;
+                }
+            }
+            catch (Exception error) when (error is BusinessException or HttpRequestException or TaskCanceledException)
+            {
+                App.SafeLog("FISCAL_QUEUE_PAUSED", error);
+                Notify("La cola fiscal quedó preservada: " + error.Message, InfoBarSeverity.Warning);
+                break;
+            }
+        }
+        await vm.RefreshAsync();
+        if (completed > 0) Notify($"{completed} comprobante(s) autorizados por ARCA.");
+    }
+
     private async Task UsersAsync()
     {
         var users = await Task.Run(() => vm.Auth.Users(vm.User));
