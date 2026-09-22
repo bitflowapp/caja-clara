@@ -28,6 +28,11 @@ public sealed record MercadoPagoConnectionStatus(bool BackendConfigured, bool Co
 public sealed record MercadoPagoPaymentRequest(Guid PaymentIntentId, string ExternalReference, long AmountCents, string Description);
 public sealed record MercadoPagoPaymentView(Guid PaymentIntentId, string ProviderOrderId, string ExternalReference, long AmountCents, string Status, string StatusDetail, string? QrData, DateTimeOffset UpdatedAt)
 {
+    public bool Paid => Status.Equals("processed", StringComparison.OrdinalIgnoreCase) &&
+        (StatusDetail.Equals("processed", StringComparison.OrdinalIgnoreCase) || StatusDetail.Equals("accredited", StringComparison.OrdinalIgnoreCase));
+    public bool Terminal => Paid || Status.Equals("canceled", StringComparison.OrdinalIgnoreCase) ||
+        Status.Equals("refunded", StringComparison.OrdinalIgnoreCase) || Status.Equals("expired", StringComparison.OrdinalIgnoreCase) ||
+        Status.Equals("failed", StringComparison.OrdinalIgnoreCase);
     public static MercadoPagoPaymentView From(CloudPaymentOrder value) => new(value.Id, value.ProviderOrderId ?? "", value.ExternalReference, value.AmountCents, value.Status, value.StatusDetail, value.QrData, value.UpdatedAt);
 }
 
