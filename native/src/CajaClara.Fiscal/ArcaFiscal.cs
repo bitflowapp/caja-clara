@@ -316,19 +316,34 @@ public sealed class ArcaFiscalAuthorizationProvider(HttpClient http, TimeProvide
 {
     private readonly ArcaWsaaClient wsaa = new(http, clock);
     private readonly ArcaWsfeClient wsfe = new(http);
+    private readonly TimeProvider time = clock ?? TimeProvider.System;
     private ArcaAccessTicket? cached;
     private string? cachedCertificate;
     private ArcaEnvironment? cachedEnvironment;
 
     public async Task<ArcaAuthorization> AuthorizeAsync(ArcaSettings settings, X509Certificate2 certificate, ArcaInvoiceRequest invoice, CancellationToken cancellationToken = default)
     {
-        var now = (clock ?? TimeProvider.System).GetUtcNow();
-        if (cached is null || cached.ExpiresAt <= now.AddMinutes(5) || cachedCertificate != certificate.Thumbprint || cachedEnvironment != settings.Environment)
+        var ticket = await TicketAsync(settings, certificate, cancellationToken);
+        return await wsfe.AuthorizeAsync(settings, ticket, invoice, cancellationToken);
+    }
+
+    public async Task<ArcaAuthorization?> ConsultAsync(ArcaSettings settings, X509Certificate2 certificate, int voucherType, long number, CancellationToken cancellationToken = default)
+    {
+        if (voucherType <= 0 || number <= 0) throw new BusinessException("Comprobante fiscal a consultar inválido.");
+        var ticket = await TicketAsync(settings, certificate, cancellationToken);
+        return await wsfe.ConsultAsync(settings, ticket, voucherType, number, cancellationToken);
+    }
+
+    private async Task<ArcaAccessTicket> TicketAsync(ArcaSettings settings, X509Certificate2 certificate, CancellationToken cancellationToken)
+    {
+        var now = time.GetUtcNow();
+        if (cached is null || cached.ExpiresAt <= now.AddMinutes(5) ||
+            cachedCertificate != certificate.Thumbprint || cachedEnvironment != settings.Environment)
         {
             cached = await wsaa.LoginAsync(settings, certificate, cancellationToken);
             cachedCertificate = certificate.Thumbprint;
             cachedEnvironment = settings.Environment;
         }
-        return await wsfe.AuthorizeAsync(settings, cached, invoice, cancellationToken);
+        return cached;
     }
 }
